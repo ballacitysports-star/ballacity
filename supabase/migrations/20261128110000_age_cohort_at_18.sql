@@ -14,7 +14,10 @@
 --      those). Never 'unknown', never 'child_under_13', never downward, never the 13 or 16 thresholds.
 --   2. private_sec.age_adult_cohorts(cap): a separate, idempotent, capped daily sweep (pg_cron when it exists; by hand
 --      otherwise: SELECT private_sec.age_adult_cohorts();). One person at a time in one savepoint, so a failure leaves that
---      person exactly as they were (fail closed: still the stricter cohort) and the next run tries again. For each person:
+--      person exactly as they were (fail closed: still the stricter cohort). A person who fails is remembered in
+--      private_sec.age_cohort_attempts and goes to the back of the next run's queue, so a handful of stuck accounts can never
+--      starve everyone behind them (the daily result has 'failed' and 'failing_people': either above 0 needs a person to
+--      look). For each person:
 --        a. the stored privacy row is made explicit BEFORE the flip. The cohort decides two things when no row exists
 --           (the default profile visibility and require_follow_approval), so a missing row is created with the values
 --           the cohort gave. A stored row was already clamped to the minor floor by trigger and stays as it was.
@@ -28,23 +31,40 @@
 --        d. profiles.age_cohort and age_category become 'adult' (under openrun.age_sync, the same switch the birthday sync
 --           uses), an age_change_events row says so, and a profile that would read wider than before (visibility, follow
 --           approval) is put back, or the whole person is rolled back. Aging never widens.
---        e. the person is told once, in app, that their account now has adult settings and where to review privacy.
---   3. A person whose birthday is corrected so that they are a minor again is already recomputed downward: the birthday
+--        e. the person is told once, in app, what changed and where to review privacy (what is held, what is now open).
+--   3. THE READERS THE FLIP WOULD OTHERWISE WIDEN (this migration changes exactly four, and only for a person who has an
+--      open private_sec.age_cohort_flips row; for everyone else each one returns what it returned before):
+--        * comments and reactions that OTHER people wrote on the person's content. The two read policies on post_comments
+--          and post_reactions asked only "may this viewer comment on this owner's content", which is a cohort question, so
+--          the day the owner became an adult every comment a teammate or guardian had left on their games, posts and reels
+--          would have become readable to anyone, signed-out visitors included. They now ask private_sec.can_read_engagement:
+--          a comment or reaction written BEFORE the flip stays readable by the same people as before (the owner, a verified
+--          guardian, a teammate); one written after follows the adult rule. Nothing is lost, nothing is deleted.
+--        * profile_ages: the person's age. Until the person saves their Privacy settings it is shown to the same people as
+--          before (the person, a verified guardian, a moderator), not to every viewer of a members or public profile.
+--        * roster_row_visible: the person's roster row on a team. Until the same moment it keeps the rule of the cohort
+--          the person had (13-15: the person, a guardian, the team's managers; 16-17: signed-in members).
+--        The "same moment" is the person saving their own Privacy settings (trg_release_age_hold on privacy_preferences;
+--        the page saves the whole row on every change). It is the person's own act, so nothing the server does releases it.
+--   4. A person whose birthday is corrected so that they are a minor again is already recomputed downward: the birthday
 --      sync (sync_age_category_from_birthdays) lowers the cohort when the new one ranks lower, and trg_reclamp_privacy_on_
 --      cohort_change re-applies the minor floor to the stored row. This migration only records it (reverted_at) in the
---      audit table, so a later 18th birthday flips and tells them again.
+--      audit table, so a later 18th birthday flips and tells them again; with the row closed, the three held readers go
+--      back to plain cohort rules (the person is a minor again: the cohort rule is the stricter one).
 --
 -- WHAT THIS DELIBERATELY DOES NOT DO
 --   * No 13 or 16 threshold, nothing for under-13 (consent rules: legal territory, owner decision). A 19-year-old with a
 --     stale child_under_13 cohort is left as they are (stricter).
 --   * Nothing for managed accounts, nothing for an unknown birthday, nothing while age_review_required is set.
---   * No change to any reader function: the stored value is what moves.
---   * Reviews, rosters, host statistics and the age shown with an adult's profile are adult behaviour with no stored
---     setting to carry over; they are listed in the doc as open decisions.
+--   * No change to any other reader function: the stored value is what moves.
+--   * New comments and reactions: from the flip on, anyone may comment and react on the person's games, posts and reels, as
+--     on any adult's (the insert policies are unchanged). The notice says so. Reviews, host statistics and the rest of
+--     the adult behaviour with no stored setting are listed in the doc as open decisions.
 --   * The migration changes no row by itself. The first sweep runs from cron, or by hand.
 --
 -- Rollback: docs/rollbacks/20261128110000_age_cohort_at_18.down.sql (guarded). It cannot un-flip a cohort the sweep
 -- already moved, nor re-open the reels and posts it put aside; private_sec.age_cohort_flips lists them and is kept.
+-- It puts the four readers back as they were, which ends every hold: it asks for a second confirmation when flipped people exist.
 
 -- ============================================================ 1. the audit table
 CREATE TABLE IF NOT EXISTS private_sec.age_cohort_flips (
@@ -54,14 +74,27 @@ CREATE TABLE IF NOT EXISTS private_sec.age_cohort_flips (
   from_category           text,
   flipped_at              timestamptz NOT NULL DEFAULT now(),
   reverted_at             timestamptz,
+  hold_released_at        timestamptz,     -- set when the person saves their own Privacy settings (see section 3)
   privacy_row_added       boolean NOT NULL DEFAULT false,
   messages_tightened      boolean NOT NULL DEFAULT false,
   drafted_reel_ids        uuid[] NOT NULL DEFAULT '{}',
   paused_availability_ids uuid[] NOT NULL DEFAULT '{}'
 );
 CREATE INDEX IF NOT EXISTS age_cohort_flips_user_idx ON private_sec.age_cohort_flips (user_id);
+-- The readers below look a person up here on every roster row, age and comment they evaluate: only the open rows matter.
+CREATE INDEX IF NOT EXISTS age_cohort_flips_open_idx ON private_sec.age_cohort_flips (user_id) WHERE reverted_at IS NULL;
 ALTER TABLE private_sec.age_cohort_flips ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON private_sec.age_cohort_flips FROM PUBLIC, anon, authenticated, service_role;
+
+-- Who the sweep could not age, and when it last tried. The sweep serves people it has never failed on first, then the one
+-- it tried longest ago, so a stuck account never sits at the front of the queue. Ids only, no content.
+CREATE TABLE IF NOT EXISTS private_sec.age_cohort_attempts (
+  user_id        uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  failures       integer NOT NULL DEFAULT 1,
+  last_failed_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE private_sec.age_cohort_attempts ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON private_sec.age_cohort_attempts FROM PUBLIC, anon, authenticated, service_role;
 
 -- ============================================================ 2. the rule
 CREATE OR REPLACE FUNCTION private_sec.cohort_due_to_age(_user uuid)
@@ -85,6 +118,141 @@ AS $$
 $$;
 REVOKE ALL ON FUNCTION private_sec.cohort_due_to_age(uuid) FROM PUBLIC, anon, authenticated, service_role;
 
+
+-- ============================================================ 2b. what the flip must not widen
+-- The cohort a person had before the flip, while their age and roster row are still held. NULL when nothing is held: no
+-- open audit row, or the person has saved their Privacy settings since.
+CREATE OR REPLACE FUNCTION private_sec.age_hold_cohort(_user uuid)
+RETURNS text
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT f.from_cohort
+    FROM private_sec.age_cohort_flips f
+   WHERE f.user_id = _user AND f.reverted_at IS NULL AND f.hold_released_at IS NULL
+   ORDER BY f.id DESC
+   LIMIT 1;
+$$;
+REVOKE ALL ON FUNCTION private_sec.age_hold_cohort(uuid) FROM PUBLIC, anon, authenticated, service_role;
+
+-- The person saving their own Privacy settings releases the hold. Only their own save (auth.uid() is them): the sweep,
+-- support and the reclamp trigger run without it and never release anything.
+CREATE OR REPLACE FUNCTION private_sec.release_age_hold()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF auth.uid() IS NOT NULL AND auth.uid() = NEW.user_id THEN
+    UPDATE private_sec.age_cohort_flips SET hold_released_at = now()
+     WHERE user_id = NEW.user_id AND reverted_at IS NULL AND hold_released_at IS NULL;
+  END IF;
+  RETURN NULL;
+END $$;
+REVOKE ALL ON FUNCTION private_sec.release_age_hold() FROM PUBLIC, anon, authenticated, service_role;
+
+DROP TRIGGER IF EXISTS trg_release_age_hold ON public.privacy_preferences;
+CREATE TRIGGER trg_release_age_hold
+  AFTER INSERT OR UPDATE ON public.privacy_preferences
+  FOR EACH ROW EXECUTE FUNCTION private_sec.release_age_hold();
+
+-- Comments and reactions other people left on the owner's content. The old read rule (can_comment_on_minor_content) is a
+-- question about the owner's cohort alone: once the owner reads as an adult it answers yes for everybody, which would open
+-- every comment a teammate or guardian left while the owner was a teen. For an owner with an open flip, what was written
+-- before the flip stays readable by the people who could read it then; what is written after follows the adult rule.
+CREATE OR REPLACE FUNCTION private_sec.can_read_engagement(_viewer uuid, _owner uuid, _written_at timestamptz)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT private_sec.can_comment_on_minor_content(_viewer, _owner)
+     AND (
+       _owner IS NULL
+       OR NOT EXISTS (SELECT 1 FROM private_sec.age_cohort_flips f
+                       WHERE f.user_id = _owner AND f.reverted_at IS NULL AND _written_at < f.flipped_at)
+       OR (_viewer IS NOT NULL
+           AND (_viewer = _owner OR public.is_guardian_of(_viewer, _owner) OR public.shares_team(_viewer, _owner)))
+     );
+$$;
+REVOKE ALL ON FUNCTION private_sec.can_read_engagement(uuid, uuid, timestamptz) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private_sec.can_read_engagement(uuid, uuid, timestamptz) TO anon, authenticated, service_role;
+
+DROP POLICY IF EXISTS "Comments are readable by permitted viewers" ON public.post_comments;
+CREATE POLICY "Comments are readable by permitted viewers"
+ON public.post_comments FOR SELECT TO anon, authenticated
+USING (private_sec.can_read_engagement(
+  auth.uid(), private_sec.comment_subject_owner(subject_type, subject_id), created_at));
+
+DROP POLICY IF EXISTS "Reactions are readable by permitted viewers" ON public.post_reactions;
+CREATE POLICY "Reactions are readable by permitted viewers"
+ON public.post_reactions FOR SELECT TO anon, authenticated
+USING (private_sec.can_read_engagement(
+  auth.uid(), private_sec.comment_subject_owner(subject_type, subject_id), created_at));
+
+-- The person's age: unchanged except that an adult whose age is still held is read by the minor rule.
+CREATE OR REPLACE FUNCTION public.profile_ages(_ids uuid[])
+ RETURNS TABLE(id uuid, age integer)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  SELECT b.user_id,
+         date_part('year', age(b.birthday))::int
+  FROM public.profile_birthdays b
+  WHERE b.user_id = ANY(_ids)
+    AND b.birthday IS NOT NULL
+    AND public.profile_visibility_of(b.user_id) IN ('public','members')
+    -- 20261125100000: not for a profile a block or a suspension hides from the caller
+    AND (auth.uid() IS NULL OR NOT private_sec.profile_hidden_from_viewer(b.user_id))
+    AND (
+      -- an adult's age follows their visibility setting, as before; 20261128110000: not while the age of a person who just
+      -- aged to adult is held (until they save their Privacy settings), which is read as the minor's was
+      (public.age_cohort_of(b.user_id) = 'adult' AND private_sec.age_hold_cohort(b.user_id) IS NULL)
+      -- the server (service role, workers, migrations) has no auth.uid()
+      OR auth.uid() IS NULL
+      -- a minor's age: the minor, a verified guardian, or a moderator
+      OR b.user_id = auth.uid()
+      OR public.is_guardian_of(auth.uid(), b.user_id)
+      OR public.is_moderator(auth.uid())
+    );
+$function$;
+
+-- The roster row: unchanged except that a person whose row is still held keeps the rule of the cohort they had.
+CREATE OR REPLACE FUNCTION private_sec.roster_row_visible(_team_id text, _member_user_id uuid)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE cohort text; caller uuid;
+BEGIN
+  IF _member_user_id IS NULL THEN RETURN true; END IF;
+
+  cohort := public.age_cohort_of(_member_user_id);
+
+  IF cohort NOT IN ('child_under_13','teen_13_15','teen_16_17') THEN
+    -- 20261128110000: a person who just aged to adult keeps the cohort they had until they save their Privacy settings
+    cohort := private_sec.age_hold_cohort(_member_user_id);
+    IF cohort IS NULL OR cohort NOT IN ('child_under_13','teen_13_15','teen_16_17') THEN RETURN true; END IF;
+  END IF;
+
+  caller := auth.uid();
+
+  IF cohort = 'teen_16_17' AND caller IS NOT NULL THEN RETURN true; END IF;
+
+  IF caller IS NULL THEN RETURN false; END IF;
+  IF caller = _member_user_id THEN RETURN true; END IF;
+  IF public.is_guardian_of(caller, _member_user_id) THEN RETURN true; END IF;
+  IF public.is_team_manager(_team_id, caller) THEN RETURN true; END IF;
+
+  RETURN false;
+END $function$;
+
 -- ============================================================ 3. the sweep
 CREATE OR REPLACE FUNCTION private_sec.age_adult_cohorts(_limit integer DEFAULT 200)
 RETURNS jsonb
@@ -102,6 +270,7 @@ DECLARE
   _posts        integer := 0;
   _remaining    integer;
   _held         integer;
+  _failing      integer;
   _vis_before   text;
   _vis_after    text;
   _follow_before boolean;
@@ -114,11 +283,14 @@ DECLARE
   _body         text;
 BEGIN
   FOR r IN
+    -- Never-failed people first, then whoever it tried longest ago: a person who keeps failing goes to the back, so a
+    -- run's cap can never be used up by the same stuck accounts day after day.
     SELECT p.id, p.age_cohort, p.age_category
       FROM public.profiles p
+      LEFT JOIN private_sec.age_cohort_attempts a ON a.user_id = p.id
      WHERE p.age_cohort IN ('teen_13_15', 'teen_16_17')
        AND private_sec.cohort_due_to_age(p.id)
-     ORDER BY p.id
+     ORDER BY a.last_failed_at NULLS FIRST, p.id
      LIMIT _cap
        FOR UPDATE OF p SKIP LOCKED
   LOOP
@@ -188,17 +360,22 @@ BEGIN
         (user_id, from_cohort, from_category, privacy_row_added, messages_tightened, drafted_reel_ids, paused_availability_ids)
       VALUES (r.id, r.age_cohort, r.age_category, _row_added, _msg_tight, _reel_ids, _post_ids);
 
-      -- e. Told once, kindly, with nothing claimed beyond what changed.
-      _body := 'You are 18 or over, so your account now uses adult settings. Your privacy choices stay as they were until you change them.';
+      -- e. Told once, kindly, saying exactly what changed and what did not (nothing here claims "nothing changed").
+      _body := 'You are 18 or over, so your account now uses adult settings.';
       IF cardinality(_reel_ids) > 0 THEN
         _body := _body || ' Your earlier reels are saved as drafts: post the ones you want to share.';
       END IF;
       IF cardinality(_post_ids) > 0 THEN
         _body := _body || ' Your open availability posts are paused: resume the ones you want listed.';
       END IF;
-      _body := _body || ' You can review who sees your profile, reels and messages in Privacy settings.';
+      _body := _body || ' Your age and your team listing stay hidden from other people until you save your Privacy settings.'
+                     || ' From now on other people can comment and react on your games, posts and reels;'
+                     || ' what was said before stays as private as it was.'
+                     || ' You can review who sees your profile, reels and messages in Privacy settings.';
       INSERT INTO public.notifications (user_id, type, title, body, link)
       VALUES (r.id, 'age_review', 'Your account now has adult settings', _body, '/account/privacy');
+
+      DELETE FROM private_sec.age_cohort_attempts WHERE user_id = r.id;
 
       _flipped := _flipped + 1;
       _notified := _notified + 1;
@@ -208,7 +385,11 @@ BEGIN
       -- The savepoint undoes everything for this person: still the stricter cohort, still every setting as it was.
       PERFORM set_config('openrun.age_sync', 'off', true);
       _failed := _failed + 1;
-      RAISE WARNING 'age_adult_cohorts: one account not aged: %', SQLERRM;   -- never the id
+      -- Remember the failure (the handler runs after the savepoint was undone, so this row is kept) and go to the back.
+      INSERT INTO private_sec.age_cohort_attempts (user_id) VALUES (r.id)
+      ON CONFLICT (user_id) DO UPDATE SET failures = private_sec.age_cohort_attempts.failures + 1, last_failed_at = now();
+      -- The SQLSTATE only: the message text comes from whatever trigger failed and could carry a name or an id.
+      RAISE WARNING 'age_adult_cohorts: one account not aged (SQLSTATE %)', SQLSTATE;
     END;
   END LOOP;
 
@@ -221,12 +402,18 @@ BEGIN
      AND NOT private_sec.cohort_due_to_age(p.id)
      AND NOT EXISTS (SELECT 1 FROM public.managed_accounts m WHERE m.child_user_id = p.id);
 
-  RETURN jsonb_build_object('aged', _flipped, 'notified', _notified, 'failed', _failed, 'remaining', _remaining,
-                            'reels_drafted', _reels, 'posts_paused', _posts, 'adults_left_alone', _held);
+  -- People still failing (tried and not aged, still due). Above 0 for more than a day, someone has to look.
+  SELECT count(*)::int INTO _failing FROM private_sec.age_cohort_attempts a
+   WHERE EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = a.user_id AND p.age_cohort IN ('teen_13_15', 'teen_16_17')
+                    AND private_sec.cohort_due_to_age(p.id));
+
+  RETURN jsonb_build_object('aged', _flipped, 'notified', _notified, 'failed', _failed, 'failing_people', _failing,
+                            'remaining', _remaining, 'reels_drafted', _reels, 'posts_paused', _posts,
+                            'adults_left_alone', _held);
 END $$;
 REVOKE ALL ON FUNCTION private_sec.age_adult_cohorts(integer) FROM PUBLIC, anon, authenticated, service_role;
 COMMENT ON FUNCTION private_sec.age_adult_cohorts(integer) IS
-  'Moves a stored teen_13_15 / teen_16_17 cohort to adult for a known, unmanaged adult with no age review pending, keeping every stored privacy setting at least as private (privacy row made explicit, reels back to drafts, open availability posts paused), and tells them once. Idempotent, capped per run, one savepoint per person. Counts only. Never under-13, never the 13 or 16 thresholds, never downward. Called by the daily job; callable by hand by a person with database access, not by clients.';
+  'Moves a stored teen_13_15 / teen_16_17 cohort to adult for a known, unmanaged adult with no age review pending, keeping every stored privacy setting at least as private (privacy row made explicit, reels back to drafts, open availability posts paused), and tells them once. Idempotent, capped per run, one savepoint per person, people who fail go to the back of the queue. Counts only. Never under-13, never the 13 or 16 thresholds, never downward. Called by the daily job; callable by hand by a person with database access, not by clients.';
 
 DO $cron$
 BEGIN

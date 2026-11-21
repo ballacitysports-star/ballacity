@@ -13,6 +13,10 @@
 -- floor never clamped), turned (exactly 18 today, teen_16_17), leapday (born 29 Feb 2008, teen_16_17). Left alone: teen
 -- (16), dayb (17, the day before 18), leapyoung (14, born 29 Feb 2012), nobday (teen cohort, no birthday), mgd (19, managed),
 -- kid (19, child_under_13), held (19, an age review pending). broken (19, a reel the sweep cannot update) comes later.
+-- Engagement and exposure: teammates (host, a real 16-year-old) comment and react on stalec's reel, game and team post, and
+-- a stranger does not; stalea (13-15) sits on a roster. The flip must not open what was said, the person's age or the roster row.
+-- The 18th-birthday boundary (28 Feb / 1 March of a leap-day birthday) is covered by arithmetic on age() and calculate_age
+-- below: the rule itself reads the session date, which a test cannot move, so one person cannot be tested on both days.
 BEGIN;
 
 SELECT t.person('host', 40), t.person('stranger', 33), t.person('ordinary', 30),
@@ -69,6 +73,30 @@ SELECT t.member('squad', 'stalec'), t.member('squad', 'norow');
 INSERT INTO public.hosted_games (id, host_id, title, sport, date, location, max_players, price)
 VALUES ('gdm', t.id('host'), 'Run', 'Basketball', now() + interval '3 days', 'Gym', 10, 0);
 DELETE FROM public.notifications;
+-- Anything others said on stalec's content, and a 13-15 on a roster. Written a day before the flip (so before the sweep).
+SELECT t.person('tmate', 16);
+SELECT t.team('sq2', 'host');
+SELECT t.member('sq2', 'stalec'), t.member('sq2', 'tmate'), t.member('squad', 'stalea');
+INSERT INTO public.hosted_games (id, host_id, title, sport, date, location, max_players, price)
+VALUES ('gsc', t.id('stalec'), 'Their run', 'Basketball', now() + interval '3 days', 'Gym', 10, 0),
+       ('gord', t.id('ordinary'), 'Their run', 'Basketball', now() + interval '3 days', 'Gym', 10, 0);
+INSERT INTO public.team_posts (id, team_id, author_id, kind, title, body)
+VALUES (t.id('tp-c'), 'squad', t.id('stalec'), 'announcement', 'Hello', 'Hello');
+CREATE FUNCTION pg_temp.comment_on(_author text, _type text, _subject text, _at timestamptz) RETURNS void LANGUAGE sql AS $$
+  INSERT INTO public.post_comments (subject_type, subject_id, author_id, body, moderation_status, created_at)
+  VALUES (_type, _subject, t.id(_author), 'comment by ' || _author, 'approved', _at);
+  INSERT INTO public.post_reactions (subject_type, subject_id, user_id, emoji, created_at)
+  VALUES (_type, _subject, t.id(_author), '👍', _at);
+$$;
+SELECT pg_temp.comment_on('host', 'highlight_reel', t.id('reel-c1')::text, now() - interval '1 day'),
+       pg_temp.comment_on('tmate', 'highlight_reel', t.id('reel-c1')::text, now() - interval '1 day'),
+       pg_temp.comment_on('host', 'game', 'gsc', now() - interval '1 day'),
+       pg_temp.comment_on('tmate', 'game', 'gsc', now() - interval '1 day'),
+       pg_temp.comment_on('host', 'team_post', t.id('tp-c')::text, now() - interval '1 day'),
+       pg_temp.comment_on('stalec', 'game', 'gsc', now() - interval '1 day'),
+       pg_temp.comment_on('stranger', 'game', 'gord', now() - interval '1 day'),
+       pg_temp.comment_on('stranger', 'highlight_reel', t.id('reel-o1')::text, now() - interval '1 day');
+DELETE FROM public.notifications;
 
 -- Everything the cohort drives for a person, as one string (as the server would read it: no signed-in user).
 CREATE FUNCTION pg_temp.adultvec(h text) RETURNS text LANGUAGE plpgsql AS $$
@@ -80,7 +108,7 @@ BEGIN
     private_sec.review_subject_is_public('host', u::text), private_sec.game_payments_allowed(u),
     private_sec.telemetry_subject_is_adult(u), private_sec.regular_invitable(t.id('host'), u),
     private_sec.can_comment_on_minor_content(t.id('stranger'), u), private_sec.post_audiences_allowed(u)::text,
-    private_sec.roster_row_visible('squad', u), public.can_manage_followers(u, u),
+    public.can_manage_followers(u, u),
     public.minor_messaging_block(t.id('host'), u), public.minor_messaging_block(u, t.id('host')),
     public.public_xp_enabled(u), private_sec.guardian_switches_apply(u), private_sec.child_game_participation_allowed(u),
     public.parental_consent_required(public.age_cohort_of(u)), public.age_cohort_of(u) = 'adult');
@@ -184,6 +212,56 @@ SELECT t.eq(pg_temp.as_count('stranger', format('SELECT 1 FROM public.player_ava
 SELECT t.eq(pg_temp.as_count('stranger', format('SELECT 1 FROM public.player_availabilities WHERE user_id = %L', t.id('ordinary'))), 1, 'while an ordinary adult''s is');
 SELECT t.eq(private_sec.team_is_youth('squad'), true, 'before: the squad (two stale teens) is a youth team');
 
+-- What each kind of viewer reads of the others' comments and reactions on stalec's content, of stalec's and stalea's age
+-- and roster row, and of an ordinary adult's, before the sweep.
+CREATE FUNCTION pg_temp.eng(_who text) RETURNS text LANGUAGE plpgsql AS $$
+DECLARE r text;
+BEGIN
+  IF _who = 'anon' THEN PERFORM t.as_anon(); ELSE PERFORM t.as_user(t.id(_who)); END IF;
+  SELECT concat_ws(',',
+    (SELECT count(*) FROM public.post_comments WHERE subject_id IN (t.id('reel-c1')::text, 'gsc', t.id('tp-c')::text)),
+    (SELECT count(*) FROM public.post_reactions WHERE subject_id IN (t.id('reel-c1')::text, 'gsc', t.id('tp-c')::text)),
+    (SELECT count(*) FROM public.post_comments WHERE subject_id IN ('gord', t.id('reel-o1')::text)),
+    (SELECT count(*) FROM public.post_reactions WHERE subject_id IN ('gord', t.id('reel-o1')::text))) INTO r;
+  PERFORM t.reset();
+  RETURN r;
+END $$;
+CREATE FUNCTION pg_temp.age_seen(_who text, _of text) RETURNS int LANGUAGE plpgsql AS $$
+DECLARE n int;
+BEGIN
+  PERFORM t.as_user(t.id(_who));
+  n := (SELECT count(*) FROM public.profile_ages(ARRAY[t.id(_of)]));
+  PERFORM t.reset();
+  RETURN n;
+END $$;
+CREATE FUNCTION pg_temp.roster_seen(_who text, _of text) RETURNS int LANGUAGE plpgsql AS $$
+DECLARE n int;
+BEGIN
+  IF _who = 'anon' THEN PERFORM t.as_anon(); ELSE PERFORM t.as_user(t.id(_who)); END IF;
+  -- The row policy asks exactly this. A visitor cannot read team_members itself (no column grant on teams.moderator_hidden_at),
+  -- so the rule is read through the function the policy calls, and through the table for signed-in people.
+  n := (SELECT CASE WHEN private_sec.roster_row_visible('squad', t.id(_of)) THEN 1 ELSE 0 END);
+  IF _who <> 'anon' AND n = 1 THEN
+    IF (SELECT count(*) FROM public.team_members WHERE team_id = 'squad' AND user_id = t.id(_of)) <> 1 THEN n := -1; END IF;
+  END IF;
+  PERFORM t.reset();
+  RETURN n;
+END $$;
+CREATE TEMP TABLE before_eng AS SELECT w, pg_temp.eng(w) AS seen FROM unnest(ARRAY['anon', 'stranger', 'host', 'tmate', 'stalec', 'ordinary']) w;
+SELECT t.eq((SELECT seen FROM before_eng WHERE w = 'anon'), '0,0,2,2', 'before: a visitor reads none of the teammates'' words on stalec''s content, but the two comments and two reactions on adults'' content');
+SELECT t.eq((SELECT seen FROM before_eng WHERE w = 'stranger'), '0,0,2,2', 'before: nor does a stranger');
+SELECT t.eq((SELECT seen FROM before_eng WHERE w = 'host'), '6,6,2,2', 'before: a teammate (the host) reads all six comments and six reactions on it');
+SELECT t.eq((SELECT seen FROM before_eng WHERE w = 'tmate'), '6,6,2,2', 'before: the other teammate too');
+SELECT t.eq((SELECT seen FROM before_eng WHERE w = 'stalec'), '6,6,2,2', 'before: and stalec reads everything said on their own content');
+SELECT t.eq(pg_temp.age_seen('stranger', 'stalec'), 0, 'before: a stranger does not get stalec''s age');
+SELECT t.eq(pg_temp.age_seen('stalec', 'stalec'), 1, 'but stalec does');
+SELECT t.eq(pg_temp.age_seen('stranger', 'ordinary'), 1, 'while an ordinary adult''s age is shown by their profile visibility');
+SELECT t.eq(pg_temp.roster_seen('anon', 'stalea'), 0, 'before: a visitor does not see the 13-15 roster row');
+SELECT t.eq(pg_temp.roster_seen('stranger', 'stalea'), 0, 'nor does a stranger');
+SELECT t.eq(pg_temp.roster_seen('host', 'stalea'), 1, 'the team''s manager does');
+SELECT t.eq(pg_temp.roster_seen('anon', 'stalec'), 0, 'before: a visitor does not see the 16-17 roster row');
+SELECT t.eq(pg_temp.roster_seen('stranger', 'stalec'), 1, 'but a signed-in member does');
+
 -- ---- 4. the sweep ---------------------------------------------------------------------------------------------
 CREATE TEMP TABLE sweep1 AS SELECT private_sec.age_adult_cohorts(3) AS r;
 SELECT t.eq((SELECT (r ->> 'aged')::int FROM sweep1), 3, 'a cap of 3 ages 3');
@@ -226,6 +304,13 @@ SELECT t.eq((SELECT link FROM public.notifications WHERE user_id = t.id('stalec'
 SELECT t.ok((SELECT body FROM public.notifications WHERE user_id = t.id('stalec') AND type = 'age_review') LIKE '%saved as drafts%'
         AND (SELECT body FROM public.notifications WHERE user_id = t.id('stalec') AND type = 'age_review') LIKE '%paused%',
   'it says the reels are drafts and the open post is paused');
+SELECT t.ok((SELECT body FROM public.notifications WHERE user_id = t.id('stalec') AND type = 'age_review') LIKE '%age and your team listing stay hidden%'
+        AND (SELECT body FROM public.notifications WHERE user_id = t.id('stalec') AND type = 'age_review') LIKE '%comment and react%'
+        AND (SELECT body FROM public.notifications WHERE user_id = t.id('stalec') AND type = 'age_review') LIKE '%Privacy settings%',
+  'it says what is held (age, team listing), what is now open (comments and reactions) and where to review');
+SELECT t.ok(NOT EXISTS (SELECT 1 FROM public.notifications WHERE title = 'Your account now has adult settings'
+                         AND body ~* '(stay as they were|nothing changes|nothing has changed)'),
+  'and never claims that nothing changed');
 SELECT t.ok((SELECT body FROM public.notifications WHERE user_id = t.id('norow') AND type = 'age_review') NOT LIKE '%draft%'
         AND (SELECT body FROM public.notifications WHERE user_id = t.id('norow') AND type = 'age_review') NOT LIKE '%paused%',
   'and says nothing about reels or posts to someone who has none');
@@ -287,6 +372,49 @@ SELECT t.eq(pg_temp.as_count('stranger', format('SELECT 1 FROM public.profiles W
 SELECT t.eq(pg_temp.as_count('anon', format('SELECT 1 FROM public.profiles WHERE id = %L', t.id('stalec'))), 0, 'a visitor still does not');
 SELECT t.eq(pg_temp.as_count('anon', format('SELECT 1 FROM public.profiles WHERE id = %L', t.id('ordinary'))), 1, 'while an ordinary adult''s profile is public by their own setting');
 
+-- ---- 5b. what others said, the person's age and the roster row do not open by themselves --------------------------
+SELECT t.eq(pg_temp.eng(w), (SELECT seen FROM before_eng b WHERE b.w = x.w), 'comments and reactions read exactly as before the flip: ' || w)
+  FROM (SELECT w, w AS w2 FROM unnest(ARRAY['anon', 'stranger', 'host', 'tmate', 'stalec', 'ordinary']) w) x;
+SELECT t.eq(pg_temp.eng('anon'), '0,0,2,2', 'a visitor still reads none of what teammates (a 16-year-old among them) said on the flipped person''s reel, game and post');
+-- A comment written after the flip follows the adult rule, as on any adult's content.
+SELECT pg_temp.comment_on('ordinary', 'game', 'gsc', now() + interval '1 hour');
+SELECT t.eq(pg_temp.eng('anon'), '1,1,2,2', 'one written after the flip is readable by a visitor (the adult rule)');
+SELECT t.eq(pg_temp.eng('stranger'), '1,1,2,2', 'and by a stranger; the earlier ones stay closed');
+SELECT t.eq((SELECT count(*)::int FROM public.post_comments WHERE subject_id = 'gsc'), 4, 'nothing was deleted (3 earlier and 1 new on the game)');
+SELECT t.as_user(t.id('stranger'));
+SELECT t.lives('INSERT INTO public.post_comments (subject_type, subject_id, author_id, body) VALUES (''game'', ''gsc'', auth.uid(), ''hi'')', 'a stranger may now comment on their game (adult behaviour, said in the notice)');
+SELECT t.reset();
+-- The same rule with the audit row closed (a correction back to a minor) is the cohort rule again: tested in section 9.
+
+-- The age and the roster row stay held until the person saves their own Privacy settings.
+SELECT t.eq(pg_temp.age_seen('stranger', 'stalec'), 0, 'a stranger still does not get the flipped person''s age');
+SELECT t.eq(pg_temp.age_seen('host', 'stalec'), 0, 'nor a teammate who is an adult');
+SELECT t.eq(pg_temp.age_seen('stalec', 'stalec'), 1, 'but the person does');
+SELECT t.eq(pg_temp.age_seen('stranger', 'ordinary'), 1, 'an ordinary adult''s age is unchanged');
+SELECT t.eq(pg_temp.roster_seen('anon', 'stalea'), 0, 'a visitor does not see the flipped 13-15''s roster row');
+SELECT t.eq(pg_temp.roster_seen('stranger', 'stalea'), 0, 'nor a stranger');
+SELECT t.eq(pg_temp.roster_seen('host', 'stalea'), 1, 'the manager does');
+SELECT t.eq(pg_temp.roster_seen('stalea', 'stalea'), 1, 'and the person');
+SELECT t.eq(pg_temp.roster_seen('anon', 'stalec'), 0, 'a visitor does not see the flipped 16-17''s roster row');
+SELECT t.eq(pg_temp.roster_seen('stranger', 'stalec'), 1, 'a signed-in member does, as before');
+SELECT t.eq((SELECT count(*)::int FROM private_sec.age_cohort_flips WHERE hold_released_at IS NOT NULL), 0, 'no hold has been released by anything the server did');
+-- The server, support and another person never release it.
+SELECT t.as_service();
+UPDATE public.privacy_preferences SET marketing_emails = marketing_emails WHERE user_id = t.id('stalea');
+SELECT t.reset();
+SELECT t.eq((SELECT hold_released_at IS NULL FROM private_sec.age_cohort_flips WHERE user_id = t.id('stalea')), true, 'a service-role write to their row does not release it');
+SELECT t.eq(pg_temp.age_seen('stranger', 'stalea'), 0, 'so a stranger still does not get the age');
+-- The person saves their Privacy settings (the page upserts the whole row): that is their choice.
+SELECT t.as_user(t.id('stalea'));
+SELECT t.lives('UPDATE public.privacy_preferences SET marketing_emails = marketing_emails WHERE user_id = auth.uid()', 'stalea saves their Privacy settings');
+SELECT t.reset();
+SELECT t.eq((SELECT hold_released_at IS NOT NULL FROM private_sec.age_cohort_flips WHERE user_id = t.id('stalea')), true, 'the hold is released');
+SELECT t.eq(pg_temp.age_seen('stranger', 'stalea'), 1, 'their age now follows their profile visibility, like any adult''s');
+SELECT t.eq(pg_temp.roster_seen('anon', 'stalea'), 1, 'and their roster row is visible like any adult''s');
+SELECT t.eq(pg_temp.eng('anon'), '1,1,2,2', 'the earlier comments of others stay closed: that is not released by saving settings');
+SELECT t.eq((SELECT hold_released_at IS NULL FROM private_sec.age_cohort_flips WHERE user_id = t.id('stalec')), true, 'and nobody else''s hold moved');
+SELECT t.eq(pg_temp.age_seen('stranger', 'stalec'), 0, 'stalec''s age is still held');
+
 -- ---- 6. the flipped adult is read as an ordinary adult everywhere the cohort is read --------------------------------
 SELECT t.eq(pg_temp.adultvec(h), pg_temp.adultvec('ordinary'), 'the cohort readers agree with an ordinary adult: ' || h)
   FROM unnest(ARRAY['stalea', 'staleb', 'stalec', 'norow', 'legacy', 'turned', 'leapday']) h;
@@ -303,6 +431,8 @@ SELECT t.lives(format('UPDATE public.highlight_reels SET is_draft = false WHERE 
 SELECT t.lives(format('UPDATE public.player_availabilities SET status = ''open'' WHERE id = %L', t.id('post-c')), 'and resume their post with the existing switch');
 SELECT t.lives('UPDATE public.privacy_preferences SET profile_visibility = ''public'', require_follow_approval = false WHERE user_id = auth.uid()', 'and make their profile public');
 SELECT t.reset();
+SELECT t.eq((SELECT hold_released_at IS NOT NULL FROM private_sec.age_cohort_flips WHERE user_id = t.id('stalec')), true, 'saving their Privacy settings released the hold on their age and roster row');
+SELECT t.eq(pg_temp.age_seen('stranger', 'stalec'), 1, 'so their age follows their (now public) profile like any adult''s');
 SELECT t.eq(public.reel_audience(t.id('reel-c1')), 'public', 'the posted reel is public, as an adult''s is');
 SELECT t.eq(pg_temp.svc_reels('stalec', false), 1, 'and in the server''s public list');
 SELECT t.eq(public.reel_audience(t.id('reel-c2')), 'none', 'the other is still a draft');
@@ -354,6 +484,8 @@ SELECT t.eq(public.reel_audience(t.id('reel-c1')), 'members', 'the reel they pos
 SELECT t.eq((SELECT count(*)::int FROM public.age_change_events WHERE user_id = t.id('stalec') AND from_cohort = 'adult' AND to_cohort = 'teen_16_17' AND outcome = 'applied'), 1, 'the history says so');
 SELECT t.eq((SELECT reverted_at IS NOT NULL FROM private_sec.age_cohort_flips WHERE user_id = t.id('stalec')), true, 'and the audit row is closed');
 SELECT t.eq((private_sec.age_adult_cohorts() ->> 'aged')::int, 0, 'the sweep leaves a minor alone');
+SELECT t.eq(pg_temp.eng('anon'), '0,0,2,2', 'and what was said on their content is closed again by the cohort rule (a minor''s)');
+SELECT t.eq(pg_temp.age_seen('stranger', 'stalec'), 0, 'their age is the minor''s again: not given to a stranger');
 -- Corrected back to an adult birthday: the existing review rule keeps the stricter cohort until a moderator decides.
 SELECT pg_temp.correct('stalec', (current_date - interval '19 years')::date);
 SELECT t.eq((SELECT age_cohort FROM public.profiles WHERE id = t.id('stalec')), 'teen_16_17', 'corrected back to an adult age: the cohort stays stricter');
@@ -368,5 +500,57 @@ SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE user_id = t.id
 SELECT pg_temp.correct('turned', (current_date - interval '25 years')::date);
 SELECT t.eq((SELECT age_cohort FROM public.profiles WHERE id = t.id('turned')), 'adult', 'adult to another adult age: still adult');
 SELECT t.eq((SELECT reverted_at IS NULL FROM private_sec.age_cohort_flips WHERE user_id = t.id('turned')), true, 'and the flip stays open');
+-- A closed audit row holds nothing: corrected to a minor, then made an adult by a moderator (not by the sweep).
+SELECT t.eq(pg_temp.age_seen('stranger', 'turned'), 0, 'setup: turned''s age is held after the flip (still open)');
+SELECT pg_temp.correct('turned', (current_date - interval '16 years')::date);
+SELECT t.eq((SELECT reverted_at IS NOT NULL FROM private_sec.age_cohort_flips WHERE user_id = t.id('turned')), true, 'corrected to 16: the audit row is closed');
+SELECT set_config('openrun.age_sync', 'on', true);
+UPDATE public.profiles SET age_cohort = 'adult', age_category = 'adult' WHERE id = t.id('turned');
+SELECT set_config('openrun.age_sync', 'off', true);
+SELECT t.eq(pg_temp.age_seen('stranger', 'turned'), 1, 'an adult by a later decision is read as an ordinary adult: a closed audit row holds nothing');
+
+-- ---- 10. a person who keeps failing cannot hold up everyone behind them ------------------------------------------------
+-- hf1 and hf2 have a reel the sweep cannot update and ids BELOW the healthy person's: in id order they would sit at the front
+-- of a cap-1 run for ever. The healthy person's name is picked so that its id sorts after both.
+SELECT t.person('hfone', 19), t.person('hftwo', 19);
+DO $pick$
+DECLARE n int; hid uuid;
+BEGIN
+  SELECT x INTO n FROM generate_series(1, 400) x WHERE t.id('hg' || chr(96 + (x % 26) + 1) || chr(96 + ((x / 26) % 26) + 1)) > greatest(t.id('hfone'), t.id('hftwo')) LIMIT 1;
+  PERFORM t.person('hg' || chr(96 + (n % 26) + 1) || chr(96 + ((n / 26) % 26) + 1), 19);
+  CREATE TEMP TABLE hg_name AS SELECT 'hg' || chr(96 + (n % 26) + 1) || chr(96 + ((n / 26) % 26) + 1) AS h;
+END $pick$;
+ALTER TABLE public.highlight_reels DISABLE TRIGGER enforce_reel_media_ownership_trg;
+INSERT INTO public.highlight_reels (id, user_id, video_path, status, is_draft)
+VALUES (t.id('reel-hf1'), t.id('hfone'), 'elsewhere/1.mp4', 'completed', false),
+       (t.id('reel-hf2'), t.id('hftwo'), 'elsewhere/2.mp4', 'completed', false);
+ALTER TABLE public.highlight_reels ENABLE TRIGGER enforce_reel_media_ownership_trg;
+SELECT pg_temp.stale('hfone', 'teen_16_17'), pg_temp.stale('hftwo', 'teen_16_17'), pg_temp.stale((SELECT h FROM hg_name), 'teen_16_17');
+SELECT t.ok(t.id('hfone') < t.id((SELECT h FROM hg_name)) AND t.id('hftwo') < t.id((SELECT h FROM hg_name)), 'setup: both failing people sort before the healthy one');
+CREATE TEMP TABLE run1 AS SELECT private_sec.age_adult_cohorts(1) AS r;
+SELECT t.eq((SELECT (r ->> 'failed')::int FROM run1), 1, 'cap 1, first run: the first stuck person fails');
+CREATE TEMP TABLE run2 AS SELECT private_sec.age_adult_cohorts(1) AS r;
+SELECT t.eq((SELECT (r ->> 'failed')::int FROM run2), 1, 'second run: the other stuck person fails (the first went to the back)');
+CREATE TEMP TABLE run3 AS SELECT private_sec.age_adult_cohorts(1) AS r;
+SELECT t.eq((SELECT (r ->> 'aged')::int FROM run3), 1, 'third run: the healthy person ages although two stuck people have lower ids');
+SELECT t.eq((SELECT age_cohort FROM public.profiles WHERE id = t.id((SELECT h FROM hg_name))), 'adult', 'and is an adult');
+SELECT t.eq((SELECT (r ->> 'failing_people')::int FROM run3), 2, 'the result says two people are still failing (so a person is told to look)');
+SELECT t.eq((SELECT count(*)::int FROM private_sec.age_cohort_attempts WHERE failures = 1), 2, 'each failed once');
+CREATE TEMP TABLE run4 AS SELECT private_sec.age_adult_cohorts(2) AS r;
+SELECT t.eq((SELECT (r ->> 'failed')::int FROM run4), 2, 'both are tried again');
+SELECT t.eq((SELECT count(*)::int FROM private_sec.age_cohort_attempts WHERE failures = 2), 2, 'and counted');
+SELECT t.eq((SELECT age_cohort FROM public.profiles WHERE id = t.id('hfone')), 'teen_16_17', 'they stay on the stricter cohort');
+ALTER TABLE public.highlight_reels DISABLE TRIGGER enforce_reel_media_ownership_trg;
+UPDATE public.highlight_reels SET video_path = t.id('hfone')::text || '/1.mp4' WHERE id = t.id('reel-hf1');
+UPDATE public.highlight_reels SET video_path = t.id('hftwo')::text || '/2.mp4' WHERE id = t.id('reel-hf2');
+ALTER TABLE public.highlight_reels ENABLE TRIGGER enforce_reel_media_ownership_trg;
+SELECT t.eq((private_sec.age_adult_cohorts() ->> 'aged')::int, 2, 'once their rows are put right both age');
+SELECT t.eq((SELECT count(*)::int FROM private_sec.age_cohort_attempts), 0, 'and the failure list is empty');
+SELECT t.ok((SELECT prosrc FROM pg_proc WHERE oid = 'private_sec.age_adult_cohorts(integer)'::regprocedure) NOT LIKE '%SQLERRM%',
+  'the failure warning logs the SQLSTATE and never the message text of whatever trigger failed');
+SELECT t.ok(NOT has_table_privilege(r, 'private_sec.age_cohort_attempts', 'SELECT'), 'the failure list is closed to ' || r)
+  FROM unnest(ARRAY['anon', 'authenticated', 'service_role']) r;
+SELECT t.ok(NOT has_function_privilege(r, 'private_sec.age_hold_cohort(uuid)', 'EXECUTE'), 'the hold lookup is not callable by ' || r)
+  FROM unnest(ARRAY['anon', 'authenticated', 'service_role']) r;
 
 ROLLBACK;

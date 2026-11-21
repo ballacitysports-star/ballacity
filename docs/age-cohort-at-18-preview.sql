@@ -72,6 +72,17 @@ SELECT
     WHERE a.status = 'open' AND a.hidden_at IS NULL)                                  AS people_with_open_availability_posts_that_would_be_paused,
   (SELECT count(*) FROM public.player_availabilities a JOIN due d2 ON d2.id = a.user_id
     WHERE a.status = 'open' AND a.hidden_at IS NULL)                                  AS open_availability_posts_that_would_be_paused,
+  -- Held at the flip until the person saves their Privacy settings: their exact age and their roster row (every aged person).
+  count(*)                                                                           AS people_whose_age_and_roster_row_would_be_held,
+  count(*) FILTER (WHERE pp.profile_visibility IN ('public', 'members'))              AS of_them_with_a_visible_profile,
+  (SELECT count(*) FROM public.team_members tm JOIN due d2 ON d2.id = tm.user_id)    AS roster_rows_that_would_be_held,
+  -- What other people wrote on their content (games they host, team posts they wrote, their reels) stays closed as it was.
+  (SELECT count(*) FROM public.post_comments c
+     JOIN due d2 ON d2.id = CASE c.subject_type
+            WHEN 'game' THEN (SELECT g.host_id FROM public.hosted_games g WHERE g.id = c.subject_id)
+            WHEN 'team_post' THEN (SELECT tp.author_id FROM public.team_posts tp WHERE tp.id::text = c.subject_id)
+            WHEN 'highlight_reel' THEN (SELECT r.user_id FROM public.highlight_reels r WHERE r.id::text = c.subject_id) END
+    WHERE c.author_id <> d2.id)                                                       AS comments_by_others_that_would_stay_closed,
   -- Families: how many of them still have an active guardian link row (the guardian sweep ends those separately).
   count(*) FILTER (WHERE EXISTS (SELECT 1 FROM public.guardian_links gl WHERE gl.child_user_id = d.id AND gl.status = 'active'))
                                                                                     AS with_an_active_guardian_link_row
