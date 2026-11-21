@@ -8,6 +8,7 @@ import {
   isMissingFunctionError,
   looksLikeEmail,
   parseManagedHandovers,
+  safeHandoverName,
 } from "@/lib/managed-handover";
 import { USER_ERROR_MESSAGES } from "@/lib/user-error";
 
@@ -107,5 +108,30 @@ describe("small helpers", () => {
     expect(firstNameOf("Jake")).toBe("Jake");
     expect(handoverPath("abc")).toBe("/handover/abc");
     expect(HANDOVER_DAYS).toBe(7);
+  });
+});
+
+describe("safeHandoverName", () => {
+  it("keeps plain names in any script, with an apostrophe, a hyphen or a closing period", () => {
+    expect(safeHandoverName("Jake S.")).toBe("Jake S.");
+    expect(safeHandoverName("Mary-Jane O'Neil")).toBe("Mary-Jane O'Neil");
+    expect(safeHandoverName("José Müller")).toBe("José Müller");
+    expect(safeHandoverName("李小龍")).toBe("李小龍");
+  });
+
+  it("removes links, digits, markup and contact details, and reads a name with no letters as none", () => {
+    expect(safeHandoverName("Click http://evil.example/pay")).toBe("Click httpevilexamplepay");
+    expect(safeHandoverName("Pat <script>x</script>")).toBe("Pat scriptxscript");
+    expect(safeHandoverName("call 555-0100")).toBe("call");
+    expect(safeHandoverName("555 0100")).toBeUndefined();
+    expect(safeHandoverName("a@b.co")).toBe("abco");
+    expect(safeHandoverName("")).toBeUndefined();
+    expect(safeHandoverName(null)).toBeUndefined();
+    expect(safeHandoverName(42)).toBeUndefined();
+  });
+
+  it("caps the length and normalises spaces", () => {
+    expect(safeHandoverName("a".repeat(100))).toHaveLength(40);
+    expect(safeHandoverName("  Jake    S  ")).toBe("Jake S");
   });
 });

@@ -15,6 +15,11 @@ const h = vi.hoisted(() => ({
   sent: [] as { template: string; to: string; opts: SendOpts }[],
   sendResult: { sent: true } as { sent: boolean },
   sendThrows: null as unknown,
+  reconciled: [] as string[],
+  names: [
+    { id: "guardian", display_name: "Alex Smith" },
+    { id: "11111111-1111-4111-8111-111111111111", display_name: "Jake S." },
+  ] as { id: string; display_name: string | null }[],
 }));
 
 vi.mock("@tanstack/react-start", () => ({
@@ -41,12 +46,7 @@ vi.mock("@tanstack/react-start", () => ({
                 },
                 from: () => ({
                   select: () => ({
-                    in: async () => ({
-                      data: [
-                        { id: "guardian", display_name: "Alex Smith" },
-                        { id: "11111111-1111-4111-8111-111111111111", display_name: "Jake S." },
-                      ],
-                    }),
+                    in: async () => ({ data: h.names }),
                   }),
                 }),
               },
@@ -76,6 +76,16 @@ vi.mock("@/lib/email-templates/send-email", () => ({
   },
 }));
 
+// The repair of a half-done sign-in record is the server module's own business (its tests are in managed-handover.server.test.ts):
+// here it is enough to see that it is asked, for this account, after the database agreed.
+vi.mock("@/lib/managed-handover.server", async (orig) => ({
+  ...(await orig<typeof import("./managed-handover.server")>()),
+  reconcileManagedRecord: async (childUserId: string) => {
+    h.reconciled.push(childUserId);
+    return "ok";
+  },
+}));
+
 const { cancelManagedHandover, startManagedHandover } =
   await import("./managed-handover.functions");
 
@@ -95,6 +105,11 @@ beforeEach(() => {
   h.sent.length = 0;
   h.sendResult = { sent: true };
   h.sendThrows = null;
+  h.reconciled.length = 0;
+  h.names = [
+    { id: "guardian", display_name: "Alex Smith" },
+    { id: "11111111-1111-4111-8111-111111111111", display_name: "Jake S." },
+  ];
   h.claims = {};
   h.rpcResult = {
     start_managed_handover: {
@@ -139,6 +154,23 @@ describe("startManagedHandover", () => {
       expiresDays: 7,
     });
     expect(mail.opts.idempotencyKey).toMatch(/^managed-handover-[0-9a-f]{64}$/);
+    // The sign-in record is made to agree with the database before the adult can follow the link.
+    expect(h.reconciled).toEqual([CHILD]);
+  });
+
+  it("puts only plain names in the email: a display name with a link, numbers or markup never reaches it", async () => {
+    h.names = [
+      { id: "guardian", display_name: "Click http://evil.example/pay now" },
+      { id: CHILD, display_name: "Jake <b>S</b> 555-0100 a@b.co" },
+    ];
+    await start();
+    const data = h.sent[0]!.opts.templateData as { guardianName?: string; accountName?: string };
+    expect(data.guardianName).toBe("Click");
+    expect(data.accountName).toBe("Jake bSb abco");
+    for (const v of [data.guardianName, data.accountName]) {
+      expect(v ?? "").not.toMatch(/[/:@<>0-9]/);
+      expect((v ?? "").length).toBeLessThanOrEqual(40);
+    }
   });
 
   it("sends nothing when the database refuses, and says why in words", async () => {
@@ -166,6 +198,7 @@ describe("startManagedHandover", () => {
     }
     expect(h.sent).toEqual([]);
     expect(h.rpc.every((c) => c.name === "start_managed_handover")).toBe(true);
+    expect(h.reconciled).toEqual([]);
   });
 
   it("is 'not available' while the migration is missing, and sends nothing", async () => {
@@ -191,6 +224,7 @@ describe("startManagedHandover", () => {
     await expect(start()).rejects.toThrow(/couldn't send the email, so nothing was changed/);
     expect(h.rpc.map((c) => c.name)).toEqual(["start_managed_handover", "cancel_managed_handover"]);
     expect(h.rpc[1]!.args).toEqual({ _child: CHILD });
+    expect(h.rpc.map((c) => c.name)).not.toContain("managed_handover_state");
   });
 
   it("does the same when the address is suppressed (the email service answers 'not sent')", async () => {
@@ -219,16 +253,20 @@ describe("cancelManagedHandover", () => {
   it("cancels through the database as the guardian", async () => {
     expect(await cancel()).toEqual({ cancelled: true });
     expect(h.rpc).toEqual([{ name: "cancel_managed_handover", args: { _child: CHILD } }]);
+    // A cancel after a half-finished attempt puts the sign-in record back so the guardian can switch in again.
+    expect(h.reconciled).toEqual([CHILD]);
   });
 
   it("reads 'nothing pending' as not cancelled, and refusals as words", async () => {
     h.rpcResult.cancel_managed_handover = { data: false, error: null };
     expect(await cancel()).toEqual({ cancelled: false });
+    h.reconciled.length = 0;
     h.rpcResult.cancel_managed_handover = {
       data: null,
       error: { message: "HANDOVER_BUSY: the handover is being finished right now.", code: "P0001" },
     };
     await expect(cancel()).rejects.toThrow(/being finished right now/);
+    expect(h.reconciled).toEqual([]);
     h.rpcResult.cancel_managed_handover = {
       data: null,
       error: { code: "PGRST202", message: "missing" },

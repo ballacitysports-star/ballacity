@@ -5,20 +5,34 @@
  * role) does, in this order, and stops at the first thing that fails:
  *
  *   1. claim_managed_handover   one finisher at a time, and the guardian cannot cancel under it.
- *   2. read the sign-in record  it must still be the managed placeholder of the guardian the database names.
- *   3. update the sign-in record  the adult's address, confirmed, and no longer marked managed (Admin API).
+ *   2. read the sign-in record  it must be the managed placeholder of the guardian the database names, or the half-done
+ *                               record an earlier attempt of this same handover left (the adult's address, not managed).
+ *   3. update the sign-in record  the adult's address, confirmed, no longer marked managed, and a random password nobody
+ *                               knows (Admin API). The throwaway password is never stored, logged or returned.
  *   4. finish_managed_handover  the database re-checks everything, removes the managed row, revokes sessions and device
- *                               pairings, ends the guardian link, tells both sides once, closes the handover. One
- *                               transaction, or nothing.
+ *                               pairings, replaces every credential a guardian could have planted, ends the guardian
+ *                               link, tells both sides once, closes the handover. One transaction, or nothing.
  *   5. a one-time sign-in link  so the adult sets their password in the browser (the password never reaches this server).
  *
- * Fail closed: if step 3 or 4 fails, step 3 is put back (placeholder address, marked managed again) and the claim is
- * released, so the account is managed and linked exactly as before. If step 5 fails the handover is already complete and
- * the adult signs in with "Forgot password" on their own address.
+ * Fail closed, decided from what the DATABASE says afterwards, never from the shape of the failure alone:
+ *   - step 3 fails: nothing was finished; the claim is released.
+ *   - step 4 fails: ask managed_handover_state. Row still there: the handover did not commit, so the sign-in record is put
+ *     back (placeholder address, managed again) and the claim released. Row gone: it DID commit (a lost answer, or a
+ *     second run that lost the race), so it is complete and step 5 goes on. State unreadable, or a transport error with
+ *     no database code: nothing is put back (it might have committed); the claim is left to run out and the next entry
+ *     point of the guardian (reconcileManagedRecord) repairs the record if the row is still there.
+ *   - the process dies, or the put-back itself fails: the record is half done, with the managed row and link intact.
+ *     reconcileManagedRecord (cancel, start, switch-in) puts the placeholder back; the adult can also retry the same link.
+ * If step 5 fails the handover is already complete and the adult signs in with "Forgot password" on their own address.
  */
 import { createHash } from "crypto";
 import { errorInsteadOf } from "@/lib/error-report";
-import { isManagedEmail, isManagedUser, managedByOf } from "@/lib/managed-children";
+import {
+  isManagedEmail,
+  isManagedUser,
+  managedByOf,
+  managedEmailFor,
+} from "@/lib/managed-children";
 import { handoverErrorMessage, isMissingFunctionError } from "@/lib/managed-handover";
 import { knownErrorMessage } from "@/lib/user-error";
 
@@ -100,19 +114,109 @@ async function report(error: unknown): Promise<void> {
 
 type AdminAuth = Awaited<ReturnType<typeof admin>>["auth"]["admin"];
 
-/** Step 3 undone. Best effort: if this too fails the handover stays pending and the adult can retry the same link. */
-async function putBack(
+/** 32 random bytes as hex, set as the account's password and then forgotten: no one can ever sign in with it. */
+function newThrowawayPassword(): string {
+  return newHandoverToken();
+}
+
+/** A fresh placeholder address, as the guardian-created account had (nothing on managed.invalid can receive mail). */
+function newPlaceholderEmail(): string {
+  return managedEmailFor(globalThis.crypto.randomUUID().replace(/-/g, ""));
+}
+
+/** Step 3 undone (or a half-done record repaired): a placeholder address and the managed flag, as a new account has. */
+async function restoreManagedRecord(
   auth: AdminAuth,
   childUserId: string,
   placeholder: string,
   managedBy: string,
-) {
+): Promise<boolean> {
   const { error } = await auth.updateUserById(childUserId, {
     email: placeholder,
     email_confirm: true,
     app_metadata: { managed: true, managed_by: managedBy },
   });
-  if (error) await report(error);
+  if (error) {
+    await report(error);
+    return false;
+  }
+  return true;
+}
+
+type HandoverState = {
+  managed: boolean;
+  managedBy: string | null;
+  pending: boolean;
+  claimLive: boolean;
+};
+
+/** What the database says about this account right now, or null when it cannot be read (never a guess). */
+async function readState(
+  db: Awaited<ReturnType<typeof admin>>,
+  childUserId: string,
+): Promise<HandoverState | null> {
+  try {
+    const { data, error } = (await db.rpc(
+      "managed_handover_state" as never,
+      { _child: childUserId } as never,
+    )) as RpcResult;
+    if (error || !data || typeof data !== "object") return null;
+    const r = data as Record<string, unknown>;
+    if (typeof r["managed"] !== "boolean") return null;
+    return {
+      managed: r["managed"],
+      managedBy: typeof r["managed_by"] === "string" ? (r["managed_by"] as string) : null,
+      pending: r["pending"] === true,
+      claimLive: r["claim_live"] === true,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export type ReconcileResult = "ok" | "repaired" | "busy" | "not_managed" | "unknown";
+
+/**
+ * Keep the sign-in record and the database in agreement for a MANAGED account: while the managed row exists, the sign-in
+ * record must be the managed placeholder of that guardian, or the guardian cannot switch in. A handover step that died
+ * half way (the adult's address set, the database never finished) leaves it otherwise; this puts it right.
+ *
+ * Only ever moves toward "managed": it does nothing when the managed row is gone (a finished handover), while somebody is
+ * finishing one right now (a live claim), or when the state cannot be read. It never throws. Callers (cancel, start,
+ * switch-in) have already checked that the signed-in person manages this account.
+ */
+export async function reconcileManagedRecord(childUserId: string): Promise<ReconcileResult> {
+  try {
+    const db = await admin();
+    const st = await readState(db, childUserId);
+    if (!st) return "unknown";
+    if (!st.managed || !st.managedBy) return "not_managed";
+    if (st.claimLive) return "busy";
+    const { data, error } = await db.auth.admin.getUserById(childUserId);
+    const user = data?.user;
+    if (error || !user) {
+      if (error) await report(error);
+      return "unknown";
+    }
+    if (isManagedUser(user) && managedByOf(user) === st.managedBy && isManagedEmail(user.email)) {
+      return "ok";
+    }
+    // Look once more right before writing: a handover that completed since the first read must not be undone.
+    const again = await readState(db, childUserId);
+    if (!again || !again.managed || again.claimLive)
+      return again?.managed === false ? "not_managed" : "busy";
+    return (await restoreManagedRecord(
+      db.auth.admin,
+      childUserId,
+      newPlaceholderEmail(),
+      st.managedBy,
+    ))
+      ? "repaired"
+      : "unknown";
+  } catch (e) {
+    await report(e);
+    return "unknown";
+  }
 }
 
 export type CompletedHandover = {
@@ -120,6 +224,11 @@ export type CompletedHandover = {
   recoveryTokenHash: string | null;
   childUserId: string;
 };
+
+/** A database-reported error (it ran and said no) carries a code; a lost connection does not. */
+function databaseAnswered(error: { code?: string } | null | undefined): boolean {
+  return typeof error?.code === "string" && error.code.length > 0;
+}
 
 export async function completeHandover(token: string): Promise<CompletedHandover> {
   const db = await admin();
@@ -146,27 +255,30 @@ export async function completeHandover(token: string): Promise<CompletedHandover
   const managedBy = String(c["managed_by"]);
   const email = String(c["email"]);
 
-  // 2. the sign-in record is still the managed placeholder of the guardian the database names
+  // 2. the sign-in record is the managed placeholder of the guardian the database names, or what an earlier attempt of
+  //    this same handover left behind (the adult's confirmed address, not managed): both are safe to continue from.
   const { data: found, error: readError } = await db.auth.admin.getUserById(childUserId);
   const user = found?.user;
-  if (
-    readError ||
-    !user ||
-    !isManagedUser(user) ||
-    managedByOf(user) !== managedBy ||
-    !isManagedEmail(user.email)
-  ) {
+  const isPlaceholderRecord =
+    !!user && isManagedUser(user) && managedByOf(user) === managedBy && isManagedEmail(user.email);
+  const isHalfDoneRecord =
+    !!user &&
+    !isManagedUser(user) &&
+    !!user.email_confirmed_at &&
+    (user.email ?? "").toLowerCase() === email.toLowerCase();
+  if (readError || !user || !(isPlaceholderRecord || isHalfDoneRecord)) {
     await release();
     throw readError
       ? errorInsteadOf(readError, say("HANDOVER_FAILED"))
       : new Error(say("HANDOVER_FAILED"));
   }
-  const placeholder = user.email as string;
+  const placeholder = isPlaceholderRecord ? (user.email as string) : newPlaceholderEmail();
 
-  // 3. the adult's confirmed address on the sign-in record, and no longer managed
+  // 3. the adult's confirmed address on the sign-in record, no longer managed, and a password nobody knows
   const { error: updateError } = await db.auth.admin.updateUserById(childUserId, {
     email,
     email_confirm: true,
+    password: newThrowawayPassword(),
     app_metadata: { managed: false, managed_by: null },
   });
   if (updateError) {
@@ -181,10 +293,25 @@ export async function completeHandover(token: string): Promise<CompletedHandover
   )) as RpcResult;
   const f = (finished.data ?? {}) as Record<string, unknown>;
   if (finished.error || f["ok"] !== true) {
-    await putBack(db.auth.admin, childUserId, placeholder, managedBy);
-    await release();
-    if (finished.error) throw failure(finished.error, "HANDOVER_FAILED");
-    throw new Error(say(f["code"]));
+    if (finished.error && !databaseAnswered(finished.error)) {
+      // The answer was lost: the transaction may or may not have committed. Put nothing back on a guess.
+      await report(finished.error);
+      throw new Error(say("HANDOVER_UNSURE"));
+    }
+    const truth = await readState(db, childUserId);
+    if (!truth) {
+      if (finished.error) await report(finished.error);
+      throw new Error(say("HANDOVER_UNSURE"));
+    }
+    if (truth.managed) {
+      // Not committed: the account is still managed and linked, so the sign-in record must say so too.
+      await restoreManagedRecord(db.auth.admin, childUserId, placeholder, managedBy);
+      await release();
+      if (finished.error) throw failure(finished.error, "HANDOVER_FAILED");
+      throw new Error(say(f["code"]));
+    }
+    // The managed row is gone: the handover completed (this run's answer was lost, or another run finished it first).
+    // Never put the record back; carry on to the sign-in link.
   }
 
   // 5. so the adult can choose a password without it ever touching this server

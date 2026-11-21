@@ -6,7 +6,9 @@
 -- and by the sweep), the claim and finish state machine (finish only after the adult's confirmed address is on the sign-in
 -- record; once only; never for someone who became a minor; every effect or none), what completion does (managed row gone, link
 -- ended, both sides told once, sessions and device pairing revoked, no address or token kept) and that the #452 rule and sweep
--- agree afterwards.
+-- agree afterwards, that completion REPLACES every credential a switched-in guardian could have planted (password, one-time
+-- tokens, extra identities, second factors, phone), the birthday boundary (exactly 18 today, one day short), the half-finished
+-- sign-in record the app repairs, and the state read the app uses to do it.
 --
 -- People: g (the managing guardian), g2 (a second guardian of the adult, not the manager), g3 (manages madb), mad (managed, 19),
 -- madb (managed, 20), mkid (managed, 15), mnob (managed, no birthday), str (a stranger), existing (an account that already
@@ -38,6 +40,24 @@ INSERT INTO auth.refresh_tokens (user_id, session_id, token, revoked)
 VALUES (t.id('mad')::text, t.id('sess-mad'), 'rt-mad', false), (t.id('pre')::text, t.id('sess-pre'), 'rt-pre', false);
 INSERT INTO public.managed_device_pairings (child_user_id, created_by, code_hash, status, expires_at)
 VALUES (t.id('mad'), t.id('g'), 'code-mad', 'linked', now() + interval '1 day');
+
+-- The stub auth schema is small. Give it the columns and tables a real one has that completion must clear (all of this is rolled
+-- back with the test; finish_managed_handover skips whatever the schema it runs on does not have).
+ALTER TABLE auth.users ADD COLUMN encrypted_password text, ADD COLUMN recovery_token text DEFAULT '',
+  ADD COLUMN email_change text DEFAULT '', ADD COLUMN phone_confirmed_at timestamptz;
+CREATE TABLE auth.one_time_tokens (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid, token_type text, token_hash text);
+CREATE TABLE auth.mfa_factors (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid, factor_type text);
+-- What a guardian could plant while switched in (nothing in the database stops it): a password, a pending email change, a
+-- phone number, a linked OAuth account, a magic link, a second factor. 'late' is never handed over: its copy must stay.
+UPDATE auth.users SET encrypted_password = 'planted-' || left(id::text, 8), recovery_token = 'rec-' || left(id::text, 8),
+       email_change = 'guardian@example.test', phone = '+1555000' || left(id::text, 4), phone_confirmed_at = now()
+ WHERE id IN (t.id('mad'), t.id('pre'), t.id('late'), t.id('madb'));
+INSERT INTO auth.identities (user_id, provider, provider_id, email)
+SELECT u.id, p.provider, p.provider || '-' || u.id::text, u.email FROM auth.users u, (VALUES ('google'), ('email')) p(provider)
+ WHERE u.id IN (t.id('mad'), t.id('late'));
+INSERT INTO auth.one_time_tokens (user_id, token_type, token_hash)
+SELECT id, 'recovery_token', 'ott-' || left(id::text, 8) FROM auth.users WHERE id IN (t.id('mad'), t.id('late'));
+INSERT INTO auth.mfa_factors (user_id, factor_type) SELECT id, 'totp' FROM auth.users WHERE id IN (t.id('mad'), t.id('late'));
 
 -- The audit log refuses updates; the test backdates rows to move past the daily limits (rolled back with everything else).
 ALTER TABLE public.family_audit_log DISABLE TRIGGER family_audit_log_no_update;
@@ -77,6 +97,15 @@ DECLARE r jsonb;
 BEGIN
   PERFORM t.as_service();
   EXECUTE format('SELECT public.%I($1)', _fn) INTO r USING pg_temp.th(_tok);
+  PERFORM t.reset();
+  RETURN r;
+END $$;
+-- What the app reads before it decides whether the sign-in record must be put back (service role).
+CREATE FUNCTION pg_temp.hstate(_child text) RETURNS jsonb LANGUAGE plpgsql AS $$
+DECLARE r jsonb;
+BEGIN
+  PERFORM t.as_service();
+  r := public.managed_handover_state(t.id(_child));
   PERFORM t.reset();
   RETURN r;
 END $$;
@@ -128,6 +157,10 @@ SELECT t.ok(has_function_privilege('service_role', 'public.finish_managed_handov
         AND has_function_privilege('service_role', 'public.managed_handover_lookup(text)', 'EXECUTE')
         AND has_function_privilege('service_role', 'public.release_managed_handover(text)', 'EXECUTE'),
   'the app''s server (service role) can');
+SELECT t.ok(has_function_privilege('service_role', 'public.managed_handover_state(uuid)', 'EXECUTE')
+        AND NOT has_function_privilege('authenticated', 'public.managed_handover_state(uuid)', 'EXECUTE')
+        AND NOT has_function_privilege('anon', 'public.managed_handover_state(uuid)', 'EXECUTE'),
+  'the state read is the app''s server only');
 SELECT t.ok(NOT has_function_privilege('authenticated', 'private_sec.expire_managed_handovers(uuid, integer)', 'EXECUTE')
         AND NOT has_function_privilege('service_role', 'private_sec.expire_managed_handovers(uuid, integer)', 'EXECUTE')
         AND NOT has_function_privilege('anon', 'private_sec.expire_managed_handovers(uuid, integer)', 'EXECUTE'),
@@ -140,6 +173,7 @@ SELECT t.ok(NOT EXISTS (SELECT 1 FROM pg_proc p, aclexplode(p.proacl) a
                                          'public.claim_managed_handover(text)'::regprocedure,
                                          'public.managed_handover_lookup(text)'::regprocedure,
                                          'public.release_managed_handover(text)'::regprocedure,
+                                         'public.managed_handover_state(uuid)'::regprocedure,
                                          'private_sec.expire_managed_handovers(uuid, integer)'::regprocedure)
                            AND a.grantee = 0),
   'none of the new functions is granted to PUBLIC');
@@ -151,6 +185,7 @@ SELECT t.ok((SELECT bool_and(p.prosecdef AND p.proconfig = ARRAY['search_path=""
                               'public.claim_managed_handover(text)'::regprocedure,
                               'public.managed_handover_lookup(text)'::regprocedure,
                               'public.release_managed_handover(text)'::regprocedure,
+                              'public.managed_handover_state(uuid)'::regprocedure,
                               'private_sec.expire_managed_handovers(uuid, integer)'::regprocedure)),
   'all SECURITY DEFINER with search_path pinned to nothing');
 SELECT t.ok((SELECT relrowsecurity FROM pg_class WHERE oid = 'private_sec.managed_handovers'::regclass)
@@ -228,6 +263,8 @@ SELECT t.eq((SELECT count(*)::int FROM public.family_audit_log WHERE action = 'm
   'every refused address (four of the guardian''s own, three that exist, one placeholder) is on the audit trail: reason only, never the address');
 SELECT t.ok(NOT EXISTS (SELECT 1 FROM public.family_audit_log WHERE context::text ILIKE '%existing@%' OR context::text ILIKE '%smith%'),
   'and no audit row holds an address');
+SELECT t.ok((SELECT bool_and(context = '{"reason": "refused"}'::jsonb) FROM public.family_audit_log WHERE action = 'managed.handover_refused'),
+  'the refusal rows say only "refused": the child and the linked guardians can read that table, so the finer reason (has an account / another handover waits / own mailbox) is not kept there');
 
 -- ---- 3. a started handover changes nothing about the account; only the managing guardian sees it ------------------------
 -- (the refused addresses above used up some of the guardian's attempts for the day: start the real one for a different guardian
@@ -347,12 +384,23 @@ UPDATE private_sec.managed_handovers SET expires_at = now() - interval '1 second
 SELECT t.eq(pg_temp.start('g', 'mad', 'adult@example.test', 'fresh2'), 'ok', 'a start passes an expired pending one without waiting for the sweep');
 SELECT t.eq((SELECT count(*)::int FROM private_sec.managed_handovers WHERE child_user_id = t.id('mad') AND status = 'pending'), 1, 'one pending');
 SELECT t.eq(pg_temp.cancel('g', 'mad'), 'true', 'setup: cancelled');
+-- An overdue handover of ANOTHER account does not keep its address reserved until the sweep: a start closes every overdue one.
+UPDATE public.family_audit_log SET created_at = now() - interval '25 hours' WHERE action = 'managed.handover_started';
+SELECT t.eq(pg_temp.start('g', 'late', 'shared@example.test', 'sh1'), 'ok', 'setup: another account of the guardian waits for an address');
+UPDATE private_sec.managed_handovers SET expires_at = now() - interval '1 second' WHERE status = 'pending';
+SELECT t.eq(pg_temp.start('g', 'mad', 'shared@example.test', 'sh2'), 'ok', 'the same address for another account works once the first is overdue, without waiting for the sweep');
+SELECT t.eq((SELECT status FROM private_sec.managed_handovers WHERE child_user_id = t.id('late') ORDER BY created_at DESC LIMIT 1), 'expired',
+  'the other account''s handover was closed as expired');
+SELECT t.eq(pg_temp.cancel('g', 'mad'), 'true', 'setup: cancelled');
 -- Being finished right now holds the sweep and the cancel off.
 UPDATE public.family_audit_log SET created_at = now() - interval '25 hours' WHERE action = 'managed.handover_started';
 SELECT t.eq(pg_temp.start('g', 'mad', 'adult@example.test', 'busy'), 'ok', 'setup: pending');
 SELECT t.eq(pg_temp.svc('claim_managed_handover', 'busy') ->> 'ok', 'true', 'the adult''s step claims it');
 SELECT t.eq(pg_temp.cancel('g', 'mad'), 'HANDOVER_BUSY', 'the guardian cannot cancel under it');
 SELECT t.eq(pg_temp.svc('claim_managed_handover', 'busy') ->> 'code', 'HANDOVER_BUSY', 'a second step is turned away');
+SELECT t.eq((SELECT count(*)::int FROM private_sec.managed_handovers WHERE status = 'pending' AND child_user_id = t.id('mad')), 1,
+  'and the refused cancel left it pending (the claim test is inside the UPDATE, not a check before it)');
+SELECT t.eq(pg_temp.hstate('mad') ->> 'claim_live', 'true', 'the state read says somebody is finishing it');
 UPDATE private_sec.managed_handovers SET expires_at = now() - interval '1 second' WHERE status = 'pending';
 SELECT t.eq(private_sec.expire_managed_handovers(), 0, 'and the sweep leaves it alone');
 SELECT t.as_service();
@@ -360,8 +408,15 @@ SELECT public.release_managed_handover(pg_temp.th('busy'));
 SELECT t.reset();
 SELECT t.ok((SELECT claimed_at IS NULL FROM private_sec.managed_handovers WHERE status = 'pending'), 'releasing gives it back');
 UPDATE private_sec.managed_handovers SET expires_at = now() + interval '1 day' WHERE status = 'pending';
-SELECT t.eq(pg_temp.cancel('g', 'mad'), 'true', 'setup: cancelled');
+-- A claim that ran out of time (the finisher died) no longer holds the cancel off.
+SELECT t.eq(pg_temp.svc('claim_managed_handover', 'busy') ->> 'ok', 'true', 'claimed again');
+UPDATE private_sec.managed_handovers SET claimed_at = now() - interval '3 minutes' WHERE status = 'pending';
+SELECT t.eq(pg_temp.hstate('mad') ->> 'claim_live', 'false', 'a claim older than two minutes is not live');
+SELECT t.eq(pg_temp.cancel('g', 'mad'), 'true', 'and the guardian can cancel it');
 SELECT t.eq(pg_temp.pending_of('g'), 0, 'nothing pending');
+SELECT t.ok((pg_temp.hstate('mad') ->> 'managed')::boolean AND NOT (pg_temp.hstate('mad') ->> 'pending')::boolean
+        AND pg_temp.hstate('mad') ->> 'managed_by' = t.id('g')::text, 'the state read: still managed by the guardian, nothing pending');
+SELECT t.eq(pg_temp.hstate('str')::text, '{"managed": false, "pending": false, "claim_live": false, "managed_by": null}', 'and for an account that is not managed');
 
 -- ---- 7. finish: only by completion -------------------------------------------------------------------------------------------
 UPDATE public.family_audit_log SET created_at = now() - interval '25 hours' WHERE action = 'managed.handover_started';
@@ -401,6 +456,11 @@ SELECT t.eq((SELECT count(*)::int FROM auth.sessions WHERE user_id = t.id('mad')
 SELECT t.eq((SELECT status FROM public.managed_device_pairings WHERE child_user_id = t.id('mad')), 'linked', 'nor the device pairing revoked');
 SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE type = 'guardian_link' AND title IN ('Account handed over', 'This account is yours')), 0,
   'nor anyone told');
+SELECT t.ok((SELECT encrypted_password LIKE 'planted-%' AND recovery_token LIKE 'rec-%' AND email_change <> '' AND phone IS NOT NULL FROM auth.users WHERE id = t.id('mad'))
+        AND (SELECT count(*) FROM auth.one_time_tokens WHERE user_id = t.id('mad')) = 1
+        AND (SELECT count(*) FROM auth.identities WHERE user_id = t.id('mad') AND provider = 'google') = 1
+        AND (SELECT count(*) FROM auth.mfa_factors WHERE user_id = t.id('mad')) = 1,
+  'nor any credential cleared (the clearing is inside the same transaction)');
 
 -- Before finishing: the person must still be a known adult. A support-approved correction that makes them a minor stops it.
 CREATE FUNCTION pg_temp.correct(_who text, _bd date) RETURNS void LANGUAGE plpgsql AS $$
@@ -413,6 +473,10 @@ END $$;
 SELECT pg_temp.correct('mad', (current_date - interval '16 years')::date);
 SELECT t.eq(pg_temp.svc('finish_managed_handover', 'fin') ->> 'code', 'HANDOVER_INVALID', 'corrected to 16 before the adult finished: refused');
 SELECT t.eq(pg_temp.state('mad'), '1|2|false|1', 'still managed and linked');
+SELECT t.ok((SELECT encrypted_password LIKE 'planted-%' FROM auth.users WHERE id = t.id('mad'))
+        AND (SELECT count(*) FROM auth.one_time_tokens WHERE user_id = t.id('mad')) = 1
+        AND (SELECT count(*) FROM auth.sessions WHERE user_id = t.id('mad')) = 1,
+  'and nothing was cleared');
 SELECT pg_temp.correct('mad', (current_date - interval '19 years')::date);
 SELECT t.eq(pg_temp.svc('finish_managed_handover', 'fin') ->> 'ok', 'true', 'back to 19: finish succeeds');
 
@@ -429,6 +493,21 @@ SELECT t.eq((SELECT count(*)::int FROM public.family_audit_log WHERE child_user_
 SELECT t.eq((SELECT count(*)::int FROM auth.sessions WHERE user_id = t.id('mad')), 0, 'every session is gone');
 SELECT t.eq((SELECT count(*)::int FROM auth.refresh_tokens WHERE user_id = t.id('mad')::text), 0, 'and every refresh token');
 SELECT t.eq((SELECT status FROM public.managed_device_pairings WHERE child_user_id = t.id('mad')), 'revoked', 'the paired device is revoked');
+-- Everything a switched-in guardian could have planted is gone: the guardian keeps no way in.
+SELECT t.ok((SELECT encrypted_password IS NOT NULL AND encrypted_password <> 'planted-' || left(id::text, 8) AND encrypted_password LIKE '$2%'
+               FROM auth.users WHERE id = t.id('mad')),
+  'a password set while switched in is replaced by a random one nobody knows (the adult sets theirs from the sign-in link)');
+SELECT t.eq((SELECT recovery_token || '|' || email_change FROM auth.users WHERE id = t.id('mad')), '|', 'a pending token and a pending email change are cleared');
+SELECT t.ok((SELECT phone IS NULL AND phone_confirmed_at IS NULL FROM auth.users WHERE id = t.id('mad')), 'a phone number added while switched in is gone');
+SELECT t.eq((SELECT count(*)::int FROM auth.one_time_tokens WHERE user_id = t.id('mad')), 0, 'every one-time token (a magic link the guardian made) is gone');
+SELECT t.eq((SELECT string_agg(provider, ',' ORDER BY provider) FROM auth.identities WHERE user_id = t.id('mad')), 'email', 'a linked OAuth account is gone; the email identity stays');
+SELECT t.eq((SELECT count(*)::int FROM auth.mfa_factors WHERE user_id = t.id('mad')), 0, 'and a second factor');
+SELECT t.ok((SELECT encrypted_password LIKE 'planted-%' AND recovery_token LIKE 'rec-%' AND phone IS NOT NULL FROM auth.users WHERE id = t.id('late'))
+        AND (SELECT count(*) FROM auth.one_time_tokens WHERE user_id = t.id('late')) = 1
+        AND (SELECT count(*) FROM auth.identities WHERE user_id = t.id('late')) = 2
+        AND (SELECT count(*) FROM auth.mfa_factors WHERE user_id = t.id('late')) = 1,
+  'another account''s credentials are untouched');
+SELECT t.eq(pg_temp.hstate('mad') ->> 'managed', 'false', 'the state read says the account is no longer managed');
 SELECT t.eq((SELECT count(*)::int FROM auth.sessions WHERE user_id = t.id('pre')), 1, 'another account''s sessions are untouched');
 SELECT t.eq((SELECT status || '|' || coalesce(email, 'no-email') || '|' || coalesce(token_hash, 'no-token') FROM private_sec.managed_handovers
               WHERE child_user_id = t.id('mad') AND status = 'completed'), 'completed|no-email|no-token', 'the handover keeps no address and no token');
@@ -511,5 +590,54 @@ SELECT t.eq(private_sec.handover_mailbox_key('Pat.Smith+x@Gmail.com'), 'patsmith
 SELECT t.eq(private_sec.handover_mailbox_key('pat.smith@googlemail.com'), 'patsmith@gmail.com', 'googlemail is gmail');
 SELECT t.eq(private_sec.handover_mailbox_key('Pat.Smith+x@example.test'), 'pat.smith@example.test', 'elsewhere: dots kept, +tag dropped');
 SELECT t.eq(private_sec.handover_mask_email('adult@example.test'), 'a***@example.test', 'the mask shows one letter');
+
+-- ---- 12. a half-finished attempt, and the birthday boundary ---------------------------------------------------------------------
+-- 'late' (managed, 19): the app put the adult's address on the sign-in record (its step 3) and then died before finish. The sign-in
+-- record says "not managed" with the adult's address while the managed row, the link and the pending handover remain.
+UPDATE public.family_audit_log SET created_at = now() - interval '25 hours' WHERE action IN ('managed.handover_started', 'managed.handover_refused');
+SELECT t.eq(pg_temp.start('g', 'late', 'half@example.test', 'h1'), 'ok', 'setup: a pending handover for the account that will be left half done');
+SELECT t.eq(pg_temp.svc('claim_managed_handover', 'h1') ->> 'ok', 'true', 'claimed');
+SELECT pg_temp.adult_signs_in_record('late', 'half@example.test');
+UPDATE private_sec.managed_handovers SET claimed_at = now() - interval '3 minutes' WHERE status = 'pending';
+SELECT t.eq(pg_temp.hstate('late') ->> 'claim_live', 'false', 'the claim ran out: the state read lets the app repair the sign-in record');
+SELECT t.eq(pg_temp.state('late'), '1|1|false|1', 'the database still has the managed row, the link and the pending handover');
+SELECT t.eq(pg_temp.cancel('g', 'late'), 'true', 'the guardian cancels (the app then puts the placeholder address and the managed flag back)');
+SELECT t.eq(pg_temp.hstate('late') ->> 'managed', 'true', 'the state read still says managed, which is what makes the app repair the record');
+-- The account's own current address is not "taken": a new start for the same address can go ahead without waiting for the repair.
+SELECT t.eq(pg_temp.start('g', 'late', 'half@example.test', 'h2'), 'ok', 'the address the earlier attempt left on the record is not refused as taken');
+SELECT t.eq(pg_temp.start('g', 'str', 'half@example.test', 'h3'), 'HANDOVER_NOT_ALLOWED', 'but nobody else can use that');
+-- A different account holding the address is still refused.
+UPDATE auth.users SET email = 'half@example.test' WHERE id = t.id('str');
+SELECT t.eq(pg_temp.start('g', 'pre', 'half@example.test', 'h4'), 'HANDOVER_NOT_ALLOWED', 'setup check: pre is not managed any more');
+UPDATE auth.users SET email = 'str@example.test' WHERE id = t.id('str');
+-- The retry: claim again, the record already carries the address (the app skips nothing: it does step 3 again), finish.
+SELECT t.eq(pg_temp.svc('claim_managed_handover', 'h2') ->> 'ok', 'true', 'the retry claims the handover');
+SELECT t.eq(pg_temp.svc('finish_managed_handover', 'h2') ->> 'ok', 'true', 'finish works on a record the earlier attempt already updated');
+SELECT t.eq(pg_temp.state('late'), '0|0|true|0', 'a plain account now');
+SELECT t.ok((SELECT encrypted_password LIKE '$2%' AND encrypted_password NOT LIKE 'planted-%' FROM auth.users WHERE id = t.id('late')), 'with its credentials replaced as well');
+
+-- Exactly 18 today is a known adult; one day short is not, at the start, the claim and the finish.
+SELECT t.person('bat', 30), t.person('bau', 30);
+SELECT pg_temp.correct('bat', (current_date - interval '18 years')::date);
+SELECT pg_temp.correct('bau', (current_date - interval '18 years' + interval '1 day')::date);
+UPDATE auth.users SET email = 'm' || replace(id::text, '-', '') || '@managed.invalid',
+       raw_app_meta_data = jsonb_build_object('managed', true, 'managed_by', t.id('g')) WHERE id IN (t.id('bat'), t.id('bau'));
+INSERT INTO public.managed_accounts (child_user_id, managed_by) VALUES (t.id('bat'), t.id('g')), (t.id('bau'), t.id('g'));
+SELECT t.guardian('g', 'bat'), t.guardian('g', 'bau');
+SELECT t.eq(private_sec.is_known_adult(t.id('bat')), true, 'setup: 18 today is a known adult');
+SELECT t.eq(private_sec.is_known_adult(t.id('bau')), false, 'setup: 18 tomorrow is not');
+SELECT t.eq(pg_temp.start('g', 'bau', 'bau@elsewhere.test', 'b1'), 'HANDOVER_NOT_ADULT', 'a person who turns 18 tomorrow: refused');
+SELECT t.eq(pg_temp.start('g', 'bat', 'bat@elsewhere.test', 'b2'), 'ok', 'a person who is 18 today: allowed');
+SELECT t.eq(pg_temp.svc('claim_managed_handover', 'b2') ->> 'ok', 'true', 'claimed');
+-- A support-approved correction between the claim and the finish makes them 17 years 364 days old.
+SELECT pg_temp.correct('bat', (current_date - interval '18 years' + interval '1 day')::date);
+SELECT pg_temp.adult_signs_in_record('bat', 'bat@elsewhere.test');
+SELECT t.eq(pg_temp.svc('finish_managed_handover', 'b2') ->> 'code', 'HANDOVER_INVALID', 'corrected to one day short of 18 between the claim and the finish: refused');
+SELECT t.eq(pg_temp.state('bat'), '1|1|false|1', 'nothing changed: still managed, linked, authority intact, handover pending');
+SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE user_id = t.id('bat') OR body LIKE 'Bat%'), 0, 'and nobody was told');
+SELECT t.eq(pg_temp.svc('managed_handover_lookup', 'b2') ->> 'code', 'HANDOVER_INVALID', 'the link page reads it as not valid');
+SELECT pg_temp.correct('bat', (current_date - interval '18 years')::date);
+UPDATE private_sec.managed_handovers SET claimed_at = now() WHERE status = 'pending' AND child_user_id = t.id('bat');
+SELECT t.eq(pg_temp.svc('finish_managed_handover', 'b2') ->> 'ok', 'true', 'back to exactly 18 today: finish works');
 
 ROLLBACK;

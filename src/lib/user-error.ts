@@ -186,6 +186,9 @@ export const USER_ERROR_MESSAGES = {
   HANDOVER_NOT_ADULT: "An account can be handed over once the person is 18 or over.",
   HANDOVER_NOT_ALLOWED: "Only the adult who manages this account can hand it over.",
   HANDOVER_UNAVAILABLE: "Handing over an account isn't available yet. Please try again later.",
+  // The outcome could not be confirmed (the database did not answer): nothing is put back until it can be read.
+  HANDOVER_UNSURE:
+    "That did not finish cleanly. Wait two minutes, then open the link again. If it still does not work, ask the person who started it to cancel and start again.",
   HOST_AS_SELF_ADULTS_ONLY:
     "Only adults can host a game without a team profile. Host it under your team instead.",
   ID_TAKEN: "A listing with that handle already exists.",

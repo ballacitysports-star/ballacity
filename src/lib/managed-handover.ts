@@ -93,6 +93,26 @@ export function handoverErrorCode(error: unknown): string | null {
   return isUserErrorCode(code) ? code : null;
 }
 
+/**
+ * A name fit to put in an email we send to an address a guardian typed: letters (any script), spaces, apostrophes and
+ * hyphens, and a period only when it ends a word ("Jake S."), at most 40 characters, nothing that can carry a link, a
+ * number or contact details. Anything else (or nothing
+ * left) reads as no name. The profile's display name is free text for an adult, so it is never trusted as it stands.
+ */
+export function safeHandoverName(raw: unknown, max = 40): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const cleaned = raw
+    .normalize("NFKC")
+    .replace(/[^\p{L}\p{M}' .-]/gu, "")
+    .replace(/\.(?=\S)/g, "")
+    .replace(/(?<!\p{L})-|-(?!\p{L})/gu, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max)
+    .trim();
+  return /\p{L}/u.test(cleaned) ? cleaned : undefined;
+}
+
 /** First name for the buttons ("Hand over Jake's account"). */
 export function firstNameOf(displayName: string): string {
   return displayName.split(/\s+/)[0] || displayName;

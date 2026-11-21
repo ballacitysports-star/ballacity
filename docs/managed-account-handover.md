@@ -15,15 +15,15 @@ managed and linked.
 | Piece                  | Where                                                                                                                                                                                                            |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Migration              | `supabase/migrations/20261128100000_managed_account_handover.sql`                                                                                                                                                |
-| SQL test               | `supabase/tests/991_managed_account_handover.test.sql` (206 assertions)                                                                                                                                          |
+| SQL test               | `supabase/tests/991_managed_account_handover.test.sql` (251 assertions)                                                                                                                                          |
 | Rollback               | `docs/rollbacks/20261128100000_managed_account_handover.down.sql` (guarded; rehearsed)                                                                                                                           |
 | Server (guardian)      | `src/lib/managed-handover.functions.ts` (`startManagedHandover`, `cancelManagedHandover`)                                                                                                                        |
 | Server (adult)         | `src/lib/managed-handover.server.ts` (claim, sign-in record, finish, one-time sign-in); `lookupManagedHandover`, `completeManagedHandover` in the functions file                                                 |
 | Shared words and rules | `src/lib/managed-handover.ts`; sentences in `src/lib/user-error.ts` (`HANDOVER_*`)                                                                                                                               |
-| Email                  | `src/lib/email-templates/managed-handover.tsx` (registered in `registry.ts`)                                                                                                                                     |
+| Email                  | `src/lib/email-templates/managed-handover.tsx` (registered in `registry.ts`; fixed subject, plain names only)                                                                                                                                     |
 | Parent Center          | `src/components/child/ManagedHandoverCard.tsx` (inside the child's panel in `src/routes/parent.index.tsx`), hooks in `src/lib/use-managed-handover.ts`                                                           |
 | The link page          | `src/routes/handover.$token.tsx` and `src/components/handover/HandoverClaim.tsx`; `/handover` is a public route (`root-gate.ts`)                                                                                 |
-| Tests                  | `managed-handover.test.ts`, `managed-handover.server.test.ts`, `managed-handover.functions.test.ts`, `ManagedHandoverCard.test.tsx`, `HandoverClaim.test.tsx`; `e2e/managed-handover.spec.ts` (written, not run) |
+| Tests                  | `managed-handover.test.ts`, `managed-handover.server.test.ts`, `email-templates/managed-handover.test.tsx`, `managed-handover.functions.test.ts`, `ManagedHandoverCard.test.tsx`, `HandoverClaim.test.tsx`; `e2e/managed-handover.spec.ts` (written, not run) |
 
 ## 1. How managed accounts work today (read from the code, not from the summary)
 
@@ -125,20 +125,52 @@ stops being managed (section 2, step 3).
 
 1. `claim_managed_handover`: re-checks everything, refuses an address that was taken since, and takes a two-minute claim so
    only one finisher runs and the guardian cannot cancel under it.
-2. Reads the sign-in record: it must still be the managed placeholder of the guardian the database names.
-3. Admin API: the adult's address, `email_confirm: true`, `app_metadata: { managed: false, managed_by: null }`.
+2. Reads the sign-in record. It must be either the managed placeholder of the guardian the database names, or the half-done
+   record an earlier attempt of this same handover left (the adult's confirmed address, not marked managed). Anything else
+   stops here, releases the claim and says so.
+3. Admin API: the adult's address, `email_confirm: true`, `app_metadata: { managed: false, managed_by: null }` and a
+   **random throwaway password** (32 random bytes, never stored, logged or returned). It replaces any password a switched-in
+   guardian may have set; the adult chooses theirs in step 5.
 4. `finish_managed_handover`: **refuses unless the sign-in record already shows the adult's confirmed address and no longer
    says managed**, then in one transaction: removes the `managed_accounts` row; revokes linked device pairings; deletes every
-   session and refresh token of the account (so a session the guardian opened while switched in dies); ends each active
-   guardian link as the 18 sweep does (its triggers write the family audit row and clear that guardian's approvals on
-   requests that are not yet a place; recorded in `guardian_link_age_events` so a support-approved birthday correction that
-   makes the person a minor again puts the links back); notifies both sides once; clears the address and token hash;
-   writes `managed.handover_completed`.
+   session and refresh token of the account (so a session the guardian opened while switched in dies); **replaces every
+   credential a guardian could have planted** (step 2b of the function: the stored password becomes a fresh random one, every
+   row in `auth.one_time_tokens` and every legacy token column is cleared, so a magic link the guardian made for themselves
+   stops working, a pending email or phone change is dropped, phone number, second factors and every identity that is not
+   `email`, such as a linked OAuth account, are removed; each step is skipped where the auth schema in use lacks the table or
+   column); ends each active guardian link as the 18 sweep does (its triggers write the family audit row and clear that
+   guardian's approvals on requests that are not yet a place; recorded in `guardian_link_age_events` so a support-approved
+   birthday correction that makes the person a minor again puts the links back); notifies both sides once; clears the address
+   and token hash; writes `managed.handover_completed`.
 5. Admin API `generateLink({ type: "recovery" })`: the one-time sign-in so the adult can choose a password in the browser.
 
-If step 3 or 4 fails, step 3 is put back (placeholder address, `managed: true` again, `managed_by` restored) and the claim is
-released: the account is managed and linked exactly as before, the handover is still pending and the same link can be
-retried. If only step 5 fails the handover is complete; the page tells the adult to sign in with their address and use
+**Why the database clears the credentials and not only the app.** Nothing server side stops a switched-in guardian from
+calling `updateUser({ password })` from the browser console (the app only redirects away from the security page, and the
+auth-email hook covers email changes, not passwords). So the design does not assume a managed account has no password: at
+completion the account keeps nothing the guardian could have put there, and a password the guardian set is replaced even if
+the adult stops before the password page.
+
+**What happens when something fails, decided from what the database says afterwards and never from the shape of the failure.**
+After a failed or doubtful step 4 the app asks `managed_handover_state` (service role only, no secrets: does the managed row
+exist, who manages it, is a handover pending, is a claim live):
+
+- step 3 fails: nothing was finished; the claim is released.
+- step 4 failed and the managed row is still there: the handover did not commit, so the sign-in record is put back (a fresh
+  placeholder address, `managed: true`, `managed_by` restored) and the claim is released. The handover stays pending.
+- step 4 failed or returned `HANDOVER_INVALID` and the managed row is **gone**: it did commit (the answer was lost, or a
+  second run lost the race to a first one), so the handover is complete: the record is never put back and step 5 goes on.
+- the answer was lost with no database code (a transport error) or the state cannot be read: nothing is put back on a guess;
+  the adult is told to wait two minutes and open the link again (`HANDOVER_UNSURE`). The claim runs out by itself.
+- the process dies, or the put-back itself fails, after step 3: the record is half done (the adult's address, not managed)
+  while the managed row, the guardian link and the pending handover remain. Three things repair it, in the order they
+  happen: (a) `reconcileManagedRecord`, run when the guardian cancels, starts again or switches in, puts the placeholder and the
+  managed flag back whenever the managed row exists and nobody is finishing it (it re-reads the state right before writing,
+  and never touches an account whose row is gone); (b) a new start for that same address is allowed, because the account's
+  own current address is not "taken by another account"; (c) the adult can open the same link again: step 2 accepts the
+  half-done record and goes on to finish. Cancel and expiry change only the handover row in the database (it cannot reach
+  the sign-in service), which is why the app runs (a) after a cancel and the guardian's next switch-in runs it too.
+
+If only step 5 fails the handover is complete; the page tells the adult to sign in with their address and use
 **Forgot password**, which works because the address is confirmed.
 
 ### 2b. Why this design, and where it differs from the recommended option
@@ -176,15 +208,16 @@ token hash; an ended row holds neither (table checks enforce it). No API grant, 
 | Only for a **known adult**: a minor and an unknown age are refused; `finish` and `claim` re-check, so a support-approved correction to a minor stops it                                                                                                                | all four                                                                    |
 | One pending handover per account; one waiting per address                                                                                                                                                                                                              | unique indexes                                                              |
 | The address must be plain and 254 characters or fewer, not a `@managed.invalid` placeholder, not an existing account (any case), not another pending handover's, and **not the guardian's own mailbox** (case, `+tag`, and Gmail dots and `googlemail.com` normalised) | `start_managed_handover`; `claim` re-checks "taken"                         |
-| 7 days to complete; expires lazily (every start, cancel and claim) and daily by sweep when `pg_cron` exists; the guardian is told once                                                                                                                                 | `expire_managed_handovers`                                                  |
-| Cancel by the guardian, not while the adult's step is running (the two-minute claim)                                                                                                                                                                                   | `cancel_managed_handover`                                                   |
+| 7 days to complete; expires lazily (every start closes every overdue handover, not only this account's, so an overdue one never keeps its address reserved; cancel and claim close this account's) and daily by sweep when `pg_cron` exists; the guardian is told once                                                                                                                                 | `expire_managed_handovers`                                                  |
+| Cancel by the guardian, not while the adult's step is running (the two-minute claim); the claim test is part of the `UPDATE` itself, so a claim that commits while the cancel waits cannot be cancelled underneath the adult                                                                                                                                                                                   | `cancel_managed_handover`                                                   |
 | Limits: 10 attempts per guardian per day (refused addresses count, so the address check can tell whether an address has an account at most ten times a day) and 3 starts per account per day                                                                           | `start_managed_handover`                                                    |
 | The token: 32 random bytes, only its SHA-256 is stored, unique, cleared when the handover ends; the page is `noindex`, `no-referrer`, never remembered as a return path                                                                                                | `managed-handover.server.ts`, route, `last-visited.ts`, `safe-next-path.ts` |
-| No client can start, finish, claim, release or look up by token; the app's server (service role) can                                                                                                                                                                   | grants (tested as `authenticated`, `anon`)                                  |
+| No client can start, finish, claim, release, look up by token or read the state; the app's server (service role) can                                                                                                                                                                   | grants (tested as `authenticated`, `anon`)                                  |
 | Nobody but the managing guardian reads a pending handover (masked address only)                                                                                                                                                                                        | `guardian_managed_handovers()`; table has no grant                          |
-| Audit: `managed.handover_started` (domain and a short hash of the address, never the address), `_refused` (reason only), `_cancelled`, `_expired`, `_completed`                                                                                                        | `family_audit_log`                                                          |
-| Fail closed: `finish` is one transaction (tested with a forced failure: nothing it did is kept); the app puts the sign-in record back if it fails                                                                                                                      | SQL and server                                                              |
+| Audit: `managed.handover_started` (domain and a short hash of the address, never the address), `_refused` (the single word "refused": the child and the linked guardians can read this table, so the finer reason is not kept there), `_cancelled`, `_expired`, `_completed`                                                                                                        | `family_audit_log`                                                          |
+| Fail closed: `finish` is one transaction (tested with a forced failure: nothing it did is kept); the app puts the sign-in record back only when the database says the managed row is still there, and a repair (`reconcileManagedRecord`) covers a step that died half way (section 2a)                                                                                                                      | SQL and server                                                              |
 | The app keeps working without the migration: `guardian_managed_handovers` missing reads as "no handover", start and cancel say "isn't available yet"                                                                                                                   | `use-managed-handover.ts`, functions                                        |
+| The email: a fixed subject and only plain names (letters, spaces, apostrophes, hyphens, 40 characters) in the body, so a guardian cannot put text of their choosing in mail sent under our name; at most 10 a day per guardian, 3 per account | `managed-handover.tsx`, `safeHandoverName` |
 | Neutral, kind wording; no legal claim (a test reads every handover sentence for law, legal, consent, custody)                                                                                                                                                          | copy, `managed-handover.test.ts`, SQL test                                  |
 
 What the guardian keeps after completion: nothing. The links end, the Parent Center, controls, audit and consent record
@@ -196,17 +229,24 @@ reads end through the existing #452 rule. `parental_consents`, `child_controls` 
 Each of these mutations of the migration was replayed into a scratch database and the SQL test run against it; every one made
 the test fail (the counts are failing assertions, and "+ error" means the test also stopped on an SQL error): a minor may
 start (6 + error); the guardian's own mailbox allowed (14 + error); an existing account's address allowed (10 + error);
-finish without the sign-in record check (22); finish callable by clients (2); start callable by clients (3); sessions kept
-(3); managed row kept (7); finish without a claim (15); the list shows everyone's handovers (5); expiry keeps the address
-(1 + error); anyone cancels (6); anyone starts (9); finish skips the adult re-check (3); device pairing kept (1); no daily
-limit (12); expired link still valid on the landing read (1); links not ended (6); cancel while being finished (4); token
+finish without the sign-in record check (24); finish callable by clients (2); start callable by clients (3); sessions kept
+(3); managed row kept (10); finish without a claim (17); the list shows everyone's handovers (5); expiry keeps the address
+(1 + error); anyone cancels (6); anyone starts (11); finish skips the adult re-check (8); device pairing kept (1); no daily
+limit (12); expired link still valid on the landing read (1); links not ended (7); cancel while being finished (7); token
 kept after finish (1 + error); managing guardian not told when their link row was gone (1).
 
-Ledger route, rehearsed on a replay made without the file: a copy with the wrong md5 rolls back and leaves nothing (object
-fingerprint equal to the replay without the file); the good copy applies, and its fingerprint equals a full replay with the
-file; a second run stops on the ledger key and changes nothing. Rollback: refuses without the confirmation, refuses when a
-function changed, refuses while a handover is being finished, restores the fingerprint exactly (a pending handover is
-cancelled by it), and the migration applies again afterwards.
+Added with the fix round: the password a guardian planted is kept (2); one-time tokens kept (1); the legacy token columns kept
+(1); the phone number kept (1); a linked OAuth identity kept (1); a second factor kept (1); a start expires only its own
+account's overdue handover (4); the refusal audit row keeps the fine reason (1); the state read never reports a live claim
+(1); the state read callable by clients (1); the adult boundary moved to "strictly over 18" (4); the cancel refuses even a
+claim that ran out (54); finish accepts a claim that ran out (17).
+
+Ledger route, rehearsed on a replay made without the file (twice: once on the first build, again on the fix round): a copy with
+the wrong md5 rolls back and leaves nothing (object fingerprint `3460|4e5e82fd`, equal to the replay without the file); the
+good copy applies, and its fingerprint `3472|35558105` equals a full replay with the file; a second run stops on the ledger key
+and changes nothing. Rollback: refuses without the confirmation, refuses when a function changed, refuses while a handover is
+being finished, restores the fingerprint exactly (a pending handover is dropped with its table), and the migration applies
+again afterwards.
 
 ## 4. Residual risk, plainly
 
@@ -219,13 +259,17 @@ cancelled by it), and the migration applies again afterwards.
   existing account's; every refused address and every start is counted (ten a day per guardian), so it cannot be used to probe much; the guardian is asked
   to confirm "not mine" and the page asks the adult to confirm "this is my account"; the audit row names the domain and a hash
   so a moderator can see who handed over to whom and spot a pattern; the adult receives an email that says who started it and
-  that nothing changes unless they act; the handover is cancellable and expires; and completion ends the guardian's sessions
-  and device pairing, so after it the guardian has nothing but a record that it happened.
+  that nothing changes unless they act; the handover is cancellable and expires; the email has a fixed subject and plain names only, so it cannot carry text of the guardian's choosing; and completion ends
+  the guardian's sessions and device pairing and **replaces every credential they could have planted while switched in** (a
+  password, a magic link, a pending email or phone change, a linked OAuth account, a second factor; section 2a), so after it
+  the guardian holds nothing but a record that it happened.
 - **Sessions already issued.** The handover deletes every session and refresh token, but an access token the guardian already
   holds stays valid until it expires (the auth service's access-token lifetime, an hour by default). PostgREST validates the
-  token, not the session. That is the same window as any password reset or sign-out in this stack.
+  token, not the session. That is the same window as any password reset or sign-out in this stack. What that token can still do is limited: the auth
+  service's own calls (for example `updateUser`) look the session up, and the session is gone.
 - **The address check is a small account-existence oracle.** A refused address reads "can't be used" whether it already has an
-  account or is a placeholder. A guardian with a managed adult can learn at most ten such answers a day.
+  account, is waiting on another handover, or is a placeholder, and the audit row says only "refused" (the child and linked
+  guardians can read that table). A guardian with a managed adult can learn at most ten such answers a day.
 - **A mailbox the adult does not control** (a typo that is a real address). The link goes to a stranger who can then take
   the account. The masked address on both screens and the guardian's confirmation are the only check. Rate limits and the 7-day
   expiry bound the window.
@@ -251,7 +295,7 @@ cancelled by it), and the migration applies again afterwards.
 ## 6. Applying, verifying and rolling back
 
 Migration `20261128100000` needs `20261125200000` applied first (it stops with a message otherwise). It adds one table
-and eleven functions, schedules one `pg_cron` job when the extension is there, and changes no existing object. Nothing is
+and twelve functions, schedules one `pg_cron` job when the extension is there, and changes no existing object. Nothing is
 applied by this branch to production or to the hosted sandbox. The app is safe either way round: before the migration the
 Parent Center shows nothing and start says "isn't available yet"; with the migration and an old app, nothing links to it.
 
@@ -262,10 +306,12 @@ mocked tests cannot prove):
    with the new address works afterwards.
 2. `app_metadata: { managed: false, managed_by: null }` leaves `managed` not `true` in the next session's claims.
 3. `generateLink({ type: "recovery" })` for a confirmed user returns a `hashed_token` that `verifyOtp({ type: "recovery" })` accepts.
-4. After `finish_managed_handover`, the guardian's switched-in browser session cannot refresh.
+4. After `finish_managed_handover`, the guardian's switched-in browser session cannot refresh and cannot call `updateUser`.
+5. The password the adult chooses (browser, recovery session) replaces the throwaway one, and a password sign-in then works; a
+   password a guardian set earlier no longer does.
 
 Rollback: `docs/rollbacks/20261128100000_managed_account_handover.down.sql` (guarded: needs
-`SET app.confirm_managed_account_handover_rollback = 'yes'`, stops if any of the eleven functions changed, stops while a handover
+`SET app.confirm_managed_account_handover_rollback = 'yes'`, stops if any of the twelve functions changed, stops while a handover
 is being finished). It cannot un-complete a handover; it cancels every pending one.
 
 ## 7. Owner decisions still open

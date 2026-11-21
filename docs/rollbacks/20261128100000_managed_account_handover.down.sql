@@ -1,5 +1,5 @@
 -- ROLLBACK for supabase/migrations/20261128100000_managed_account_handover.sql (docs/managed-account-handover.md).
--- NOT a migration. It unschedules the daily expiry (when pg_cron is there), drops the eight functions and the three helper
+-- NOT a migration. It unschedules the daily expiry (when pg_cron is there), drops the nine functions and the three helper
 -- functions the migration added, and drops private_sec.managed_handovers. Nothing else changes: no #452 reader, no
 -- managed_accounts row, no guardian link, no consent, no notification is touched by the rollback.
 --
@@ -22,13 +22,14 @@ BEGIN;
 DO $guard$
 DECLARE
   _want jsonb := '{
-    "public.start_managed_handover(uuid, uuid, text, text)": "9d262dbc33a97c5b2fc78842559efc90",
-    "public.cancel_managed_handover(uuid)": "69b886ed84cf2b19a63f89760c5535c0",
+    "public.start_managed_handover(uuid, uuid, text, text)": "3c844256e86fbe6eb9d2220c0fa8d0ac",
+    "public.cancel_managed_handover(uuid)": "86ea32f1d898d3dc6c53c8e2c53ad69e",
     "public.guardian_managed_handovers()": "10d70a0360f69a006ccb08f55b9c0bf7",
     "public.managed_handover_lookup(text)": "b07c5054b879cd8a72c3170741185ee4",
     "public.claim_managed_handover(text)": "00cee931dc6120c1bb30acd444af9731",
     "public.release_managed_handover(text)": "7ce4f9b726ea7c77fdfab6a95998dded",
-    "public.finish_managed_handover(text)": "fd9745b5cf8bac5ee3b59e592dcbe4b2",
+    "public.managed_handover_state(uuid)": "7bfbcf791ce3fa97289e7cda676cc2df",
+    "public.finish_managed_handover(text)": "1c2e9890ea94fee555071c659514e05d",
     "private_sec.expire_managed_handovers(uuid, integer)": "2fba4893efbc2866dbd8ec832fc8661a",
     "private_sec.handover_mailbox_key(text)": "2a52e6e7b916500321a45c1b7fcfb030",
     "private_sec.handover_mask_email(text)": "b53dad6803c97720cbdd22d3eb63f450",
@@ -71,6 +72,7 @@ DROP FUNCTION public.guardian_managed_handovers();
 DROP FUNCTION public.managed_handover_lookup(text);
 DROP FUNCTION public.claim_managed_handover(text);
 DROP FUNCTION public.release_managed_handover(text);
+DROP FUNCTION public.managed_handover_state(uuid);
 DROP FUNCTION public.finish_managed_handover(text);
 DROP FUNCTION private_sec.expire_managed_handovers(uuid, integer);
 DROP TABLE private_sec.managed_handovers;

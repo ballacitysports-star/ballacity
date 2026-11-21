@@ -11,6 +11,7 @@ import {
   handoverErrorMessage,
   handoverPath,
   isMissingFunctionError,
+  safeHandoverName,
 } from "@/lib/managed-handover";
 import { knownErrorMessage } from "@/lib/user-error";
 
@@ -43,6 +44,16 @@ function failure(error: unknown, fallbackCode: string): Error {
   const known = knownErrorMessage(error);
   if (known) return new Error(known);
   return errorInsteadOf(error, handoverErrorMessage(fallbackCode));
+}
+
+/** Never throws, never blocks the answer: the repair is also tried at the guardian's next switch-in. */
+async function reconcileOnce(childUserId: string): Promise<void> {
+  try {
+    const { reconcileManagedRecord } = await import("@/lib/managed-handover.server");
+    await reconcileManagedRecord(childUserId);
+  } catch {
+    /* reported inside; the answer to the guardian does not change */
+  }
 }
 
 export type StartedHandover = { expiresAt: string; emailMasked: string };
@@ -86,6 +97,10 @@ export const startManagedHandover = createServerFn({ method: "POST" })
     const result = (started.data ?? {}) as Record<string, unknown>;
     if (result["ok"] !== true) throw new Error(handoverErrorMessage(result["code"]));
 
+    // A half-finished earlier attempt can have left the sign-in record with an address and no managed flag: the guardian can
+    // only switch in when it says managed again. Best effort; it never throws and does nothing while a finish is running.
+    await reconcileOnce(data.childUserId);
+
     const email = data.email.trim().toLowerCase();
     const expiresAt = String(result["expires_at"]);
     const emailMasked = String(result["email_masked"] ?? "");
@@ -99,8 +114,9 @@ export const startManagedHandover = createServerFn({ method: "POST" })
         .select("id, display_name")
         .in("id", [ctx.userId, data.childUserId]);
       for (const r of (rows ?? []) as { id: string; display_name: string | null }[]) {
-        if (r.id === ctx.userId) guardianName = r.display_name?.split(/\s+/)[0] || undefined;
-        if (r.id === data.childUserId) accountName = r.display_name || undefined;
+        // Plain names only: the profile's display name is free text, and this mail goes to an address the guardian typed.
+        if (r.id === ctx.userId) guardianName = safeHandoverName(r.display_name?.split(/\s+/)[0]);
+        if (r.id === data.childUserId) accountName = safeHandoverName(r.display_name);
       }
     } catch {
       /* the email reads fine without names */
@@ -156,6 +172,9 @@ export const cancelManagedHandover = createServerFn({ method: "POST" })
         isMissingFunctionError(error) ? "HANDOVER_UNAVAILABLE" : "HANDOVER_FAILED",
       );
     }
+    // The database never touches the sign-in record, so a cancel (or an expiry) after a half-finished attempt needs the app to
+    // put the placeholder address and the managed flag back. It does nothing when the record is already right.
+    await reconcileOnce(data.childUserId);
     return { cancelled: cancelled === true };
   });
 

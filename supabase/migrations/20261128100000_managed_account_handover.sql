@@ -30,6 +30,9 @@
 --   * It does not revoke or rewrite parental_consents, child_controls or legal_consents (history, as in #452).
 --   * It stores no plain token and, once a handover ends, no email (only a short hash and the domain stay in the audit row).
 --
+--   * It does not stop a switched-in guardian from setting a password on a managed account (the app's pages do that); instead
+--     completion REPLACES whatever password and one-time tokens the account holds (finish_managed_handover step 2b).
+--
 -- Rollback: docs/rollbacks/20261128100000_managed_account_handover.down.sql (guarded). It cannot un-complete a handover.
 
 DO $guard$
@@ -230,7 +233,9 @@ BEGIN
     RAISE EXCEPTION 'HANDOVER_NOT_ADULT: an account can be handed over once its person is 18 or over.';
   END IF;
 
-  PERFORM private_sec.expire_managed_handovers(_child);
+  -- Close every overdue handover, not only this account's: an overdue one for another account would otherwise keep its
+  -- address reserved (the unique index and the 'taken' test below look at status only) until the daily sweep.
+  PERFORM private_sec.expire_managed_handovers(NULL, 50);
   IF EXISTS (SELECT 1 FROM private_sec.managed_handovers h WHERE h.child_user_id = _child AND h.status = 'pending') THEN
     RAISE EXCEPTION 'HANDOVER_ALREADY_PENDING: a handover is already waiting for this account.';
   END IF;
@@ -257,13 +262,18 @@ BEGIN
   _reason := CASE
     WHEN split_part(_addr, '@', 2) = 'managed.invalid' THEN 'unusable'
     WHEN _g_email IS NOT NULL AND private_sec.handover_mailbox_key(_g_email) = _key THEN 'own'
-    WHEN EXISTS (SELECT 1 FROM auth.users u WHERE lower(u.email) = _addr) THEN 'taken'
+    -- The account's own current address is allowed: it is what a half-finished earlier attempt left on the sign-in record,
+    -- and starting again must be able to recover (the app also puts the placeholder back; docs section 2a).
+    WHEN EXISTS (SELECT 1 FROM auth.users u WHERE lower(u.email) = _addr AND u.id <> _child) THEN 'taken'
     WHEN EXISTS (SELECT 1 FROM private_sec.managed_handovers h WHERE h.status = 'pending' AND h.email = _addr) THEN 'taken'
     ELSE NULL END;
   _hash := left(encode(sha256(convert_to(_addr, 'UTF8')), 'hex'), 16);
   IF _reason IS NOT NULL THEN
     INSERT INTO public.family_audit_log (actor_user_id, child_user_id, action, context)
-    VALUES (_guardian, _child, 'managed.handover_refused', jsonb_build_object('reason', _reason));
+    -- A coarse reason only: the family audit log is readable by the child and the linked guardians, and the finer reason
+    -- ('taken' covers both "has an account" and "another handover waits for this address") would say more than the
+    -- start call's own generic answer does.
+    VALUES (_guardian, _child, 'managed.handover_refused', jsonb_build_object('reason', 'refused'));
     RETURN jsonb_build_object('ok', false,
       'code', CASE WHEN _reason = 'own' THEN 'HANDOVER_EMAIL_IS_OWN' ELSE 'HANDOVER_EMAIL_UNUSABLE' END);
   END IF;
@@ -303,15 +313,17 @@ BEGIN
     RAISE EXCEPTION 'HANDOVER_NOT_ALLOWED: only the adult who manages this account can cancel its handover.';
   END IF;
   PERFORM private_sec.expire_managed_handovers(_child);
-  -- Not while the adult's step is running: it would change the account under it.
-  IF EXISTS (SELECT 1 FROM private_sec.managed_handovers h
-              WHERE h.child_user_id = _child AND h.status = 'pending' AND h.claimed_at > now() - interval '2 minutes') THEN
-    RAISE EXCEPTION 'HANDOVER_BUSY: the handover is being finished right now. Try again in a minute.';
-  END IF;
+  -- Not while the adult's step is running: it would change the account under it. The claim test is part of the UPDATE itself
+  -- (not a separate check before it): a claim that commits while this waits for the row is seen again by the UPDATE's
+  -- condition, so a claimed handover can never be cancelled underneath the adult's step.
   UPDATE private_sec.managed_handovers h
      SET status = 'cancelled', email = NULL, token_hash = NULL, claimed_at = NULL, ended_at = now()
    WHERE h.child_user_id = _child AND h.status = 'pending'
+     AND (h.claimed_at IS NULL OR h.claimed_at <= now() - interval '2 minutes')
   RETURNING h.id INTO _hid;
+  IF _hid IS NULL AND EXISTS (SELECT 1 FROM private_sec.managed_handovers h WHERE h.child_user_id = _child AND h.status = 'pending') THEN
+    RAISE EXCEPTION 'HANDOVER_BUSY: the handover is being finished right now. Try again in a minute.';
+  END IF;
   IF _hid IS NULL THEN RETURN false; END IF;
   INSERT INTO public.family_audit_log (actor_user_id, child_user_id, action, context)
   VALUES (_guardian, _child, 'managed.handover_cancelled', jsonb_build_object('handover_id', _hid));
@@ -380,6 +392,25 @@ END $$;
 REVOKE ALL ON FUNCTION public.claim_managed_handover(text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.claim_managed_handover(text) TO service_role;
 
+-- What the app needs to know to keep the sign-in record and the database in agreement (docs section 2a): does this account
+-- still have its managed row, is a handover pending, is somebody finishing one this minute. Service role only, no secrets.
+CREATE OR REPLACE FUNCTION public.managed_handover_state(_child uuid)
+RETURNS jsonb
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT jsonb_build_object(
+    'managed', EXISTS (SELECT 1 FROM public.managed_accounts m WHERE m.child_user_id = _child),
+    'managed_by', (SELECT m.managed_by FROM public.managed_accounts m WHERE m.child_user_id = _child),
+    'pending', EXISTS (SELECT 1 FROM private_sec.managed_handovers h WHERE h.child_user_id = _child AND h.status = 'pending'),
+    'claim_live', EXISTS (SELECT 1 FROM private_sec.managed_handovers h
+                           WHERE h.child_user_id = _child AND h.status = 'pending' AND h.claimed_at > now() - interval '2 minutes'));
+$$;
+REVOKE ALL ON FUNCTION public.managed_handover_state(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.managed_handover_state(uuid) TO service_role;
+
 CREATE OR REPLACE FUNCTION public.release_managed_handover(_token_hash text)
 RETURNS void
 LANGUAGE sql
@@ -404,6 +435,7 @@ DECLARE
   r        record;
   _name    text;
   _told    boolean := false;
+  _sets    text;
 BEGIN
   SELECT * INTO h FROM private_sec.managed_handovers x WHERE x.token_hash = _token_hash AND x.status = 'pending' FOR UPDATE;
   IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'code', 'HANDOVER_INVALID'); END IF;
@@ -435,6 +467,39 @@ BEGIN
   END IF;
   DELETE FROM auth.refresh_tokens WHERE user_id::text = h.child_user_id::text;
   DELETE FROM auth.sessions WHERE user_id = h.child_user_id;
+
+  -- 2b. Nothing the guardian could have planted while switched in survives. A managed account is meant to have no password,
+  --     but only the app's pages keep a switched-in guardian from setting one; nothing in the database does. So here, in the
+  --     same transaction: the stored password becomes a random one nobody knows (the adult sets theirs from the emailed
+  --     sign-in link), every outstanding one-time token (a magic link the guardian made, an email-change or recovery token)
+  --     and every extra identity (an OAuth account linked while switched in), second factor and phone number goes. Each
+  --     step is skipped where the auth schema in use does not have the table or column.
+  IF to_regprocedure('extensions.crypt(text, text)') IS NOT NULL AND to_regprocedure('extensions.gen_salt(text)') IS NOT NULL
+     AND EXISTS (SELECT 1 FROM information_schema.columns c WHERE c.table_schema = 'auth' AND c.table_name = 'users' AND c.column_name = 'encrypted_password') THEN
+    EXECUTE 'UPDATE auth.users SET encrypted_password = extensions.crypt(gen_random_uuid()::text || gen_random_uuid()::text, extensions.gen_salt(''bf'')) WHERE id = $1'
+      USING h.child_user_id;
+  END IF;
+  IF to_regclass('auth.one_time_tokens') IS NOT NULL THEN
+    EXECUTE 'DELETE FROM auth.one_time_tokens WHERE user_id = $1' USING h.child_user_id;
+  END IF;
+  SELECT string_agg(format('%I = %L', c.column_name, ''), ', ') INTO _sets
+    FROM information_schema.columns c
+   WHERE c.table_schema = 'auth' AND c.table_name = 'users'
+     AND c.column_name IN ('confirmation_token', 'recovery_token', 'email_change_token_new', 'email_change_token_current',
+                           'phone_change_token', 'reauthentication_token', 'email_change', 'phone_change');
+  IF _sets IS NOT NULL THEN
+    EXECUTE 'UPDATE auth.users SET ' || _sets || ' WHERE id = $1' USING h.child_user_id;
+  END IF;
+  SELECT string_agg(format('%I = NULL', c.column_name), ', ') INTO _sets
+    FROM information_schema.columns c
+   WHERE c.table_schema = 'auth' AND c.table_name = 'users' AND c.column_name IN ('phone', 'phone_confirmed_at');
+  IF _sets IS NOT NULL THEN
+    EXECUTE 'UPDATE auth.users SET ' || _sets || ' WHERE id = $1' USING h.child_user_id;
+  END IF;
+  DELETE FROM auth.identities WHERE user_id = h.child_user_id AND provider <> 'email';
+  IF to_regclass('auth.mfa_factors') IS NOT NULL THEN
+    EXECUTE 'DELETE FROM auth.mfa_factors WHERE user_id = $1' USING h.child_user_id;
+  END IF;
 
   -- 3. The links end now, as the sweep ends them (its triggers write the family audit row and clear that guardian's
   --    approvals on requests that are not yet a place); recorded as 'ended' so a birthday correction that makes the person

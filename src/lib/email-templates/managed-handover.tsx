@@ -9,6 +9,7 @@ import {
   Preview,
   Text,
 } from "@react-email/components";
+import { safeHandoverName } from "@/lib/managed-handover";
 import type { TemplateEntry } from "./registry";
 
 interface Props {
@@ -22,7 +23,15 @@ interface Props {
  * Sent to the adult a managed account is being handed to (docs/managed-account-handover.md). Kind and plain: it says who
  * started it, what happens if the link is opened and what does not happen if it is not. It makes no claim about the law.
  */
-const ManagedHandoverEmail = ({ accountName, guardianName, handoverUrl, expiresDays }: Props) => {
+const ManagedHandoverEmail = ({
+  accountName: rawAccount,
+  guardianName: rawGuardian,
+  handoverUrl,
+  expiresDays,
+}: Props) => {
+  // The names are free text a guardian can influence and the address is one they typed: only plain names reach the email.
+  const guardianName = safeHandoverName(rawGuardian);
+  const accountName = safeHandoverName(rawAccount);
   const who = guardianName || "The person who manages your BallaCity account";
   return (
     <Html lang="en" dir="ltr">
@@ -59,10 +68,8 @@ const ManagedHandoverEmail = ({ accountName, guardianName, handoverUrl, expiresD
 
 export const template = {
   component: ManagedHandoverEmail,
-  subject: (d: Record<string, unknown>) =>
-    typeof d.guardianName === "string" && d.guardianName
-      ? `${d.guardianName} is handing your BallaCity account over to you`
-      : "Take over your BallaCity account",
+  // A fixed subject: no name a guardian can influence ever reaches the subject line of mail sent under our name.
+  subject: "Take over your BallaCity account",
   displayName: "Managed account handover",
   previewData: {
     accountName: "Jordan",
