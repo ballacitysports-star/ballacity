@@ -659,7 +659,10 @@ guardian rule unchanged, (e) a full game blocked on the pay page on branch claud
   - `get_game_host_payment_methods` only **tightens**: a caller who is not the payee, not on the roster and has no
     claim of their own for the game, and whom `payment_claim_block` would refuse, gets nothing. The payee, a rostered
     player (who still owes for a game that has ended, and keeps the handles) and a payer with a claim in get exactly
-    what they got; so does any stranger or approved requester the claim rules let through. The SQL test compares it
+    what they got; so does any stranger or approved requester the claim rules let through. An approved requester who
+    is not on the roster is tightened exactly where `payment_claim_block` refuses their claim (a full roster, a
+    cancelled or ended game, a guardian's "Can join games" switch off): no handles there either, consistent with the
+    claim trigger (test 993 pins a full game and a switch off). The SQL test compares it
     with its previous definition for every person against every game (272 pairs): nobody gains a handle, no entitled
     caller loses one, only a refused caller who held handles now gets none. It changes one assertion of test 900
     (a guardian's "Can join games" switch off used to leave the handles visible to a non-rostered 16-year-old; it now
@@ -676,8 +679,12 @@ guardian rule unchanged, (e) a full game blocked on the pay page on branch claud
     Cash App. The payment details appear once the host approves you." The game page's "Before you join" Payment line
     and its "Payment settings" card say the same (fee, deadline, accepted apps by name), and its fee (button, `isPaid`)
     follows the terms' fee too. After approval or any entitlement the viewer reads the row and the existing view
-    appears unchanged. **Fails closed:** the terms are best effort: the function not there yet (the migration not
-    applied), an error or a 4 s timeout is "no terms": the pages show what they showed before (the game's price, no
+    appears unchanged. **Fails closed:** the terms are best effort and **off the critical path**: the function not
+    there yet (the migration not applied) or an error is "no terms". The pay page starts the read beside the rest
+    and does not wait for it (it gives up after 4 s, and the page never shows "Loading payment options" because of
+    it); the game page's hook has no timeout and keeps showing today's view until, and unless, the read answers.
+    The answer is kept per signed-in account and game (the user id is part of the key), dropped on sign-out, and
+    never read for the game's own host. The pages show what they showed before (the game's price, no
     deadline, no apps), never a Retry for this read, never raw error text, never invented terms. The app works with
     or without the migration; deploy the migration before or with the app.
   - Decisions that follow the owner's rules: no guardian or age rule is loosened (every new condition removes an
@@ -691,7 +698,7 @@ guardian rule unchanged, (e) a full game blocked on the pay page on branch claud
   | Decision       | `src/lib/pay-entry-gate.ts` (`payTermsView`, `payTermsMethodsLine`, `PAY_TERMS_APPROVAL_LINE`)                                   |
   | Read           | `src/lib/payments.ts` (`getGamePaymentTerms`, `gamePaymentTermsFrom`), `src/hooks/use-game-payment-terms.ts`                     |
   | Pages          | `src/routes/games.$gameId.pay.tsx`; `src/routes/games.$gameId.index.tsx`, `GamePolicySummary`, `GamePaymentTerms`, `game-policy.ts` |
-  | Unit tests     | `pay-entry-gate.test.ts` (+10), `payments-terms.test.ts` (10), `use-game-payment-terms.test.tsx` (5), `GamePaymentTermsView.test.tsx` (6), `pay-terms-wiring.test.ts` (7) |
+  | Unit tests     | `pay-entry-gate.test.ts` (+10), `payments-terms.test.ts` (10), `use-game-payment-terms.test.tsx` (7), `GamePaymentTermsView.test.tsx` (6), `pay-terms-wiring.test.ts` (7) |
   | E2E (real RLS) | `e2e/pay-terms-before-approval.spec.ts` (5 tests; local stack only; written, not run when it was added)                          |
 
 ## 7. Product decision: should paid joins show "Before you join"?

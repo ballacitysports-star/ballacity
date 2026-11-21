@@ -13,9 +13,14 @@ const payments = readFileSync("src/lib/payments.ts", "utf8");
 describe("pay page", () => {
   it("reads the terms only for a viewer who cannot read the settings row, and never as a Retry", () => {
     expect(pay).toContain("getGamePaymentTerms(gameId)");
-    // Skipped when the settings row came back; a failed or slow read is no terms (null), not a thrown error.
-    expect(pay).toMatch(/const \[policy, nextTerms\] = s\s*\? \[null, null\]/);
-    expect(pay).toMatch(/"getGamePaymentTerms", 4000\)\.catch\(\s*\(\) => null/);
+    // Skipped when the settings row came back; a failed or slow read is no terms, not a thrown error, and it is not
+    // awaited: the page does not wait on it.
+    expect(pay).toMatch(
+      /if \(!s && !cancelled\) \{\s*withTimeout\(getGamePaymentTerms\(gameId\), "getGamePaymentTerms", 4000\)/,
+    );
+    expect(pay).toMatch(/\.catch\(\(\) => \{\}\);/);
+    expect(pay).not.toMatch(/await[^;]*getGamePaymentTerms/);
+    expect(pay).not.toMatch(/Promise\.all\(\[[^\]]*getGamePaymentTerms/);
   });
 
   it("shows them only through payTermsView, with the row's own values first and the game's price last", () => {
@@ -49,7 +54,9 @@ describe("pay page", () => {
 
 describe("game page", () => {
   it("passes the terms through payTermsView to the policy block, the payment card and the fee", () => {
-    expect(game).toContain("useGamePaymentTerms(gameId, settings, { enabled: !!user })");
+    expect(game).toContain("useGamePaymentTerms(gameId, settings, {");
+    expect(game).toContain("enabled: !!user && user.id !== game?.hostUserId,");
+    expect(game).toContain("userId: user?.id,");
     expect(game).toContain(
       "payTermsView({ terms: paymentTerms, settingsReadable: !!settings, isHost })",
     );

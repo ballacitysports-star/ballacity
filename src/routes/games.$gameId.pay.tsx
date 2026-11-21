@@ -452,18 +452,19 @@ function PayPage() {
         const s = await withTimeout(getGamePaymentSettings(gameId), "getGamePaymentSettings");
         if (cancelled) return;
         // RLS hides the row from a viewer who is not yet the payee, an approved requester, a payer or a participant:
-        // ask the public join policy for that viewer (a failure is the Retry below, never "no approval needed"), and
-        // the payment terms they may read (fee, deadline, accepted apps by name). The terms are best effort: a read
-        // that fails (the function not there yet, an error, a timeout) is no terms, never a Retry and never an error
-        // on screen, and the page shows what it showed before.
-        const [policy, nextTerms] = s
-          ? [null, null]
-          : await Promise.all([
-              withTimeout(getGameJoinPolicy(gameId), "getGameJoinPolicy"),
-              withTimeout(getGamePaymentTerms(gameId), "getGamePaymentTerms", 4000).catch(
-                () => null,
-              ),
-            ]);
+        // ask the public join policy for that viewer (a failure is the Retry below, never "no approval needed").
+        const policy = s ? null : await withTimeout(getGameJoinPolicy(gameId), "getGameJoinPolicy");
+        // The payment terms they may read (fee, deadline, accepted apps by name) are best effort and OFF the critical
+        // path: the page renders with what it showed before, and the terms appear when (and if) the read answers. A
+        // read that fails (the function not there yet, an error, a timeout) is no terms: never a Retry, never an
+        // error on screen, never a wait on "Loading payment options...". payTermsView decides whether they are shown.
+        if (!s && !cancelled) {
+          withTimeout(getGamePaymentTerms(gameId), "getGamePaymentTerms", 4000)
+            .then((t) => {
+              if (!cancelled) setTerms(t);
+            })
+            .catch(() => {});
+        }
         if (cancelled) return;
         const nextSetup = paySetupFrom({ settings: s, policy, gameHostId });
         const held = payMethodsHeldForApproval({
@@ -480,7 +481,6 @@ function PayPage() {
         if (cancelled) return;
         setSettings(s);
         setSetup(nextSetup);
-        setTerms(nextTerms);
         setMethodsHeld(held);
         setMethods(all);
 

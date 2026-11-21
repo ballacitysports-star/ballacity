@@ -270,6 +270,16 @@ SELECT t.eq(pg_temp.handles('teen', 'host', 't-open'), 0, 'and no handles either
 UPDATE public.child_controls SET game_participation = true WHERE child_user_id = t.id('teen');
 SELECT t.eq(pg_temp.handles('teen', 'host', 't-open'), 2, 'switched back on: the handles are back');
 SELECT t.eq(pg_temp.term_rows('ga', 't-open'), 1, 'a guardian (an adult) is told like any adult');
+-- An approved requester is tightened exactly where the claim is refused (the switch is a game rule, approval does not lift it).
+SELECT t.as_user(t.id('host'));
+UPDATE public.join_requests SET status = 'approved', reviewed_at = now() WHERE id = t.id('req-teent-open');
+SELECT t.reset();
+SELECT t.eq(pg_temp.handles('teen', 'host', 't-open'), 2, 'the host approves the teen too: handles, as before');
+UPDATE public.child_controls SET game_participation = false WHERE child_user_id = t.id('teen');
+SELECT t.eq(pg_temp.handles('teen', 'host', 't-open'), 0, 'an approved requester whose guardian switch is off: no handles (the claim would be refused)');
+SELECT t.eq(pg_temp.term_rows('teen', 't-open'), 0, 'and no terms');
+UPDATE public.child_controls SET game_participation = true WHERE child_user_id = t.id('teen');
+SELECT t.eq(pg_temp.handles('teen', 'host', 't-open'), 2, 'the switch back on: the handles are back');
 
 -- ---- 8. get_game_host_payment_methods only tightened -------------------------------------------------------------------
 -- The previous definition (20261119200000), kept here as a function of its own, so the two can be compared on every
@@ -357,6 +367,11 @@ SELECT t.eq(pg_temp.handles('pa', 'host', 't-open'), 0, 'while a stranger does n
 SELECT t.eq(pg_temp.handles('other', 'host', 't-open'), 2, 'a rostered player keeps them on a cancelled game');
 SELECT t.eq(pg_temp.handles('host', 'host', 't-open'), 2, 'the host keeps them');
 SELECT t.eq(pg_temp.handles('pa', 'host', 't-all'), 5, 'an ordinary stranger on an open game: all five enabled methods, as before');
+-- An approved requester who is not on the roster of a game that is full: the claim is refused (GAME_FULL), so no handles.
+SELECT pg_temp.request('pa', 't-full', true);
+SELECT t.eq(pg_temp.handles('pa', 'host', 't-full'), 0, 'an approved requester of a full game, not on the roster: no handles (the claim would be refused)');
+SELECT t.eq(pg_temp.term_rows('pa', 't-full'), 0, 'and no terms');
+SELECT t.eq(pg_temp.handles('other', 'host', 't-full'), 5, 'while the rostered player is unchanged');
 
 -- ---- 9. the answer is about the caller only ------------------------------------------------------------------------
 SELECT t.eq(pg_temp.shown('pa', 't-all'), pg_temp.shown('pb', 't-all'), 'two strangers are told the same thing');

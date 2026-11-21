@@ -19,22 +19,27 @@ import {
 export function useGamePaymentTerms(
   gameId: string | undefined,
   settings: GamePaymentSettings | null,
-  options: { enabled: boolean },
+  options: { enabled: boolean; userId: string | null | undefined },
 ): GamePaymentTerms | null {
-  const [terms, setTerms] = useState<{ gameId: string; terms: GamePaymentTerms | null } | null>(
-    null,
-  );
-  const enabled = options.enabled && !settings && !!gameId;
+  const [terms, setTerms] = useState<{ key: string; terms: GamePaymentTerms | null } | null>(null);
+  const { userId } = options;
+  const enabled = options.enabled && !settings && !!gameId && !!userId;
+  // The answer belongs to one signed-in account and one game: the server answers about the caller, so another
+  // account's answer, or another game's, never stands in for this one's (a refused viewer is told nothing).
+  const key = enabled ? `${userId}:${gameId}` : null;
   useEffect(() => {
-    if (!enabled || !gameId) return;
+    if (!key || !gameId) {
+      // Signed out, the viewer reads the row, or the read is off: nothing is kept.
+      setTerms(null);
+      return;
+    }
     let cancelled = false;
     getGamePaymentTerms(gameId)
-      .then((t) => !cancelled && setTerms({ gameId, terms: t }))
-      .catch(() => !cancelled && setTerms({ gameId, terms: null }));
+      .then((t) => !cancelled && setTerms({ key, terms: t }))
+      .catch(() => !cancelled && setTerms({ key, terms: null }));
     return () => {
       cancelled = true;
     };
-  }, [gameId, enabled]);
-  // Another game's answer never stands in for this one's.
-  return enabled && terms && terms.gameId === gameId ? terms.terms : null;
+  }, [gameId, key]);
+  return key && terms && terms.key === key ? terms.terms : null;
 }

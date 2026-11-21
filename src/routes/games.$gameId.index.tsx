@@ -390,7 +390,11 @@ function GameDetail() {
   const publicRequiresApproval = useGameJoinPolicy(gameId, settings);
   // The entry fee, deadline and accepted apps a viewer may know before approval or payment (get_game_payment_terms;
   // payTermsView, in pay-entry-gate.ts, decides whether they are shown). Null for a viewer who reads the row.
-  const paymentTerms = useGamePaymentTerms(gameId, settings, { enabled: !!user });
+  // Nothing is asked for the game's own host (they hold the row).
+  const paymentTerms = useGamePaymentTerms(gameId, settings, {
+    enabled: !!user && user.id !== game?.hostUserId,
+    userId: user?.id,
+  });
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
   // A status read that answers after the page wrote the viewer's own rows (the

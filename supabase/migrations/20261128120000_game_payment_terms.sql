@@ -37,8 +37,11 @@
 --      claim of their own for the game, and whom payment_claim_block would refuse, now gets nothing. Everyone else gets
 --      exactly what they got: the payee, a rostered player (who keeps the handles whatever happens to the game, as the
 --      pay page lets them pay for an ended game they still owe), a payer with a claim in, and any stranger or approved
---      requester the claim rules would let through. The body is otherwise the one of 20261119200000, character for
---      character apart from the new check (rollback: docs/rollbacks/20261128120000_game_payment_terms.down.sql).
+--      requester the claim rules would let through. An approved requester who is not on the roster is tightened exactly
+--      where payment_claim_block refuses their claim (a full roster, a cancelled or ended game, a guardian's "Can join
+--      games" switch off): they get no handles there, as the claim would be refused too (test 993 pins both). The body is
+--      otherwise the one of 20261119200000, character for character apart from the new check (rollback:
+--      docs/rollbacks/20261128120000_game_payment_terms.down.sql).
 -- Not changed: row level security on game_payment_settings; the approval rule (a visible game's handles still need
 -- approval only through the page, as before: payMethodsHeldForApproval; the owner decided "behind exactly the existing
 -- entitlement"); no guardian rule is loosened (every new condition only removes an answer).
@@ -47,6 +50,11 @@
 
 DO $guard$
 BEGIN
+  -- A second run is expected to refuse: it is the ledger's job (supabase_migrations.schema_migrations stops on the
+  -- version key); a hand replay over a database that has it stops here, changing nothing.
+  IF to_regprocedure('public.get_game_payment_terms(text)') IS NOT NULL THEN
+    RAISE EXCEPTION '20261128120000: already applied (public.get_game_payment_terms exists); nothing changed';
+  END IF;
   IF to_regprocedure('private_sec.payment_claim_block(text, uuid)') IS NULL
      OR to_regprocedure('private_sec.game_payee(text)') IS NULL
      OR to_regprocedure('private_sec.can_read_game_payment_settings(text, uuid)') IS NULL
