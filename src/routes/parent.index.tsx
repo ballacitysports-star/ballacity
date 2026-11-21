@@ -39,6 +39,7 @@ import { FamilyApprovalsPanel } from "@/components/child/FamilyApprovalsPanel";
 import { GuardianApprovalsDashboard } from "@/components/child/GuardianApprovalsDashboard";
 import { GuardianProfileCard } from "@/components/child/GuardianProfileCard";
 import { FamilyRoster } from "@/components/child/FamilyRoster";
+import { ManagedHandoverCard } from "@/components/child/ManagedHandoverCard";
 import { UnfinishedChildProfilesPrompt } from "@/components/child/UnfinishedChildProfilesPrompt";
 import { FollowRequestsPanel } from "@/components/follow/FollowRequestsPanel";
 import { useDeleteManagedChild, useSwitchToManagedChild } from "@/lib/use-managed-children";
@@ -414,6 +415,7 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
       ) : null}
 
       <div className="mt-4 grid gap-4">
+        {child.managed ? <ManagedHandoverCard childUserId={childUserId} /> : null}
         <FamilyPostLink child={child} />
         {child.cohort === "teen_13_15" && (
           <TeenReelReview childUserId={child.childUserId} childName={child.displayName} />
