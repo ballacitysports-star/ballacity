@@ -58,6 +58,16 @@ Sources: the analytics, feedback, pilot and privacy maps and the critique, all a
 
 ---
 
+## Owner decisions (2026-11-21)
+
+| Topic           | Decision                                                                                                                                                                                                                                                                                                                                                                 |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Pilot city      | New York City (on Eastern time; no time-zone work needed).                                                                                                                                                                                                                                                                                                               |
+| Who joins       | Teens are included. Before any teen is recruited, counsel signs off on counting minors in product metrics and on the teen safety texts; that is a gate in the WP 5.0 checklist. Until then the funnel shows adults, and its separate under-18 column stays hidden behind a legal-review flag. Feedback from minors stays off (WP 5.7 and 5.8) until counsel approves it. |
+| Feedback        | Kept 90 days, then purged. Optional "You may contact me" box; superadmins see who wrote a note only when it is ticked. Counsel confirms the period before WP 5.7 ships.                                                                                                                                                                                                  |
+| Build order     | WP 5.0 to 5.6 now, through the usual route (PR, green CI, sandbox, then production). WP 5.7 and 5.8 wait for counsel.                                                                                                                                                                                                                                                    |
+| Everything else | The recommended defaults below, unless the owner says otherwise.                                                                                                                                                                                                                                                                                                         |
+
 ## Owner decisions needed
 
 Each item gives a recommended default and why.
