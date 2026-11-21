@@ -1,8 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertSuperadmin, getAdmin, countRows } from "@/lib/superadmin.server";
+import { OPEN_REPORT_STATUSES } from "@/lib/report-status";
 
 export type SuperadminAttention = {
+  newReports: number;
   birthdayCorrections: number;
   guardianRequests: number;
   ageReviews: number;
@@ -21,6 +23,7 @@ export const superadminAttention = createServerFn({ method: "GET" })
     const stuckBefore = new Date(Date.now() - STUCK_AFTER_MS).toISOString();
 
     const [
+      newReports,
       birthdayCorrections,
       guardianRequests,
       ageReviews,
@@ -29,6 +32,8 @@ export const superadminAttention = createServerFn({ method: "GET" })
       failed,
       stuck,
     ] = await Promise.all([
+      // The moderation queue's "New" filter: new reports plus the legacy "pending" and "open".
+      countRows(admin, "user_reports", (q) => q.in("status", OPEN_REPORT_STATUSES)),
       countRows(admin, "birthday_correction_requests", (q: any) => q.eq("status", "pending")),
       countRows(admin, "parent_requests", (q: any) => q.in("status", ["open", "in_progress"])),
       countRows(admin, "profiles", (q: any) => q.eq("age_review_required", true)),
@@ -45,6 +50,7 @@ export const superadminAttention = createServerFn({ method: "GET" })
     ]);
 
     return {
+      newReports,
       birthdayCorrections,
       guardianRequests,
       ageReviews,

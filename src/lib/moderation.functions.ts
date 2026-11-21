@@ -3,6 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import type { AuditAction } from "@/lib/audit-actions";
 import { assertModerator } from "@/lib/moderation.server";
+import { reportStatusesFor } from "@/lib/report-status";
 
 /** Canonical audit action for each moderation outcome. */
 const MODERATION_AUDIT_ACTION = {
@@ -99,16 +100,7 @@ export const listReports = createServerFn({ method: "GET" })
       )
       .order("created_at", { ascending: false })
       .limit(300);
-    if (data.status !== "all") {
-      const legacy: Record<string, string[]> = {
-        new: ["new", "pending", "open"],
-        investigating: ["investigating", "reviewing"],
-        resolved: ["resolved", "actioned"],
-        dismissed: ["dismissed"],
-        escalated: ["escalated"],
-      };
-      q = q.in("status", legacy[data.status] ?? [data.status]);
-    }
+    if (data.status !== "all") q = q.in("status", reportStatusesFor(data.status));
     if (data.subjectType !== "all") q = q.eq("subject_type", data.subjectType);
 
     const { data: rows, error } = await q;

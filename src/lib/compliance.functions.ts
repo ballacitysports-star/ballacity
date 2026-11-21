@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { OPEN_REPORT_STATUSES, REPORT_STATUS_GROUPS } from "@/lib/report-status";
 import {
   assertComplianceAdmin,
   COMPLIANCE_LEGAL_TYPES,
@@ -90,8 +91,10 @@ export const adminComplianceOverview = createServerFn({ method: "GET" })
         .order("created_at", { ascending: false }),
       admin.rpc("legal_consent_stats"),
       countRows(admin, "profiles"),
-      countRows(admin, "user_reports", (q: any) => q.in("status", ["new", "open", "pending"])),
-      countRows(admin, "user_reports", (q: any) => q.in("status", ["investigating", "reviewing"])),
+      countRows(admin, "user_reports", (q: any) => q.in("status", OPEN_REPORT_STATUSES)),
+      countRows(admin, "user_reports", (q: any) =>
+        q.in("status", REPORT_STATUS_GROUPS.investigating),
+      ),
       countRows(admin, "user_reports", (q: any) => q.eq("status", "escalated")),
       countRows(admin, "profiles", (q: any) => q.not("suspended_at", "is", null)),
       countRows(admin, "profiles", (q: any) => q.eq("moderation_state", "banned")),
