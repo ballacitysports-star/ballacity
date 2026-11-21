@@ -31,7 +31,17 @@ test.describe("superadmin funnel card", () => {
     await signInAs(page, "player");
     await page.goto("/superadmin", { waitUntil: "domcontentloaded" });
 
-    await expect(page).not.toHaveURL(/\/superadmin/);
+    // The page sends a member home once the access check answers, or shows "We couldn't verify your access" if the
+    // check fails. Either way it never renders the superadmin tabs. Wait for one of the two outcomes first, so the
+    // card's absence is not just read on the loading screen.
+    await expect
+      .poll(
+        async () =>
+          !/\/superadmin/.test(new URL(page.url()).pathname) ||
+          (await page.getByText(/couldn't verify your access/i).count()) > 0,
+        { timeout: 30_000, message: "the page should refuse a member" },
+      )
+      .toBe(true);
     await expect(page.getByText("Pilot funnel")).toHaveCount(0);
   });
 });
