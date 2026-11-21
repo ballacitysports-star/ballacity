@@ -24,7 +24,6 @@ import {
   assertConverterReachable,
   convertToPlayableMp4,
   stripVideoMetadata,
-  ConverterUnavailableError,
 } from "@/lib/video-transcode";
 import { buildMediaMeta, probeVideo, type ProbedVideo } from "@/lib/video-metadata";
 import { RepairPlaybackButton } from "@/components/reels/RepairPlaybackButton";
@@ -93,7 +92,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { normalizePostPackage, reelPhase } from "@/lib/reel-post";
-import { familyPostErrorMessage } from "@/lib/family-posts";
+import { ReelUploadProblem, reelUploadErrorMessage } from "@/lib/reel-upload-errors";
 import { useMyChildren } from "@/lib/child-safety";
 import { ReelProgress } from "@/components/reels/ReelProgress";
 import { teenReelState } from "@/lib/teen-reel-privacy";
@@ -106,9 +105,6 @@ import { ReelPrivacyPanel } from "@/components/reels/ReelPrivacyPanel";
 import { useMyCohort } from "@/lib/youth-features";
 import { poseAllowedForCohort, type PoseMetrics } from "@/lib/pose-metrics";
 import { PreviewGate } from "@/components/public/PreviewGate";
-
-/** An upload problem this page words itself, so its sentence shows as it is; anything else never shows raw (WP 4.0). */
-class ReelUploadProblem extends Error {}
 
 /**
  * The stored `error_message` of a failed reel can be the worker's raw catch text (AI, ffmpeg, storage), so only the
@@ -1259,14 +1255,7 @@ function ReelsPage() {
       toast.success("Reel uploaded — AI is working on it now");
       void kickOffProcessing((inserted as { id?: string } | null)?.id);
     } catch (e: any) {
-      toast.error(
-        e instanceof ConverterUnavailableError
-          ? "Video conversion is temporarily unavailable. Nothing was uploaded — please try again shortly."
-          : e instanceof ReelUploadProblem
-            ? e.message
-            : (familyPostErrorMessage(e) ??
-              userErrorMessage(e, "Upload failed. Please try again.")),
-      );
+      toast.error(reelUploadErrorMessage(e));
     } finally {
       setBusy(false);
     }

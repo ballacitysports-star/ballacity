@@ -1,6 +1,11 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { describeMessagingError } from "@/lib/minor-messaging";
-import type { PaymentSubmissionStatus } from "@/lib/payment-states";
+import {
+  CANCELLED_CLAIM_REVIEW_MESSAGE,
+  DECLINED_CLAIM_REVIEW_MESSAGE,
+  rosterRowClaimStatus,
+  type PaymentSubmissionStatus,
+} from "@/lib/payment-states";
 import {
   Clock,
   MessageCircle,
@@ -25,6 +30,7 @@ import { formatHoldRemaining, holdExpiresAt, useNow } from "@/lib/payment-hold";
 import { getOrCreateDirectConversation } from "@/lib/messages";
 import { createNotification } from "@/lib/notifications";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchProfileNameBits, withManagedProfileNames } from "@/lib/managed-profile-names";
 import { blockPlayer } from "@/components/game-detail/game-player-actions";
 import { errorText, paymentSubmissionErrorMessage, userErrorMessage } from "@/lib/user-error";
 
@@ -35,6 +41,8 @@ const PAYMENT_REVIEW_SENTENCES: readonly string[] = [
   "Payment coordination isn't available for this account yet.",
   "Payment coordination isn't available for this player's account yet.",
   "No payment submission to update.",
+  CANCELLED_CLAIM_REVIEW_MESSAGE,
+  DECLINED_CLAIM_REVIEW_MESSAGE,
 ];
 
 /** What a host sees when reviewing a payment fails: our own sentence, else the payment mapper's, never raw text. */
@@ -46,12 +54,6 @@ function paymentReviewErrorMessage(e: unknown): string {
   if (PAYMENT_REVIEW_SENTENCES.includes(text)) return text;
   return paymentSubmissionErrorMessage(e);
 }
-
-type ProfileBits = {
-  display_name?: string | null;
-  avatar_initials?: string | null;
-  avatar_url?: string | null;
-};
 
 export function RosterPlayerRow({
   req,
@@ -121,26 +123,25 @@ export function RosterPlayerRow({
         .maybeSingle();
       if (cancel) return;
       const d = data as { id: string; status: string; screenshot_path: string | null } | null;
-      if (d && (d.status === "verified" || d.status === "pending" || d.status === "rejected")) {
+      // A cancelled claim keeps its own state: "Mark as paid" on it would be refused (DECISION_FINAL).
+      const shown = rosterRowClaimStatus(d?.status);
+      if (d && shown) {
         if (fromRealtime && d.status === "pending" && paymentStatusRef.current !== "pending") {
           playAttentionPing();
           toast.info(`${nameRef.current} sent payment proof`, {
             description: `${gameTitle} · tap View proof to confirm.`,
           });
         }
-        setLatestSub({ id: d.id, status: d.status, screenshot_path: d.screenshot_path });
+        setLatestSub({ id: d.id, status: shown, screenshot_path: d.screenshot_path });
       } else {
         setLatestSub(null);
       }
     };
     (async () => {
-      const profRes = await supabase
-        .from("profiles")
-        .select("display_name, avatar_initials, avatar_url")
-        .eq("id", req.player_id)
-        .maybeSingle();
+      // A block or a suspension hides the profile row; the host still has to tell whose
+      // spot and payment proof this is, so the name is filled from managed_profile_names.
+      const d = await fetchProfileNameBits(supabase, req.player_id);
       if (!cancel) {
-        const d = profRes.data as ProfileBits | null;
         if (d) {
           const n = d.display_name ?? "Player";
           setName(n);
@@ -298,11 +299,17 @@ export function RosterPlayerRow({
       );
       const nameMap: Record<string, string> = {};
       if (actorIds.length) {
-        const { data: profs } = await supabase
+        const { data: read } = await supabase
           .from("profiles")
           .select("id, display_name")
           .in("id", actorIds);
-        for (const p of (profs ?? []) as Array<{ id: string; display_name: string | null }>) {
+        // The player's own entries keep their name when a block or suspension hides the row.
+        const profs = await withManagedProfileNames(
+          supabase,
+          actorIds,
+          (read ?? []) as Array<{ id: string; display_name: string | null }>,
+        );
+        for (const p of profs) {
           nameMap[p.id] = p.display_name ?? "Someone";
         }
       }
@@ -466,7 +473,9 @@ export function RosterPlayerRow({
               cls: "border-amber-500/40 bg-amber-500/10 text-amber-500",
               Icon: Clock,
             };
-  const canRemind = feeRequired && (paymentStatus === "none" || paymentStatus === "rejected");
+  const canRemind =
+    feeRequired &&
+    (paymentStatus === "none" || paymentStatus === "rejected" || paymentStatus === "cancelled");
   const now = useNow();
   const holdExpires = canRemind
     ? holdExpiresAt({ approvedAt: req.reviewed_at, holdMinutes, gameStartsAt })
@@ -585,14 +594,16 @@ export function RosterPlayerRow({
             </>
           )}
           {paymentStatus === "rejected" && (
-            <button
-              type="button"
-              onClick={() => setPaymentStatusAction("verified", "payment_verified")}
-              disabled={busy}
-              className="inline-flex items-center gap-1 rounded-full border border-lime/50 bg-lime/15 px-2.5 py-1 text-[11px] font-bold text-lime disabled:opacity-50"
-            >
-              <Check className="h-3 w-3" /> Verify anyway
-            </button>
+            // A declined payment is final for the host (DECISION_FINAL, 20261125100000): the player sends it again.
+            <span className="text-[11px] text-muted-foreground">
+              Declined. The player can send their payment again.
+            </span>
+          )}
+          {paymentStatus === "cancelled" && (
+            // A cancelled claim is final for the host too (DECISION_FINAL, 20261125100000): the player sends a new one.
+            <span className="text-[11px] text-muted-foreground">
+              Claim cancelled. The player can send their payment again.
+            </span>
           )}
           {paymentStatus === "verified" && (
             <button

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { isMissingFunctionError } from "@/lib/managed-profile-names";
 
 export type ReportReason =
   | "spam"
@@ -222,7 +223,81 @@ export async function reportUser(reportedId: string, reason: ReportReason, detai
   await submitReport({ subjectType: "user", reportedId, reason, details });
 }
 
-/** Ids of everyone the signed-in user has blocked, with profile details. */
+/** One row of the signed-in member's block list. */
+export type BlockedUser = {
+  id: string;
+  displayName: string;
+  username: string | null;
+  avatarUrl: string | null;
+  initials: string | null;
+  blockedAt: string;
+};
+
+type BlockedProfileRow = {
+  blocked_id: string;
+  blocked_at: string;
+  display_name: string | null;
+  username: string | null;
+  avatar_initials: string | null;
+  avatar_url: string | null;
+};
+
+type RpcCall = (
+  fn: string,
+  args?: Record<string, unknown>,
+) => PromiseLike<{ data: unknown; error: { code?: string; message?: string } | null }>;
+
+/**
+ * Everyone `viewerId` has blocked, newest first, with the names the blocker may
+ * see. A block hides the blocked person's profile row from the blocker
+ * (20261125100000), so the names come from `my_blocked_profiles`, which
+ * returns the caller's own blocks with a name wherever the profile rule would
+ * have shown it without the block. Before that migration (and after its
+ * rollback) the function is missing and the old rules let the blocker read the
+ * row, so the list falls back to reading user_blocks and profiles.
+ */
+export async function fetchBlockedUsers(viewerId: string): Promise<BlockedUser[]> {
+  const rpc = (supabase.rpc as unknown as RpcCall).bind(supabase);
+  const { data: named, error: rpcError } = await rpc("my_blocked_profiles");
+  if (!rpcError) {
+    return ((named ?? []) as BlockedProfileRow[]).map((r) => ({
+      id: r.blocked_id,
+      displayName: r.display_name ?? "Blocked account",
+      username: r.username ?? null,
+      avatarUrl: r.avatar_url ?? null,
+      initials: r.avatar_initials ?? null,
+      blockedAt: r.blocked_at,
+    }));
+  }
+  if (!isMissingFunctionError(rpcError)) throw rpcError;
+
+  const { data, error } = await supabase
+    .from("user_blocks")
+    .select("blocked_id, created_at")
+    .eq("blocker_id", viewerId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  const ids = (data ?? []).map((r) => r.blocked_id);
+  if (ids.length === 0) return [];
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, display_name, username, avatar_url, avatar_initials")
+    .in("id", ids);
+  const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
+  return (data ?? []).map((r) => {
+    const p = byId.get(r.blocked_id);
+    return {
+      id: r.blocked_id,
+      displayName: p?.display_name ?? "Blocked account",
+      username: p?.username ?? null,
+      avatarUrl: p?.avatar_url ?? null,
+      initials: p?.avatar_initials ?? null,
+      blockedAt: r.created_at,
+    };
+  });
+}
+
+/** Everyone the signed-in user has blocked, with the names they may see. */
 export function useBlockedUsersList() {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -231,40 +306,7 @@ export function useBlockedUsersList() {
   const query = useQuery({
     queryKey: ["blocked-users", viewerId],
     enabled: !!viewerId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_blocks")
-        .select("blocked_id, created_at")
-        .eq("blocker_id", viewerId!)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      const ids = (data ?? []).map((r) => r.blocked_id);
-      if (ids.length === 0)
-        return [] as {
-          id: string;
-          displayName: string;
-          username: string | null;
-          avatarUrl: string | null;
-          initials: string | null;
-          blockedAt: string;
-        }[];
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, display_name, username, avatar_url, avatar_initials")
-        .in("id", ids);
-      const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
-      return (data ?? []).map((r) => {
-        const p = byId.get(r.blocked_id);
-        return {
-          id: r.blocked_id,
-          displayName: p?.display_name ?? "Blocked account",
-          username: p?.username ?? null,
-          avatarUrl: p?.avatar_url ?? null,
-          initials: p?.avatar_initials ?? null,
-          blockedAt: r.created_at,
-        };
-      });
-    },
+    queryFn: () => fetchBlockedUsers(viewerId!),
   });
 
   const unblock = useMutation({

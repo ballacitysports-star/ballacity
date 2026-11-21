@@ -2,6 +2,7 @@ import { fulfillRows } from "./helpers/invite-postgrest";
 import { currentSafetyAckVersion, mockRiskNotAcknowledged } from "./helpers/risk-ack";
 import { test, expect, type Browser, type Page, type Route as PWRoute } from "@playwright/test";
 import { isLegalReviewed } from "../src/lib/legal-review";
+import { answerSessionChecks } from "./helpers/signed-in";
 
 /**
  * E2E: the real "Before you join" risk acknowledgment stands between a player
@@ -47,6 +48,11 @@ const GAME_ID = "g2";
 const FAKE_HOST_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
 
 async function restoreSession(page: Page) {
+  // Answer the session checks every load starts (GET /auth/v1/user and the root gate's
+  // age, onboarding and child-status server functions) from the injected session, as the
+  // pay specs do. They are not what this spec is about, and each signed-in load
+  // otherwise sends the shared sandbox 8-13 requests for them. See helpers/signed-in.ts.
+  await answerSessionChecks(page);
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(
     ([key, value]) => window.localStorage.setItem(key!, value!),

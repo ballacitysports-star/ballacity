@@ -17,6 +17,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { withManagedProfileNames } from "@/lib/managed-profile-names";
 import { getCurrentUserId } from "@/lib/current-user-id";
 import {
   listMySubmissionsForGame,
@@ -32,6 +33,8 @@ import { reviewPaymentAction } from "@/lib/payments.functions";
 import { hostCancelPaymentSubmission } from "@/lib/payments";
 import {
   CANCELLATION_REASON_LABELS,
+  CANCELLED_CLAIM_REVIEW_MESSAGE,
+  DECLINED_CLAIM_REVIEW_MESSAGE,
   PAYMENT_DISCLAIMER,
   PAYMENT_STATE_META,
   canHostConfirm,
@@ -56,6 +59,8 @@ const PAYMENT_REVIEW_SENTENCES: readonly string[] = [
   "Payment coordination isn't available for this account yet.",
   "Payment coordination isn't available for this player's account yet.",
   "No payment submission to update.",
+  CANCELLED_CLAIM_REVIEW_MESSAGE,
+  DECLINED_CLAIM_REVIEW_MESSAGE,
 ];
 
 /**
@@ -390,11 +395,13 @@ export function HostPaymentsPanel({
       const ids = Array.from(new Set(subs.map((s) => s.player_id)));
       const nameMap: Record<string, { n: string; i: string; a: string | null }> = {};
       if (ids.length) {
-        const { data: profs } = await supabase
+        const { data: read } = await supabase
           .from("profiles")
           .select("id, display_name, avatar_initials, avatar_url")
           .in("id", ids);
-        for (const p of (profs ?? []) as Array<{
+        // A block or suspension hides the row; the host still needs the name.
+        const profs = await withManagedProfileNames(supabase, ids, read);
+        for (const p of profs as Array<{
           id: string;
           display_name: string | null;
           avatar_initials: string | null;
@@ -758,24 +765,26 @@ export function HostPaymentsPanel({
                   {row.screenshot_path && <ExternalLink className="h-3 w-3" />}
                 </button>
                 <div className="ml-auto flex gap-2">
-                  {canHostConfirm(
-                    row.status === "verified"
-                      ? "confirmed"
-                      : row.status === "cancelled"
-                        ? "cancelled"
-                        : row.status === "disputed"
-                          ? "disputed"
-                          : "host_confirmation_pending",
-                  ) && (
-                    <button
-                      type="button"
-                      disabled={busyId === row.id}
-                      onClick={() => act(row, "verified")}
-                      className="inline-flex items-center gap-1 rounded-full bg-lime px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-60"
-                    >
-                      <Check className="h-3.5 w-3.5" /> Confirm received
-                    </button>
-                  )}
+                  {/* A declined payment is final for the host (DECISION_FINAL, 20261125100000): the player sends it again. */}
+                  {row.status !== "rejected" &&
+                    canHostConfirm(
+                      row.status === "verified"
+                        ? "confirmed"
+                        : row.status === "cancelled"
+                          ? "cancelled"
+                          : row.status === "disputed"
+                            ? "disputed"
+                            : "host_confirmation_pending",
+                    ) && (
+                      <button
+                        type="button"
+                        disabled={busyId === row.id}
+                        onClick={() => act(row, "verified")}
+                        className="inline-flex items-center gap-1 rounded-full bg-lime px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-60"
+                      >
+                        <Check className="h-3.5 w-3.5" /> Confirm received
+                      </button>
+                    )}
                   {row.status !== "rejected" && (
                     <button
                       type="button"

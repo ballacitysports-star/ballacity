@@ -39,6 +39,7 @@ import {
 import { LegalNotice } from "@/components/LegalNotice";
 import { GAMES } from "@/lib/sample-data";
 import { formatGameWhen } from "@/lib/format";
+import { fetchProfileNameBits } from "@/lib/managed-profile-names";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 
@@ -528,12 +529,10 @@ function SubmissionCard({ sub, onReviewed }: { sub: PaymentSubmission; onReviewe
     let cancelled = false;
     (async () => {
       const { supabase } = await import("@/integrations/supabase/client");
-      const { data } = await supabase
-        .from("profiles")
-        .select("display_name, username, avatar_initials, avatar_url")
-        .eq("id", sub.player_id)
-        .maybeSingle();
-      if (!cancelled) setPlayer(data as any);
+      // A block or a suspension hides the payer's profile row; the host still has to
+      // know whose payment they confirm, so the name is filled from managed_profile_names.
+      const data = await fetchProfileNameBits(supabase, sub.player_id);
+      if (!cancelled) setPlayer(data);
     })();
     return () => {
       cancelled = true;

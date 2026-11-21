@@ -28,6 +28,15 @@ const db: {
   payee: string | null;
   /** Every .eq() the code made, so a test can see which settings row it asked for. */
   eqs: { table: string; col: string; val: unknown }[];
+  /**
+   * What `blocks_exist_between` would answer for the host and the player (a block either way). The code must not
+   * refuse on it: the join gate refuses only the host's own block, which is a `user_blocks` row (db.rows.user_blocks).
+   */
+  blocked: boolean | "error";
+  /** The arguments each blocks_exist_between call was made with. */
+  blockChecks: unknown[];
+  /** Tables whose reads fail. */
+  failing: string[];
 } = {
   rows: {},
   inserts: [],
@@ -35,6 +44,9 @@ const db: {
   notificationsDown: false,
   payee: "host-1",
   eqs: [],
+  blocked: false,
+  blockChecks: [],
+  failing: [],
 };
 
 function from(table: string) {
@@ -58,7 +70,12 @@ function from(table: string) {
     maybeSingle: async () =>
       chain.error
         ? { data: null, error: chain.error }
-        : { data: db.rows[table] ?? null, error: null },
+        : db.failing.includes(table)
+          ? {
+              data: null,
+              error: { code: "57014", message: "canceling statement due to statement timeout" },
+            }
+          : { data: db.rows[table] ?? null, error: null },
     insert: async (row: any) => {
       if (table === "notifications" && db.notificationsDown) throw new Error("notifications down");
       db.inserts.push({ table, row });
@@ -68,7 +85,15 @@ function from(table: string) {
   return chain;
 }
 
-const rpc = async (fn: string) => ({ data: fn === "game_payee_id" ? db.payee : null, error: null });
+const rpc = async (fn: string, args?: unknown) => {
+  if (fn === "blocks_exist_between") {
+    db.blockChecks.push(args);
+    return db.blocked === "error"
+      ? { data: null, error: { message: "unavailable" } }
+      : { data: db.blocked, error: null };
+  }
+  return { data: fn === "game_payee_id" ? db.payee : null, error: null };
+};
 
 vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: { from, rpc } }));
 
@@ -93,6 +118,9 @@ beforeEach(() => {
   db.notificationsDown = false;
   db.payee = "host-1";
   db.eqs = [];
+  db.blocked = false;
+  db.blockChecks = [];
+  db.failing = [];
 });
 
 describe("addPaidPlayerToRoster", () => {
@@ -272,6 +300,62 @@ describe("addPaidPlayerToRoster", () => {
     });
     expect(notPlaced()[0].title).toBe("Paid, not on the roster · A player");
     expect(notPlaced()[0].body).toMatch(/the game has ended/);
+    error.mockRestore();
+  });
+
+  it("does not place a player the host blocked, as the join gate refuses them", async () => {
+    db.rows.game_payment_settings = { requires_approval: false };
+    db.rows.user_blocks = { blocker_id: "host-1" };
+    db.blocked = true;
+    const result = await addPaidPlayerToRoster("g1", "p1");
+    expect(result).toEqual({ added: false, reason: "refused", noticeSent: true });
+    expect(holdsPlace(result)).toBe(false);
+    expect(rostered()).toHaveLength(0);
+    // the gate's test: the host's own block of the player (blocker = host, blocked = player)
+    expect(db.eqs).toContainEqual({ table: "user_blocks", col: "blocker_id", val: "host-1" });
+    expect(db.eqs).toContainEqual({ table: "user_blocks", col: "blocked_id", val: "p1" });
+    const [host, player] = notPlaced();
+    // the host knows whom they blocked
+    expect(host.title).toBe("Paid, not on the roster · Pat");
+    expect(host.body).toMatch(/the game's joining rules don't allow it/);
+    expect(player).toMatchObject({ user_id: "p1" });
+  });
+
+  it("places a player who blocked the host, as the join gate and the payment claim gate let them in", async () => {
+    // enforce_host_block and payment_claim_block refuse only the host's block of the player; this one could request a
+    // spot, be approved and pay, so the host's verification must not leave them paid and off the roster.
+    db.rows.game_payment_settings = { requires_approval: false };
+    db.rows.user_blocks = null;
+    db.blocked = true;
+    await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toEqual({ added: true });
+    expect(rostered()).toHaveLength(1);
+    expect(notPlaced()).toHaveLength(0);
+    expect(db.blockChecks).toHaveLength(0);
+  });
+
+  it("names a player who blocked the host in a not-placed notice, as the host's screens do", async () => {
+    // "A player" only for those who blocked the host would tell the host exactly who did (managed_profile_names names
+    // them on every screen, 20261125100000).
+    db.rows.game_payment_settings = { requires_approval: true };
+    db.blocked = true;
+    await addPaidPlayerToRoster("g1", "p1");
+    expect(notPlaced()[0].title).toBe("Paid, not on the roster · Pat");
+    expect(notPlaced()[0].body).toMatch(/^Pat's payment for Sunday Run/);
+  });
+
+  it("does not name a suspended player in a not-placed notice", async () => {
+    db.rows.game_payment_settings = { requires_approval: true };
+    db.rows.profiles = { display_name: "Pat", suspended_at: "2026-11-01T00:00:00Z" };
+    await addPaidPlayerToRoster("g1", "p1");
+    expect(notPlaced()[0].title).toBe("Paid, not on the roster · A player");
+  });
+
+  it("still places the player when the block check cannot be read", async () => {
+    db.failing = ["user_blocks"];
+    db.rows.game_payment_settings = { requires_approval: false };
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toEqual({ added: true });
+    expect(error).toHaveBeenCalledWith("[roster] block check before placing failed");
     error.mockRestore();
   });
 

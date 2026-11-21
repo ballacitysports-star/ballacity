@@ -6,6 +6,15 @@
 /** 200 MB — matches the `highlight-videos` bucket limit enforced by Storage. */
 export const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
 
+/**
+ * The fixed sentences a clip is refused with, here (validateVideoSize) and on the server (finalizeVideoUpload). They
+ * tell the member what is wrong, so the reels upload shows them as they are (reel-upload-errors.ts).
+ */
+export const VIDEO_TOO_LARGE_MESSAGE = `Video is too large (max ${MAX_VIDEO_BYTES / (1024 * 1024)} MB)`;
+export const VIDEO_EMPTY_MESSAGE = "The file is empty";
+export const VIDEO_NOT_PLAYABLE_MESSAGE = "That file could not be prepared for playback";
+export const VIDEO_UPLOAD_MISSING_MESSAGE = "Uploaded file could not be found";
+
 export type VideoContainer = "mp4" | "webm" | "quicktime" | null;
 
 export function videoExtension(name: string): string | null {
@@ -32,8 +41,8 @@ export function videoExtension(name: string): string | null {
  * still sniffed server-side by `finalizeVideoUpload`.
  */
 export function validateVideoSize(input: { bytes: number | null | undefined }): string | null {
-  if (!input.bytes || input.bytes <= 0) return "The file is empty";
-  if (input.bytes > MAX_VIDEO_BYTES) return "Video is too large (max 200 MB)";
+  if (!input.bytes || input.bytes <= 0) return VIDEO_EMPTY_MESSAGE;
+  if (input.bytes > MAX_VIDEO_BYTES) return VIDEO_TOO_LARGE_MESSAGE;
   return null;
 }
 

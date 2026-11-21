@@ -19,7 +19,7 @@
  */
 import { readFileSync } from "node:fs";
 import type { FullConfig } from "@playwright/test";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type User } from "@supabase/supabase-js";
 import {
   LEGAL_DOCUMENT_LIST,
   effectiveVersion,
@@ -162,6 +162,22 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
       document_version: effectiveVersion(doc.type, published).version,
     }));
 
+    // One listing of the users for every fixture account. Each upsert used to page through
+    // all of the sandbox's users again (five calls a run, perPage 1000). A failed listing is
+    // forgotten, so the next account asks again, as before.
+    let userListing: Promise<User[]> | null = null;
+    const listAllUsers = (): Promise<User[]> =>
+      (userListing ??= admin.auth.admin
+        .listUsers({ page: 1, perPage: 1000 })
+        .then(({ data, error }) => {
+          if (error) throw new Error(error.message);
+          return data.users;
+        })
+        .catch((err: unknown) => {
+          userListing = null;
+          throw err;
+        }));
+
     async function upsertAccount(acct: {
       email: string;
       password: string;
@@ -185,14 +201,8 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
         is_guardian: false,
       };
       try {
-        const { data: list, error: listErr } = await admin.auth.admin.listUsers({
-          page: 1,
-          perPage: 1000,
-        });
-        if (listErr) throw new Error(listErr.message);
-        const existing = list.users.find(
-          (u) => u.email?.toLowerCase() === acct.email.toLowerCase(),
-        );
+        const users = await listAllUsers();
+        const existing = users.find((u) => u.email?.toLowerCase() === acct.email.toLowerCase());
 
         let id: string | null = existing?.id ?? null;
         if (!existing) {

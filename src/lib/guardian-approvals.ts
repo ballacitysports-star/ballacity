@@ -39,11 +39,22 @@ export type GuardianJoinRequest = {
 };
 
 /**
+ * The guardian's own words for a child still waiting on parental consent (CHILD_ACTIVITY_LOCKED). The guardian reads
+ * it in the Parent Center, which has no control to give consent: consent is given only from the emailed link
+ * (parent.consent.$token), and the child asks for a new email from their account (requestParentalConsent).
+ */
+export const GUARDIAN_CONSENT_NEEDED_MESSAGE =
+  "Your child's account is waiting on your parental consent before they can join a team. Approve it from the consent email we sent you (your child can send a new one from their account), then approve this invite again.";
+
+/**
  * The guardian dashboard's words for a refused approval. guardian_approve_team_invite raises the child's own
- * WAIVER_REQUIRED (the waiver is the child's, signed on their behalf), so it is worded for the parent here.
+ * WAIVER_REQUIRED (the waiver is the child's, signed on their behalf) and CHILD_ACTIVITY_LOCKED (the child still needs
+ * parental consent), so both are worded for the parent here; the catalog keeps the child's own sentences.
  */
 export function guardianApprovalError(e: unknown): string {
-  if (errorCode(e) === "WAIVER_REQUIRED") return "Sign the team's waiver for your child first.";
+  const code = errorCode(e);
+  if (code === "WAIVER_REQUIRED") return "Sign the team's waiver for your child first.";
+  if (code === "CHILD_ACTIVITY_LOCKED") return GUARDIAN_CONSENT_NEEDED_MESSAGE;
   return userErrorMessage(e, "Something went wrong. Please try again.");
 }
 

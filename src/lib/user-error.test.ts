@@ -99,6 +99,9 @@ const DB_RAISES: readonly string[] = [
   "CONSENT_NOT_FOUND",
   "CONSENT_TOKEN_EXPIRED",
   "CONSENT_TOKEN_INVALID",
+  "DECISION_FINAL: a declined request can only be sent again by the player.",
+  "DECISION_FINAL: a reviewed waitlist entry cannot be put back to waiting.",
+  "DECISION_FINAL: a settled payment can only be reopened by the player.",
   "DOB_INVALID: enter a valid date of birth.",
   "DOB_IN_FUTURE: enter a date of birth in the past.",
   "DOB_REQUIRED: enter your child's date of birth.",
@@ -134,6 +137,7 @@ const DB_RAISES: readonly string[] = [
   "GAME_APPROVAL_REQUIRED: the host has to approve your request to join first.",
   "GAME_CANCELLED: this game was cancelled by the host.",
   "GAME_CANCELLED: this game was cancelled, so a payment for it cannot be recorded.",
+  "GAME_CLOSED: a game that is over or called off cannot be reopened.",
   "GAME_COMPLETED: this game has already ended.",
   "GAME_COMPLETED: this game has already ended, so a payment for it cannot be recorded.",
   "GAME_FULL: the roster is full.",
@@ -275,6 +279,7 @@ const DB_RAISES: readonly string[] = [
   "REQUEST_PENDING: you already have a correction under review.",
   "REVIEW_HELD_FOR_SCREENING: your review is published after screening.",
   "ROLE_WRITE_FORBIDDEN: roles are granted and revoked by the server on a superadmin's instruction, never written through the API",
+  "ROW_IDENTITY_FIXED: user_id cannot be changed on this row.",
   "SELF_INVITE",
   "SUPERADMIN_ONLY",
   "TARGET_NOT_MANAGER",
@@ -826,6 +831,47 @@ describe("plain-sentence database refusals", () => {
     expect(userErrorMessage("Invite is no longer pending", FALLBACK)).toBe(
       USER_ERROR_MESSAGES.INVITE_NOT_PENDING,
     );
+  });
+
+  it("tells a signed-out host to sign in, not that they lack permission (game_series_start / _stop)", () => {
+    // Raised with SQLSTATE 42501 and no HINT (20261122100000_game_series.sql), as PostgREST hands them back.
+    expect(
+      userErrorMessage(
+        { message: "Sign in to make a game repeat.", code: "42501", hint: null },
+        FALLBACK,
+      ),
+    ).toBe("Sign in to make a game repeat.");
+    expect(
+      userErrorMessage({ message: "Sign in first.", code: "42501", hint: null }, FALLBACK),
+    ).toBe(USER_ERROR_MESSAGES.AUTH_REQUIRED);
+    // The host-only refusals keep their HINT-coded sentences for start and stop.
+    expect(
+      userErrorMessage(
+        {
+          message: "Only the host can make this game repeat.",
+          code: "42501",
+          hint: "SERIES_NOT_HOST",
+        },
+        FALLBACK,
+      ),
+    ).toBe("Only the host can make this game repeat.");
+    expect(
+      userErrorMessage(
+        { message: "Only the host can stop this series.", code: "42501", hint: "SERIES_NOT_HOST" },
+        FALLBACK,
+      ),
+    ).toBe("Only the host can stop this series.");
+  });
+
+  it("reads a bare Forbidden (assertModerator / assertSuperadmin) as a permission failure", () => {
+    expect(userErrorMessage(new Error("Forbidden"), FALLBACK)).toBe(
+      GENERIC_ERROR_MESSAGES.permission,
+    );
+    expect(userErrorMessage(new Error("Forbidden."), FALLBACK)).toBe(
+      GENERIC_ERROR_MESSAGES.permission,
+    );
+    // Only the whole message: a sentence that merely mentions it is left to the fallback.
+    expect(userErrorMessage(new Error("Forbidden word in title"), FALLBACK)).toBe(FALLBACK);
   });
 
   it("wins over the generic permission sentence for a 42501 refusal of ours", () => {

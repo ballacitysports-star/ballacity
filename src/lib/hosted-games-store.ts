@@ -4,6 +4,7 @@ import type { Game, Sport } from "@/lib/sample-data";
 import { normalizeCutoff } from "@/lib/cancel-window";
 import { imageFor, ME, resolveSportAsset, toStoredCover } from "@/lib/sample-data";
 import { supabase } from "@/integrations/supabase/client";
+import { trackIdentity, type SeenIdentity } from "@/lib/auth-identity";
 import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 
 const STORAGE_KEY = "openrun.hostedGames.v1";
@@ -373,9 +374,14 @@ function ensureRealtime() {
 }
 
 // Re-hydrate when auth state changes so newly signed-in users pull DB rows.
+// A SIGNED_IN for the user already loaded (re-emitted whenever any tab opens
+// or becomes visible) changes nothing, so it does not reload.
 if (typeof window !== "undefined") {
-  supabase.auth.onAuthStateChange((event) => {
-    if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
+  let seenIdentity: SeenIdentity = undefined;
+  supabase.auth.onAuthStateChange((event, session) => {
+    const step = trackIdentity(seenIdentity, event, session);
+    seenIdentity = step.seen;
+    if (step.changed) {
       dbHydrated = false;
       dbHydratePromise = null;
       ensureDbHydrated();

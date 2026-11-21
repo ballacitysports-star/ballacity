@@ -1,5 +1,8 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  CANCELLED_CLAIM_REVIEW_MESSAGE,
+  DECLINED_CLAIM_REVIEW_MESSAGE,
   PAYMENT_STATES,
   PAYMENT_STATE_META,
   canHostConfirm,
@@ -8,6 +11,8 @@ import {
   cancellationReasonLabel,
   isOpenPaymentState,
   paymentStateFor,
+  rosterRowClaimStatus,
+  settledClaimReviewRefusal,
 } from "./payment-states";
 
 describe("canonical payment states", () => {
@@ -90,5 +95,43 @@ describe("cancellation reasons", () => {
     expect(cancellationReasonLabel("game_cancelled")).toBe("Game cancelled");
     expect(cancellationReasonLabel(null)).toBe("Cancelled");
     expect(cancellationReasonLabel("nonsense")).toBe("Cancelled");
+  });
+});
+
+describe("a host cannot mark a cancelled or declined claim paid (DECISION_FINAL, 20261125100000)", () => {
+  it("refuses Mark as paid, in words, on a cancelled or declined latest claim", () => {
+    expect(settledClaimReviewRefusal("cancelled", "verified")).toBe(CANCELLED_CLAIM_REVIEW_MESSAGE);
+    expect(settledClaimReviewRefusal("rejected", "verified")).toBe(DECLINED_CLAIM_REVIEW_MESSAGE);
+    expect(settledClaimReviewRefusal("cancelled", "pending")).toBe(CANCELLED_CLAIM_REVIEW_MESSAGE);
+  });
+
+  it("allows what the database allows: verifying a pending or disputed claim, declining, marking unpaid", () => {
+    expect(settledClaimReviewRefusal("pending", "verified")).toBeNull();
+    expect(settledClaimReviewRefusal("disputed", "verified")).toBeNull();
+    expect(settledClaimReviewRefusal("cancelled", "rejected")).toBeNull();
+    expect(settledClaimReviewRefusal("verified", "pending")).toBeNull();
+  });
+
+  it("reviewPaymentAction checks it before updating the existing claim", () => {
+    const src = readFileSync("src/lib/payments.functions.ts", "utf8");
+    const check = src.indexOf("settledClaimReviewRefusal(existing.status, next)");
+    const update = src.indexOf(".update({\n        status: next,");
+    expect(check).toBeGreaterThan(0);
+    expect(update).toBeGreaterThan(check);
+  });
+
+  it("the roster row keeps a cancelled claim as its own state, with no Mark as paid button", () => {
+    expect(rosterRowClaimStatus("cancelled")).toBe("cancelled");
+    expect(rosterRowClaimStatus("rejected")).toBe("rejected");
+    expect(rosterRowClaimStatus("disputed")).toBeNull();
+    expect(rosterRowClaimStatus(undefined)).toBeNull();
+    const src = readFileSync("src/components/game-detail/RosterPlayerRow.tsx", "utf8");
+    expect(src).toMatch(/const shown = rosterRowClaimStatus\(d\?\.status\);/);
+    expect(src).toMatch(
+      /paymentStatus === "cancelled" && \([\s\S]{0,400}Claim cancelled\. The player can send their payment again\./,
+    );
+    expect(src).toMatch(
+      /paymentStatus === "none" && \([\s\S]{0,200}onClick=\{markPaidNoSubmission\}/,
+    );
   });
 });

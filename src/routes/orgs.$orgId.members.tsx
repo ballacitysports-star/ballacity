@@ -97,9 +97,11 @@ function MembersPage() {
   }, [orgId]);
 
   const membersQ = useQuery({
-    queryKey: ["org-members", orgId],
+    // Keyed on the viewer (the list is read as them); invalidations below match
+    // by the ["org-members", orgId] prefix.
+    queryKey: ["org-members", orgId, userId],
     queryFn: () => listOrgMembers({ data: { orgId } }),
-    enabled: isAdmin,
+    enabled: isAdmin && !!userId,
   });
 
   const requestsQ = useQuery({

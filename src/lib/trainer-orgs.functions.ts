@@ -1023,16 +1023,27 @@ export const deleteTrainerOrg = createServerFn({ method: "POST" })
 // Generic (non-trainer) org membership
 // ============================================================
 
+/**
+ * The facility's member list, read as the caller. The only read rule on
+ * org_members is "Org-scoped members can view org members" (TO authenticated):
+ * a member or facility admin sees every row, any other signed-in person sees
+ * only their own row, and a visitor (anon) has no grant at all. So a signed-out
+ * caller gets an empty list without asking the database, and a signed-in one is
+ * read with their own bearer client, never the anon key (which failed with
+ * "permission denied for table org_members" for everyone).
+ */
 export const listOrgMembers = createServerFn({ method: "GET" })
   .inputValidator((d: { orgId: string }) => z.object({ orgId: z.string().uuid() }).parse(d))
   .handler(async ({ data }) => {
-    const sb = publicClient();
+    const { sb, signedIn } = viewerClient();
+    if (!signedIn) return [];
     const { data: rows, error } = await sb
       .from("org_members")
       .select("id, org_id, user_id, role, created_at")
       .eq("org_id", data.orgId)
       .order("created_at", { ascending: true });
-    if (error) throw new Error(error.message);
+    // Rethrow the PostgREST error itself so the UI mappers still see its code.
+    if (error) throw error;
     const userIds = Array.from(new Set((rows ?? []).map((r) => r.user_id)));
     let profiles: Array<{
       id: string;
@@ -1045,6 +1056,9 @@ export const listOrgMembers = createServerFn({ method: "GET" })
         .from("profiles")
         .select("id, display_name, avatar_initials, avatar_url")
         .in("id", userIds);
+      // A block (either way) or a suspension hides the row, and the member
+      // then shows as "Member", for a facility admin too: a membership can be
+      // added without the person's consent, so it is no reason to name them.
       profiles = profs ?? [];
     }
     const map = new Map(profiles.map((p) => [p.id, p]));

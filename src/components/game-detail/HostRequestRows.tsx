@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { reviewJoinRequest, type JoinRequest } from "@/lib/payments";
 import { HOST_APPROVE_NOTE, hostBadge } from "@/lib/join-guardian-status";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchProfileNameBits } from "@/lib/managed-profile-names";
 import { userErrorMessage } from "@/lib/user-error";
 import {
   blockConfirmText,
@@ -16,11 +17,9 @@ import {
   notifyJoinReview,
 } from "@/components/game-detail/game-player-actions";
 
-type ProfileBits = {
-  display_name?: string | null;
-  avatar_initials?: string | null;
-  avatar_url?: string | null;
-};
+// The requester's name and avatar for the host: fetchProfileNameBits. A block or suspension hides the
+// profile row, but the host still has to tell who asked for a spot, so a missing row is filled from
+// managed_profile_names (null when not allowed).
 
 export function HostRequestRow({
   req,
@@ -41,12 +40,8 @@ export function HostRequestRow({
   const [age, setAge] = useState<number | null>(null);
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("display_name, avatar_initials, avatar_url")
-        .eq("id", req.player_id)
-        .maybeSingle();
-      if (data) setName((data as ProfileBits).display_name ?? "Player");
+      const data = await fetchProfileNameBits(supabase, req.player_id);
+      if (data) setName(data.display_name ?? "Player");
       const ages = await fetchProfileAges([req.player_id]);
       setAge(ages[req.player_id] ?? null);
     })();
@@ -204,16 +199,12 @@ export function HostPendingChip({
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("display_name, avatar_initials, avatar_url")
-        .eq("id", req.player_id)
-        .maybeSingle();
+      const data = await fetchProfileNameBits(supabase, req.player_id);
       if (data) {
-        const dn = (data as ProfileBits).display_name ?? "Player";
+        const dn = data.display_name ?? "Player";
         setName(dn);
-        setInitials(((data as ProfileBits).avatar_initials ?? dn.slice(0, 2)).toUpperCase());
-        setAvatarUrl((data as ProfileBits).avatar_url ?? null);
+        setInitials((data.avatar_initials ?? dn.slice(0, 2)).toUpperCase());
+        setAvatarUrl(data.avatar_url ?? null);
       }
     })();
   }, [req.player_id]);
