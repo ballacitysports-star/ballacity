@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { restoreSession } from "./helpers/signed-in";
+import { payFixtureGameRow, serveFixtureGame } from "./helpers/pay-fixtures";
 import { stubRiskAcknowledged } from "./helpers/risk-ack";
 
 /**
@@ -147,8 +148,13 @@ async function assertPayScreenRendered(page: Page, gameId: string) {
   await page.waitForURL((u) => u.pathname === `/games/${gameId}/pay`, { timeout: 10_000 });
   // Must NOT show the not-found fallback.
   await expect(page.getByText(/game not found/i)).toHaveCount(0);
-  // Title heading is rendered on the pay screen.
-  await expect(page.locator("h1").first()).toBeVisible({ timeout: 10_000 });
+  // The URL changes before the pay screen replaces the game page: the router
+  // still has to load the pay route's code. Any h1 matched the game page's own
+  // title in that window, so the checks after this one started early and could
+  // time out (seen once in 160 runs). Wait for the pay screen's fee card, which
+  // only the pay screen renders.
+  await expect(page.getByText("Entry fee", { exact: true })).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator("h1").first()).toBeVisible();
 }
 
 test("Pay host button on a custom (sample) game routes to the pay screen", async ({ browser }) => {
@@ -160,6 +166,10 @@ test("Pay host button on a custom (sample) game routes to the pay screen", async
   // Not a spec about "Before you join": the viewer has acknowledged it, so the pay page (which asks it
   // before any payment option, docs/paid-path-gates.md section 7) goes straight to the options.
   await stubRiskAcknowledged(page);
+  // The game itself: g2 is not a sample game, so the pay page looks it up in
+  // hosted_games. Served here, hosted by the spec's mocked host, so the screen
+  // never waits on the real row (unanswered, a slow read ended on "Game not found").
+  await serveFixtureGame(page, payFixtureGameRow(CUSTOM_GAME_ID, { host_id: FAKE_HOST_ID }));
   await restoreSession(page);
 
   await page.goto(`/games/${CUSTOM_GAME_ID}`, { waitUntil: "domcontentloaded" });
@@ -252,6 +262,7 @@ test("Pay host still renders when optional status lookups hang", async ({ browse
   );
 
   await stubRiskAcknowledged(page);
+  await serveFixtureGame(page, payFixtureGameRow(CUSTOM_GAME_ID, { host_id: FAKE_HOST_ID }));
   await restoreSession(page);
   await page.goto(`/games/${CUSTOM_GAME_ID}`, { waitUntil: "domcontentloaded" });
 
@@ -307,6 +318,7 @@ test("Pay screen exits payment-options loading when payment settings hang", asyn
   );
 
   await stubRiskAcknowledged(page);
+  await serveFixtureGame(page, payFixtureGameRow(CUSTOM_GAME_ID, { host_id: FAKE_HOST_ID }));
   await restoreSession(page);
   await page.goto(`/games/${CUSTOM_GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
 
@@ -328,6 +340,7 @@ test("Pay host button remains a pay link when local joined state is stale", asyn
 
   await mockPaymentBackend(page, CUSTOM_GAME_ID, { writeAttempts });
   await stubRiskAcknowledged(page);
+  await serveFixtureGame(page, payFixtureGameRow(CUSTOM_GAME_ID, { host_id: FAKE_HOST_ID }));
   await restoreSession(page);
   await page.evaluate(
     (gameId) => window.localStorage.setItem("openrun.joinedGameIds.v1", JSON.stringify([gameId])),
@@ -359,6 +372,7 @@ test("Payment status button with a pending submission still routes to the pay sc
     writeAttempts,
   });
   await stubRiskAcknowledged(page);
+  await serveFixtureGame(page, payFixtureGameRow(CUSTOM_GAME_ID, { host_id: FAKE_HOST_ID }));
   await restoreSession(page);
   await page.evaluate(
     (gameId) => window.localStorage.setItem("openrun.joinedGameIds.v1", JSON.stringify([gameId])),
@@ -394,6 +408,7 @@ test("Payment rejected button routes back to the pay screen without deleting the
     writeAttempts,
   });
   await stubRiskAcknowledged(page);
+  await serveFixtureGame(page, payFixtureGameRow(CUSTOM_GAME_ID, { host_id: FAKE_HOST_ID }));
   await restoreSession(page);
   await page.evaluate(
     (gameId) => window.localStorage.setItem("openrun.joinedGameIds.v1", JSON.stringify([gameId])),
