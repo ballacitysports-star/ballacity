@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { settledClaimReviewRefusal } from "@/lib/payment-states";
 
 type Next = "verified" | "rejected" | "pending";
 /** Any status a submission may currently hold (host actions only set `Next`). */
@@ -222,6 +223,11 @@ export const reviewPaymentAction = createServerFn({ method: "POST" })
         `Payment status changed since you loaded the page (now ${existing.status}). Please refresh.`,
       );
     }
+
+    // A cancelled or declined claim is final for the host (DECISION_FINAL in the database, 20261125100000): only the
+    // player reopens it. Say so instead of sending an update the database refuses ("Mark as paid" on a cancelled claim).
+    const refusal = settledClaimReviewRefusal(existing.status, next);
+    if (refusal) throw new Error(refusal);
 
     // Conditional update: only apply when the row is still in its prior status.
     // Serializes concurrent host clicks — the second one affects zero rows.

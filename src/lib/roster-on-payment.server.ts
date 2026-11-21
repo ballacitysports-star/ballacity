@@ -7,6 +7,12 @@
 // the payment stays verified and the host and the player are both told in-app
 // (notification type "payment_not_placed", in the Payment updates category),
 // so a confirmed payment without a place is never silent.
+//
+// A host's block of the player is honoured as the join gate honours it (enforce_host_block, and the payment claim gate):
+// the player is not placed by the server. A player who blocked the host is placed, as the gates let them request a spot
+// and pay. The host's notice names the player, as the host's screens do (managed_profile_names, 20261125100000),
+// except a suspended account ("A player", as visible_avatars has no entry for it). Naming only some of them would
+// tell the host which payers blocked them.
 
 /** Why a verified payment did not give the player a place. */
 export type NotPlacedReason =
@@ -139,6 +145,25 @@ export async function addPaidPlayerToRoster(
   ]);
   if (!game) return { added: false, reason: "game_missing" };
 
+  const hostId = (game as { host_id: string }).host_id;
+
+  /** Whether the host has blocked the player (the join gate's test); null when that could not be read. */
+  const hostBlockedPlayer = async (): Promise<boolean | null> => {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from("user_blocks")
+        .select("blocker_id")
+        .eq("blocker_id", hostId)
+        .eq("blocked_id", playerId)
+        .limit(1)
+        .maybeSingle();
+      if (error) return null;
+      return !!data;
+    } catch {
+      return null;
+    }
+  };
+
   /** The payment is verified and the place was not given: tell both sides, never fail the caller. */
   const notPlaced = async (
     reason: "cancelled" | "approval_required" | "refused",
@@ -148,17 +173,20 @@ export async function addPaidPlayerToRoster(
     try {
       const { data: profile } = await supabaseAdmin
         .from("profiles")
-        .select("display_name")
+        .select("display_name, suspended_at")
         .eq("id", playerId)
         .maybeSingle();
+      const p = profile as { display_name?: string | null; suspended_at?: string | null } | null;
+      // A block does not change the name (see the top of this file); a suspension does.
+      const hidden = !!p?.suspended_at;
       const notices = notPlacedNotices({
         reason,
         code,
         gameId,
         gameTitle: (game as { title?: string | null }).title ?? null,
-        hostId: (game as { host_id: string }).host_id,
+        hostId,
         playerId,
-        playerName: (profile as { display_name?: string | null } | null)?.display_name ?? null,
+        playerName: hidden ? null : (p?.display_name ?? null),
       });
       const { error } = await supabaseAdmin.from("notifications").insert(notices as never);
       if (error) console.error("[roster] not-placed notice failed", error.message);
@@ -196,6 +224,13 @@ export async function addPaidPlayerToRoster(
       .maybeSingle();
     if (!req) return notPlaced("approval_required");
   }
+
+  // The server's insert passes no join gate check for blocks (auth.uid() is not the player), so it is made here, the
+  // gate's way: only the host's block of the player refuses. An unreadable answer does not stop the place: that is how
+  // it was before this check.
+  const blocked = await hostBlockedPlayer();
+  if (blocked === null) console.error("[roster] block check before placing failed");
+  if (blocked === true) return notPlaced("refused");
 
   const row: Record<string, unknown> = { game_id: gameId, user_id: playerId };
   if (position && position.trim()) row.position = position.trim();

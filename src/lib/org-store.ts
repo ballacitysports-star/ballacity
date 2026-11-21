@@ -9,6 +9,7 @@ import {
   type Sport,
 } from "./sample-data";
 import { supabase } from "@/integrations/supabase/client";
+import { trackIdentity, type SeenIdentity } from "@/lib/auth-identity";
 import { createTeam, deleteTeam, listTeams, updateTeam } from "./teams.functions";
 import { normalizeCutoff } from "@/lib/cancel-window";
 
@@ -293,9 +294,14 @@ export async function hydrateOrgs(): Promise<void> {
 }
 
 // Re-hydrate on auth change so ownership flags flip immediately.
+// A SIGNED_IN for the user already loaded (re-emitted whenever any tab opens
+// or becomes visible) changes nothing, so it does not reload.
 if (typeof window !== "undefined") {
-  supabase.auth.onAuthStateChange((event) => {
-    if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
+  let seenIdentity: SeenIdentity = undefined;
+  supabase.auth.onAuthStateChange((event, session) => {
+    const step = trackIdentity(seenIdentity, event, session);
+    seenIdentity = step.seen;
+    if (step.changed) {
       hydratePromise = null;
       if (event === "SIGNED_OUT") {
         // Whole rows are for signed-in viewers; don't keep them in memory after sign-out.

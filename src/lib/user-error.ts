@@ -107,6 +107,8 @@ export const USER_ERROR_MESSAGES = {
   CONSENT_TOKEN_EXPIRED: "This approval link has expired. Ask your child to send a new one.",
   CONSENT_TOKEN_INVALID:
     "This approval link isn't valid or was already used. Ask your child to send a new one.",
+  // A host reopening what has ended: a declined request, a reviewed waitlist entry, a settled payment (20261125100000).
+  DECISION_FINAL: "That was already decided, so it can't be reopened.",
   DOB_INVALID: "That date of birth isn't valid. Check the month, day and year.",
   DOB_IN_FUTURE: "A date of birth can't be in the future.",
   DOB_REQUIRED: "Enter your date of birth.",
@@ -143,6 +145,8 @@ export const USER_ERROR_MESSAGES = {
   FORBIDDEN: "You don't have access to that.",
   GAME_APPROVAL_REQUIRED: "The host has to approve your request before you can join.",
   GAME_CANCELLED: "This game was cancelled by the host.",
+  // A host reopening a game that is over or called off (20261125100000).
+  GAME_CLOSED: "This game is over or called off, so it can't be reopened. Post a new game instead.",
   GAME_COMPLETED: "This game has already ended.",
   // A host can turn the waitlist off, so the join caller adds the waitlist step (joinGateErrorMessage).
   GAME_FULL: "This game is full.",
@@ -288,6 +292,8 @@ export const USER_ERROR_MESSAGES = {
   REQUEST_PENDING: "You already have a date of birth correction waiting for review.",
   REVIEW_HELD_FOR_SCREENING: "Your review will be published after screening.",
   ROLE_WRITE_FORBIDDEN: "You don't have access to that.",
+  // A waitlist entry or payment submission keeps who and which game it is about (20261125100000).
+  ROW_IDENTITY_FIXED: "This can't be moved to another person or game.",
   SELF_INVITE: "You can't invite yourself.",
   // Hint-coded (20261122100000), in the database's own words like GAME_TEAM_NOT_MANAGED.
   SERIES_ALREADY: "This game is already part of a series.",
@@ -547,6 +553,10 @@ export const DATABASE_SENTENCE_REFUSALS: readonly { when: RegExp; message: strin
   // accept_trainer_org_invite (20261027160000_trainer_org_no_forged_affiliation.sql).
   { when: /^Invite is no longer pending\.?$/, message: USER_ERROR_MESSAGES.INVITE_NOT_PENDING },
   { when: /^Invite not found\.?$/, message: USER_ERROR_MESSAGES.INVITE_NOT_FOUND },
+  // game_series_start / game_series_stop (20261122100000_game_series.sql) raise these with SQLSTATE 42501 and no
+  // HINT; matched here, before the 42501 permission sentence, so a signed-out host is told to sign in.
+  { when: /^Sign in to make a game repeat\.?$/, message: "Sign in to make a game repeat." },
+  { when: /^Sign in first\.?$/, message: USER_ERROR_MESSAGES.AUTH_REQUIRED },
   // mark_refund_sent (20261008170000_guardian_refund_notices.sql).
   {
     when: /^Payment not found\.?$/,
@@ -675,7 +685,9 @@ const OFFLINE_TEXT =
   /failed to fetch|networkerror|network request failed|network error|load failed|fetch failed|err_network|err_internet_disconnected|econnrefused|econnreset|enotfound|eai_again|etimedout|socket hang up/i;
 const SESSION_TEXT =
   /jwt expired|invalid jwt|jwserror|jwt malformed|auth session missing|refresh token|session (?:has )?expired|session_not_found|^unauthorized\b|^not authenticated\b/i;
-const PERMISSION_TEXT = /row-level security|permission denied|insufficient privilege/i;
+// The last alternative is the bare "Forbidden" that assertModerator / assertSuperadmin throw for a missing role.
+const PERMISSION_TEXT =
+  /row-level security|permission denied|insufficient privilege|^Forbidden\.?$/i;
 const DUPLICATE_TEXT = /duplicate key value|violates unique constraint/i;
 
 function field(err: unknown, key: string): unknown {

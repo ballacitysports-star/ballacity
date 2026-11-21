@@ -1,6 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getCurrentUserId } from "@/lib/current-user-id";
-import { ATTACHMENT_ACCEPT } from "@/lib/message-attachment-validation";
+import {
+  ATTACHMENT_ACCEPT,
+  ATTACHMENT_TOO_LARGE_MESSAGE,
+  ATTACHMENT_TYPE_MESSAGE,
+  MAX_ATTACHMENT_BYTES,
+} from "@/lib/message-attachment-validation";
 import { finalizeMessageAttachment } from "@/lib/message-attachments.functions";
 import { createNotification } from "@/lib/notifications";
 
@@ -377,14 +382,10 @@ export async function uploadMessageAttachment(
 ): Promise<Attachment> {
   const uid = await getCurrentUserId();
   if (!uid) throw new Error("Sign in to send attachments.");
-  const MAX = 20 * 1024 * 1024;
-  if (file.size > MAX) throw new Error("Attachment too large (max 20MB).");
-  // Early, friendly refusal. The server decides from the file's real bytes.
-  if (!ATTACHMENT_ACCEPT.split(",").includes(file.type)) {
-    throw new Error(
-      "That file type is not allowed. Send a photo (JPG, PNG, WEBP), a video (MP4, MOV, WEBM) or a PDF.",
-    );
-  }
+  // Early, friendly refusals with the shared sentences, which the send-error display passes on as they are
+  // (ATTACHMENT_REFUSAL_MESSAGES). The server decides from the file's real bytes.
+  if (file.size > MAX_ATTACHMENT_BYTES) throw new Error(ATTACHMENT_TOO_LARGE_MESSAGE);
+  if (!ATTACHMENT_ACCEPT.split(",").includes(file.type)) throw new Error(ATTACHMENT_TYPE_MESSAGE);
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
   const path = `${convId}/${uid}/${Date.now()}-${safeName}`;
   const contentType = file.type || "application/octet-stream";

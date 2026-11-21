@@ -36,13 +36,14 @@ export function useManagedSessionWatcher() {
   useEffect(() => {
     if (auth.loading || auth.user || isIdentitySwitchInProgress()) return;
     if (!readParkedGuardianSession()) return;
-    // No user is not yet proof that the child's session is gone. When the
-    // server check of the stored session outlasts the auth store's hydration
-    // timeout (a slow auth server on any full page load), the store publishes
-    // "no user" and then the user once the check answers. Switching back on
-    // that signed the child out and sent the guardian to the Parent Center
-    // unasked. So act only once the client holds no session either. A sign-out
-    // that comes later is a new auth state, and this runs again for it.
+    // No user is not yet proof that the child's session is gone. The auth
+    // store now publishes the stored session when only its server check is
+    // slow, but when reading storage itself outlasts the hydration timeout it
+    // still publishes "no user" and then the user once the read answers.
+    // Switching back on that signed the child out and sent the guardian to the
+    // Parent Center unasked. So act only once the client holds no session
+    // either. A sign-out that comes later is a new auth state, and this runs
+    // again for it.
     let cancelled = false;
     void supabase.auth
       .getSession()

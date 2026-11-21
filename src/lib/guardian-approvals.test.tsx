@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { userErrorMessage } from "@/lib/user-error";
 
 /**
  * A minor's game request needs the host's answer and the guardian's, in either
@@ -160,6 +161,33 @@ describe("guardianApprovalError", () => {
     );
     expect(guardianApprovalError({ message: raw, code: "P0001" })).toBe(
       "Sign the team's waiver for your child first.",
+    );
+  });
+
+  it("asks the parent for their own consent, not someone else's (CHILD_ACTIVITY_LOCKED)", () => {
+    // guardian_approve_team_invite raises the bare code when child_features_locked (20261111120000).
+    const parentSentence =
+      "Your child's account is waiting on your parental consent before they can join a team. Approve it from the consent email we sent you (your child can send a new one from their account), then approve this invite again.";
+    expect(guardianApprovalError(new Error("CHILD_ACTIVITY_LOCKED"))).toBe(parentSentence);
+    expect(guardianApprovalError({ message: "CHILD_ACTIVITY_LOCKED", code: "P0001" })).toBe(
+      parentSentence,
+    );
+    expect(guardianApprovalError(new Error("CHILD_ACTIVITY_LOCKED"))).not.toMatch(
+      /A parent or guardian needs/,
+    );
+    // The guardian reads it inside the Parent Center, which has no consent control: point at the email.
+    expect(guardianApprovalError(new Error("CHILD_ACTIVITY_LOCKED"))).not.toMatch(/Parent Center/);
+    expect(guardianApprovalError(new Error("CHILD_ACTIVITY_LOCKED"))).toMatch(/consent email/);
+    // The child's own screens keep the catalog sentence.
+    expect(userErrorMessage(new Error("CHILD_ACTIVITY_LOCKED"), "x")).toBe(
+      "A parent or guardian needs to approve this account before it can join a team.",
+    );
+    // The waiver wording and the fallback are unchanged.
+    expect(guardianApprovalError(new Error("WAIVER_REQUIRED"))).toBe(
+      "Sign the team's waiver for your child first.",
+    );
+    expect(guardianApprovalError(new Error("something odd"))).toBe(
+      "Something went wrong. Please try again.",
     );
   });
 

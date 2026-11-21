@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { FEATURED_LIMIT_MESSAGE } from "@/lib/featured-orgs";
+import { FACILITY_NOT_FOUND_MESSAGE, FEATURED_LIMIT_MESSAGE } from "@/lib/featured-orgs";
 import { errorText, userErrorMessage } from "@/lib/user-error";
 import { useAuth } from "@/hooks/use-auth";
 import type { ListingSubjectType } from "@/lib/listings.functions";
@@ -45,11 +45,31 @@ export const CLAIM_STATUS_LABEL: Record<MyClaim["status"], string> = {
 
 /**
  * Turn a listing RPC's error code into something a person can act on; any other failure reads as a generic sentence,
- * never as the database's text. The moderators' featured-venue limit (setOrgFeatured) keeps its own sentence.
+ * never as the database's text. The moderators' featured-venue sentences (setOrgFeatured: the limit, a facility that
+ * is gone) are passed on as they are.
  */
 export function listingErrorMessage(err: unknown): string {
-  if (errorText(err) === FEATURED_LIMIT_MESSAGE) return FEATURED_LIMIT_MESSAGE;
+  const text = errorText(err);
+  if (text === FEATURED_LIMIT_MESSAGE || text === FACILITY_NOT_FOUND_MESSAGE) return text;
   return userErrorMessage(err, "Something went wrong. Please try again.");
+}
+
+/** assertModerator / assertSuperadmin refuse a caller without the role (or who lost it) with this bare text. */
+const FORBIDDEN_TEXT = /^Forbidden\.?$/;
+
+/**
+ * What the staff listings panel (claims queue, unclaimed listings, featured facilities) shows when an action fails.
+ * Staff read the same sentences as listingErrorMessage, plus a short code for the two refusals they may need to
+ * report: a facility that is gone and a missing moderator role. Never for member screens.
+ */
+export function adminListingErrorMessage(err: unknown): string {
+  const text = errorText(err);
+  if (text === FACILITY_NOT_FOUND_MESSAGE)
+    return `${FACILITY_NOT_FOUND_MESSAGE} (FACILITY_NOT_FOUND)`;
+  if (text && FORBIDDEN_TEXT.test(text)) {
+    return "Your account doesn't have moderator access for this. Sign in again or ask a superadmin. (FORBIDDEN)";
+  }
+  return listingErrorMessage(err);
 }
 
 async function rpc(name: string, args: Record<string, unknown>) {

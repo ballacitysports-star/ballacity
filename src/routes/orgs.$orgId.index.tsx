@@ -522,9 +522,14 @@ function RequestToJoin({
 function MembersSection({ orgId, isAdmin }: { orgId: string; isAdmin: boolean }) {
   const qc = useQueryClient();
   const auth = useAuth();
-  const { data } = useQuery({
-    queryKey: ["org-members", orgId],
+  const viewerId = auth.user?.id ?? null;
+  // Keyed on the viewer: a list read while signed out (always empty) must not be
+  // reused once someone signs in. Visitors have no read grant on org_members, so
+  // they are not asked at all.
+  const { data, isSuccess } = useQuery({
+    queryKey: ["org-members", orgId, viewerId],
     queryFn: () => listOrgMembers({ data: { orgId } }),
+    enabled: !!viewerId,
   });
   const rows = data ?? [];
 
@@ -538,6 +543,11 @@ function MembersSection({ orgId, isAdmin }: { orgId: string; isAdmin: boolean })
       toast.error(userErrorMessage(e, "Couldn't remove this member. Please try again."));
     }
   }
+
+  // Only members and facility admins may read the list. Anyone else (a visitor,
+  // or a signed-in non-member, who reads back no rows) sees no section rather
+  // than a misleading "No members yet".
+  if (!viewerId || !isSuccess || (rows.length === 0 && !isAdmin)) return null;
 
   return (
     <section className="rounded-2xl border border-border/60 bg-surface p-4">

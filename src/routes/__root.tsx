@@ -24,6 +24,7 @@ import { SwipeNavigator } from "@/components/navigation/SwipeNavigator";
 import { ClientOnly } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { getCurrentUserId } from "@/lib/current-user-id";
+import { trackIdentity, type SeenIdentity } from "@/lib/auth-identity";
 import { Toaster } from "@/components/ui/sonner";
 import { runLegacyHostMigration } from "@/lib/legacy-host-migration";
 import { useAuth } from "@/hooks/use-auth";
@@ -927,13 +928,19 @@ function RootComponent() {
     void getCurrentUserId().then((id) => {
       if (id) runLegacyHostMigration(id);
     });
+    // The identity this tab last reacted to (undefined until the first event).
+    let seenIdentity: SeenIdentity = undefined;
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       // Only react to identity transitions. TOKEN_REFRESHED / INITIAL_SESSION
       // fire on every mount and every ~hour of tab focus — invalidating on
-      // those thrashes the router and can 401-storm protected queries.
-      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") {
-        return;
-      }
+      // those thrashes the router and can 401-storm protected queries. The
+      // same goes for SIGNED_IN with the user already signed in: supabase-js
+      // re-emits it whenever a tab opens or becomes visible, and broadcasts it
+      // to every other tab, so each new tab reloaded every query everywhere.
+      // INITIAL_SESSION only records who is signed in, without reloading.
+      const step = trackIdentity(seenIdentity, event, session);
+      seenIdentity = step.seen;
+      if (!step.changed) return;
       router.invalidate();
       if (event !== "SIGNED_OUT") {
         queryClient.invalidateQueries();

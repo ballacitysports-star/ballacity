@@ -58,7 +58,8 @@ export async function startGameSeries(
       _until: choice.until,
     } as never,
   );
-  if (error) throw new Error(error.message);
+  // The PostgREST error itself, so its SQLSTATE and HINT code (SERIES_*) reach userErrorMessage.
+  if (error) throw error;
   const d = (data ?? {}) as { series_id?: string; created?: number };
   return { seriesId: String(d.series_id ?? ""), created: Number(d.created ?? 0) };
 }
@@ -70,6 +71,6 @@ export async function stopGameSeries(seriesId: string): Promise<boolean> {
       _series: seriesId,
     } as never,
   );
-  if (error) throw new Error(error.message);
+  if (error) throw error;
   return !!data;
 }

@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
 import { serveHostedGame } from "./helpers/realtime-game-row";
+import { answerSessionChecks } from "./helpers/signed-in";
 
 /**
  * E2E: viewing the game as the host, when a player leaves (their
@@ -39,6 +40,11 @@ const JOIN_REQ_ID = "mock-pending-req-id";
 const isTable = (url: string | URL, table: string) => String(url).includes(`/rest/v1/${table}`);
 
 async function restoreSession(page: Page) {
+  // Answer the session checks every load starts (GET /auth/v1/user and the root gate's
+  // age, onboarding and child-status server functions) from the injected session, as the
+  // pay specs do. They are not what this spec is about, and each signed-in load
+  // otherwise sends the shared sandbox 8-13 requests for them. See helpers/signed-in.ts.
+  await answerSessionChecks(page);
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(
     ([key, value]) => window.localStorage.setItem(key!, value!),

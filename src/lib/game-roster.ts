@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { withManagedProfileNames } from "@/lib/managed-profile-names";
 
 export type LiveParticipant = {
   userId: string;
@@ -43,7 +44,10 @@ async function fetchProfiles(userIds: string[]): Promise<Map<string, ProfileRow>
     .from("profiles")
     .select("id, display_name, username, avatar_initials, avatar_url")
     .in("id", userIds);
-  (data ?? []).forEach((p) => map.set(p.id, p as ProfileRow));
+  // A block or suspension hides a row. The game's host still gets the name of
+  // everyone on their roster; anyone else gets nothing more ("Player").
+  const rows = await withManagedProfileNames(supabase, userIds, data);
+  rows.forEach((p) => map.set(p.id, p as ProfileRow));
   return map;
 }
 

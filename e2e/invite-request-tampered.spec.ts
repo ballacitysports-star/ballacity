@@ -2,6 +2,7 @@ import { openAlertsAndTap } from "./helpers/invite-alerts";
 import { fulfillRows } from "./helpers/invite-postgrest";
 import { mockRiskNotAcknowledged, watchRiskDialog } from "./helpers/risk-ack";
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { answerSessionChecks } from "./helpers/signed-in";
 
 /**
  * E2E: the "Request to join" CTA on an approval-gated game must show an error
@@ -37,6 +38,11 @@ const REAL_HOST_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
 const TAMPERED_HOST_ID = "ffffffff-0000-1111-2222-333333333333";
 
 async function restoreSession(page: Page) {
+  // Answer the session checks every load starts (GET /auth/v1/user and the root gate's
+  // age, onboarding and child-status server functions) from the injected session, as the
+  // pay specs do. They are not what this spec is about, and each signed-in load
+  // otherwise sends the shared sandbox 8-13 requests for them. See helpers/signed-in.ts.
+  await answerSessionChecks(page);
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(
     ([key, value]) => window.localStorage.setItem(key!, value!),

@@ -148,9 +148,12 @@ function EditOrg() {
     },
   });
 
+  // Read as the signed-in editor (org_members has no anon read grant); keyed on
+  // the viewer so a list read before sign-in is never reused after it.
   const genericMembersQ = useQuery({
-    queryKey: ["org-edit-generic-members", orgId],
+    queryKey: ["org-edit-generic-members", orgId, userId],
     queryFn: () => listOrgMembers({ data: { orgId } }),
+    enabled: !!userId,
   });
 
   useEffect(() => {
@@ -428,7 +431,7 @@ function EditOrg() {
         <p className="text-[11px] text-muted-foreground">
           Members who joined this gym through a request to join. Change their role or remove them.
         </p>
-        {genericMembersQ.isLoading ? (
+        {!userId || genericMembersQ.isLoading ? (
           <div className="text-xs text-muted-foreground">Loading…</div>
         ) : (genericMembersQ.data ?? []).length === 0 ? (
           <div className="text-xs text-muted-foreground">No members yet.</div>

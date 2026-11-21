@@ -53,6 +53,16 @@ export function formatClipLength(seconds: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
+/**
+ * The shapes of the plan-limit refusals below, as uploadSizeProblem / clipLengthProblem / resolutionProblem word them.
+ * finalizeVideoUpload re-checks them on the server, and the reels upload shows them as they are (reel-upload-errors.ts).
+ */
+export const PLAN_LIMIT_REFUSALS: readonly RegExp[] = [
+  /^This video is \d+ MB\. Your plan allows uploads up to \d+(?:\.\d+)? MB\.$/,
+  /^This clip is \d+:\d{2} long\. Your plan allows clips up to \d+:\d{2}\.$/,
+  /^This clip is \d+×\d+\. Your plan allows up to \d+ pixels on the longer side\.$/,
+];
+
 /** A user-facing refusal, or null when the file fits. */
 export function uploadSizeProblem(bytes: number, limits: ClipLimits): string | null {
   if (bytes > limits.maxUploadMb * MB) {

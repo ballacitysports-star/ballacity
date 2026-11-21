@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { BellRing, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { withManagedProfileNames } from "@/lib/managed-profile-names";
 import { createNotification } from "@/lib/notifications";
 import { UserAvatar } from "@/components/UserAvatar";
 import { formatGameWhen } from "@/lib/format";
@@ -12,7 +13,12 @@ type Row = {
   title: string;
   date: string;
   price: number;
-  players: { id: string; name: string; avatarUrl: string | null; status: "unpaid" | "pending" | "rejected" }[];
+  players: {
+    id: string;
+    name: string;
+    avatarUrl: string | null;
+    status: "unpaid" | "pending" | "rejected";
+  }[];
 };
 
 /** Host view: every player on the host's paid, active games who isn't verified paid yet. */
@@ -68,9 +74,14 @@ export function UnpaidPlayersPanel() {
         (p) => p.user_id !== me && status.get(`${p.game_id}:${p.user_id}`) !== "verified",
       );
       const uids = [...new Set(owed.map((p) => p.user_id))];
-      const { data: profs } = uids.length
-        ? await supabase.from("profiles").select("id, display_name, username, avatar_url").in("id", uids)
+      const { data: read } = uids.length
+        ? await supabase
+            .from("profiles")
+            .select("id, display_name, username, avatar_url")
+            .in("id", uids)
         : { data: [] as any[] };
+      // A block or suspension hides the row; the host still needs the name.
+      const profs = uids.length ? await withManagedProfileNames(supabase, uids, read) : [];
       const pm = new Map((profs ?? []).map((p: any) => [p.id, p]));
       const out: Row[] = list
         .map((g) => ({
@@ -87,7 +98,9 @@ export function UnpaidPlayersPanel() {
                 id: p.user_id,
                 name: pr?.display_name || (pr?.username ? `@${pr.username}` : "Player"),
                 avatarUrl: pr?.avatar_url ?? null,
-                status: (st === "pending" || st === "rejected" ? st : "unpaid") as Row["players"][number]["status"],
+                status: (st === "pending" || st === "rejected"
+                  ? st
+                  : "unpaid") as Row["players"][number]["status"],
               };
             }),
         }))
@@ -113,7 +126,9 @@ export function UnpaidPlayersPanel() {
           }),
         ),
       );
-      toast.success(`Reminder sent to ${playerIds.length} player${playerIds.length === 1 ? "" : "s"}.`);
+      toast.success(
+        `Reminder sent to ${playerIds.length} player${playerIds.length === 1 ? "" : "s"}.`,
+      );
     } catch {
       toast.error("Couldn't send reminders.");
     } finally {
@@ -151,7 +166,12 @@ export function UnpaidPlayersPanel() {
             </Link>
             <button
               disabled={!!busy}
-              onClick={() => remind(r, r.players.filter((p) => p.status !== "pending").map((p) => p.id))}
+              onClick={() =>
+                remind(
+                  r,
+                  r.players.filter((p) => p.status !== "pending").map((p) => p.id),
+                )
+              }
               className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
             >
               <BellRing className="h-3.5 w-3.5" /> Remind all
@@ -163,7 +183,11 @@ export function UnpaidPlayersPanel() {
                 <UserAvatar name={p.name} avatarUrl={p.avatarUrl} size="sm" />
                 <span className="min-w-0 flex-1 truncate text-sm">{p.name}</span>
                 {p.status === "pending" ? (
-                  <Link to="/payments" search={{ tab: "verify" } as any} className="text-xs font-semibold text-primary">
+                  <Link
+                    to="/payments"
+                    search={{ tab: "verify" } as any}
+                    className="text-xs font-semibold text-primary"
+                  >
                     Proof to review
                   </Link>
                 ) : (

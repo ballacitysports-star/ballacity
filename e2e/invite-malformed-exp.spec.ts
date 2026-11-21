@@ -1,5 +1,6 @@
 import { expectOnDiscovery } from "./helpers/invite-discovery";
 import { test, expect, type Page } from "@playwright/test";
+import { answerSessionChecks } from "./helpers/signed-in";
 
 /**
  * E2E: invite deep-links with a malformed `exp` param (non-numeric, negative,
@@ -23,6 +24,11 @@ const GAME_ID = "g1";
 const FAKE_HOST_ID = "11111111-2222-3333-4444-555555555555";
 
 async function restoreSession(page: Page) {
+  // Answer the session checks every load starts (GET /auth/v1/user and the root gate's
+  // age, onboarding and child-status server functions) from the injected session, as the
+  // pay specs do. They are not what this spec is about, and each signed-in load
+  // otherwise sends the shared sandbox 8-13 requests for them. See helpers/signed-in.ts.
+  await answerSessionChecks(page);
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(
     ([key, value]) => window.localStorage.setItem(key!, value!),

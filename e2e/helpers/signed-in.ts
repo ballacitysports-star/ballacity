@@ -61,8 +61,19 @@ export const ADULT_CHILD_STATUS = {
   hasBirthday: true,
 };
 
-/** Answer the session checks above from the injected session. Call before the first navigation. */
+const answered = new WeakSet<Page>();
+
+/**
+ * Answer the session checks above from the injected session. Call before the first navigation.
+ *
+ * Used by every spec that injects the fixture player's session to test a mocked screen (the pay,
+ * invite, join-request and leave specs). It registers its handlers once per page, so a spec that
+ * re-seeds the same page does not stack them. Specs about sign-in itself (oauth-*, onboarding-*,
+ * social-login-*, child-lifecycle-*, *-refresh-protected) keep the real checks.
+ */
 export async function answerSessionChecks(page: Page) {
+  if (answered.has(page)) return;
+  answered.add(page);
   const user = (JSON.parse(SESSION_JSON!) as { user?: unknown }).user;
   await page.route(/\/auth\/v1\/user(?:\?|$)/, async (route) => {
     if (route.request().method() !== "GET") return route.fallback();
