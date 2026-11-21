@@ -71,13 +71,23 @@ describe("wiring", () => {
     expect(src).not.toContain("const rosterHydrated = liveParticipantCount !== undefined;");
   });
 
-  it("the pay page warns only a viewer without a place or a payment", () => {
+  it("the pay page blocks a full game in payEntryView instead of warning under the handles", () => {
+    // Owner decision 2026-11-20 (docs/paid-path-gates.md section 6): payment_claim_block refuses a non-rostered
+    // player's claim on a full game (GAME_FULL), so the soft "just filled up" warning became a block.
+    const src = readFileSync("src/routes/games.$gameId.pay.tsx", "utf8");
+    expect(src).not.toContain("showFilledUpWarning");
+    expect(src).not.toContain("This game just filled up");
+    expect(src).toMatch(/payEntryView\(\{[\s\S]*?roster: rosterCheck,/);
+  });
+
+  it("the pay page re-reads the payer's places after a PayPal capture before it can show the full block", () => {
+    // A PayPal payment that fills the last place: the count can arrive before the payer's own place does.
     const src = readFileSync("src/routes/games.$gameId.pay.tsx", "utf8");
     expect(src).toMatch(
-      /justFilledDuringPay = showFilledUpWarning\(\{[\s\S]*?viewerHoldsPlace,[\s\S]*?hasSubmission: hasPaymentIn\(mySubs\),[\s\S]*?loading: fetching,/,
+      /onPaid=\{async \(\) => \{[\s\S]*?setRosterReloadFor\(paidGame\);[\s\S]*?reloadRoster\(\)[\s\S]*?finally \{\s*setRosterReloadFor/,
     );
-    expect(src).not.toContain(
-      "const justFilledDuringPay = liveCount !== undefined && spotsLeft <= 0;",
+    expect(src).toMatch(
+      /payEntryView\(\{[\s\S]*?flow: payEntryFlow\(\{ flow: flowState, rosterReloading: rosterReloadFor === gameId \}\),/,
     );
   });
 });

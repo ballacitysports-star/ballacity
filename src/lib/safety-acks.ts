@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCurrentUserId } from "@/lib/current-user-id";
 import { useAuth } from "@/hooks/use-auth";
 import { SAFETY_ACK_VERSION, type SafetyAckKind } from "@/lib/safety";
 
@@ -13,11 +14,11 @@ export async function recordSafetyAck(input: {
   kind: SafetyAckKind;
   version?: string;
 }) {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) throw new Error("Sign in to continue");
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error("Sign in to continue");
   const { error } = await supabase.from("game_safety_acknowledgments").upsert(
     {
-      user_id: u.user.id,
+      user_id: userId,
       game_id: input.gameId,
       kind: input.kind,
       version: input.version ?? SAFETY_ACK_VERSION,
@@ -28,11 +29,20 @@ export async function recordSafetyAck(input: {
   if (error) throw error;
 }
 
+/** useSafetyAck's cache key, for a caller that writes an acknowledgment and must see it at once. */
+export function safetyAckQueryKey(
+  userId: string | null | undefined,
+  gameId: string | null | undefined,
+  kind: SafetyAckKind,
+) {
+  return ["safety-ack", userId ?? "anon", gameId ?? "none", kind] as const;
+}
+
 /** Latest acknowledged version for this viewer + game + kind (null when none). */
 export function useSafetyAck(gameId: string | null | undefined, kind: SafetyAckKind) {
   const { user } = useAuth();
   return useQuery({
-    queryKey: ["safety-ack", user?.id ?? "anon", gameId ?? "none", kind],
+    queryKey: safetyAckQueryKey(user?.id, gameId, kind),
     enabled: !!user && !!gameId,
     staleTime: 60_000,
     queryFn: async () => {

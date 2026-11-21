@@ -19,7 +19,9 @@ INSERT INTO public.user_blocks (blocker_id, blocked_id) VALUES (t.id('teen'), t.
 
 -- every listed helper is wrapped, and the original logic lives on, unchanged, under private_sec
 SELECT t.eq((SELECT count(*)::int FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND obj_description(p.oid, 'pg_proc') = 'oracle-wrapper'), 26, 'all 26 helpers are wrapped');
-SELECT t.eq((SELECT count(*)::int FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND NOT p.prosecdef AND p.prosrc LIKE '%private_sec.rpc_probe_denied%'), 26, 'and all 26 public wrappers are SECURITY INVOKER bodies that call the probe check');
+-- (public.profile_visibility_of is contained the same way by 20261125100000, outside this list; test 960 covers it)
+SELECT t.eq((SELECT count(*)::int FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND NOT p.prosecdef AND p.prosrc LIKE '%private_sec.rpc_probe_denied%'
+               AND p.oid <> 'public.profile_visibility_of(uuid)'::regprocedure), 26, 'and all 26 public wrappers are SECURITY INVOKER bodies that call the probe check');
 SELECT t.ok((SELECT bool_and(to_regprocedure('private_sec.' || s) IS NOT NULL) FROM unnest(ARRAY['is_team_member(text,uuid)', 'is_guardian_of(uuid,uuid)', 'is_game_participant(text,uuid)', 'shares_team(uuid,uuid)', 'is_minor(uuid)']) s), 'and the originals moved to private_sec');
 SELECT t.ok(EXISTS (SELECT 1 FROM pg_policy WHERE pg_get_expr(polqual, polrelid) LIKE '%private_sec.is_team_member(%'), 'existing policies now point at the original (by OID), not the wrapper');
 SELECT t.eq((SELECT count(*)::int FROM pg_depend d JOIN pg_proc p ON p.oid = d.refobjid

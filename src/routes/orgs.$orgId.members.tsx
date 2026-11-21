@@ -18,6 +18,14 @@ import {
   searchProfilesForInvite,
   addOrgMemberDirect,
 } from "@/lib/trainer-orgs.functions";
+import { ORG_MEMBER_DIRECT_ADD_REFUSED } from "@/lib/org-members";
+import { errorText, userErrorMessage } from "@/lib/user-error";
+
+/** The sentences addOrgMemberDirect words itself (its refused-add sentence and its admin check); shown as they are. */
+const ORG_ADD_SENTENCES: readonly string[] = [
+  ORG_MEMBER_DIRECT_ADD_REFUSED,
+  "Only owners or admins can perform this action.",
+];
 
 export const Route = createFileRoute("/orgs/$orgId/members")({
   head: () =>
@@ -31,7 +39,7 @@ export const Route = createFileRoute("/orgs/$orgId/members")({
   errorComponent: ({ error, reset }) => (
     <RouteFallback
       title="Couldn't load these members"
-      message={error instanceof Error ? error.message : "Something went wrong."}
+      message={userErrorMessage(error, "Couldn't load this gym's members. Please try again.")}
       onRetry={reset}
       action={
         <Link to="/orgs" className={FALLBACK_ACTION_CLASS}>
@@ -89,9 +97,11 @@ function MembersPage() {
   }, [orgId]);
 
   const membersQ = useQuery({
-    queryKey: ["org-members", orgId],
+    // Keyed on the viewer (the list is read as them); invalidations below match
+    // by the ["org-members", orgId] prefix.
+    queryKey: ["org-members", orgId, userId],
     queryFn: () => listOrgMembers({ data: { orgId } }),
-    enabled: isAdmin,
+    enabled: isAdmin && !!userId,
   });
 
   const requestsQ = useQuery({
@@ -147,7 +157,7 @@ function MembersPage() {
       qc.invalidateQueries({ queryKey: ["org-members", orgId] });
       toast.success(`Set to ${role}`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed");
+      toast.error(userErrorMessage(e, "Couldn't change this member's role. Please try again."));
     }
   }
 
@@ -158,7 +168,7 @@ function MembersPage() {
       qc.invalidateQueries({ queryKey: ["org-members", orgId] });
       toast.success("Removed");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed");
+      toast.error(userErrorMessage(e, "Couldn't remove this member. Please try again."));
     }
   }
 
@@ -169,7 +179,7 @@ function MembersPage() {
       qc.invalidateQueries({ queryKey: ["org-members", orgId] });
       toast.success("Approved");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed");
+      toast.error(userErrorMessage(e, "Couldn't approve this request. Please try again."));
     }
   }
 
@@ -180,7 +190,7 @@ function MembersPage() {
       qc.invalidateQueries({ queryKey: ["org-member-requests", orgId] });
       toast.success("Denied");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed");
+      toast.error(userErrorMessage(e, "Couldn't deny this request. Please try again."));
     }
   }
 
@@ -191,7 +201,12 @@ function MembersPage() {
       qc.invalidateQueries({ queryKey: ["org-invite-search", orgId, debouncedQ] });
       toast.success("Added");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed");
+      const text = errorText(e) ?? "";
+      toast.error(
+        ORG_ADD_SENTENCES.includes(text)
+          ? text
+          : userErrorMessage(e, "Couldn't add this member. Please try again."),
+      );
     }
   }
 
@@ -254,9 +269,7 @@ function MembersPage() {
                       {p.display_name || "Unnamed"}
                     </div>
                     {already && (
-                      <div className="micro-label text-muted-foreground">
-                        Already a member
-                      </div>
+                      <div className="micro-label text-muted-foreground">Already a member</div>
                     )}
                   </div>
                   {!already && (

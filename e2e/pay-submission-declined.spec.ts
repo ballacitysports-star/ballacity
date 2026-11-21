@@ -1,10 +1,14 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
+import { PAY_FIXTURE_HOST_ID, payFixtureGameRow, serveFixtureGame } from "./helpers/pay-fixtures";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
+import { PAYMENT_SAVE_FAILED_MESSAGE } from "../src/lib/payments-policy";
+import { answerSessionChecks } from "./helpers/signed-in";
 
 /**
  * E2E: submitting proof-of-payment fails (declined at the API layer).
  *
  * Mocks payment_submissions POST to return an error, then asserts:
- *   - an actionable error toast surfaces with the server message
+ *   - an error toast in plain words surfaces (WP 4.0: never the server's raw text)
  *   - the URL stays on the same game's pay screen (no navigation away)
  *   - the "I have paid" button is still enabled so the user can retry
  *   - a follow-up POST that succeeds transitions the timeline to pending
@@ -21,7 +25,7 @@ test.skip(
 );
 
 const GAME_ID = "g2";
-const HOST_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+const HOST_ID = PAY_FIXTURE_HOST_ID;
 const METHOD_ID = "mock-method-venmo-1";
 const DECLINE_MSG = "Payment declined by processor — please try again.";
 
@@ -30,6 +34,11 @@ function tableUrl(url: string, table: string) {
 }
 
 async function restoreSession(page: Page) {
+  // Answer the session checks every load starts (GET /auth/v1/user and the root gate's
+  // age, onboarding and child-status server functions) from the injected session, as the
+  // pay specs do. They are not what this spec is about, and each signed-in load
+  // otherwise sends the shared sandbox 8-13 requests for them. See helpers/signed-in.ts.
+  await answerSessionChecks(page);
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(
     ([key, value]) => window.localStorage.setItem(key!, value!),
@@ -76,9 +85,11 @@ test("declined submission shows actionable error and stays on the pay screen", a
   );
 
   await page.route(
-    (url) => tableUrl(url, "host_payment_methods") || String(url).includes("/rest/v1/rpc/get_game_host_payment_methods"),
+    (url) =>
+      tableUrl(url, "host_payment_methods") ||
+      String(url).includes("/rest/v1/rpc/get_game_host_payment_methods"),
     async (route) => {
-      if (!["GET","POST"].includes(route.request().method())) return route.fallback();
+      if (!["GET", "POST"].includes(route.request().method())) return route.fallback();
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -107,13 +118,10 @@ test("declined submission shows actionable error and stays on the pay screen", a
     },
   );
 
-  await page.route(
-    (url) => tableUrl(url, "hosted_games"),
-    async (route) => {
-      if (route.request().method() !== "GET") return route.fallback();
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-    },
-  );
+  // The game itself: src/lib/sample-data.ts ships no games any more, so the pay
+  // page looks g2 up in hosted_games. Answering that with [] rendered "Game not
+  // found."; serve the row instead, hosted by the same mocked host.
+  await serveFixtureGame(page, payFixtureGameRow(GAME_ID));
 
   await page.route(
     (url) => tableUrl(url, "game_participants"),
@@ -203,12 +211,19 @@ test("declined submission shows actionable error and stays on the pay screen", a
 
   // ---- Flow ----------------------------------------------------------
 
+  // Not a spec about "Before you join": the viewer has acknowledged it, so the pay page (which asks it
+  // before any payment option, docs/paid-path-gates.md section 7) goes straight to the options.
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
   await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
 
-  const methodButton = page.getByRole("button", { name: /e2e-host|venmo/i }).first();
-  await expect(methodButton).toBeVisible({ timeout: 10_000 });
-  await methodButton.click();
+  // The host takes exactly one method, so the pay screen skips the picker and
+  // opens that method's proof step itself. (There is no method row to tap: the
+  // only button naming Venmo there launches the Venmo app.)
+  await expect(page.getByRole("heading", { name: /i have paid — submit proof/i })).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect(page.getByText("e2e-host", { exact: true })).toBeVisible();
 
   // Amount (the $15 fee) and date (today) are prefilled and tucked away.
 
@@ -229,10 +244,12 @@ test("declined submission shows actionable error and stays on the pay screen", a
   ]);
   expect(declinedResp.status()).toBe(402);
 
-  // Actionable error surfaces via the toast layer (sonner renders under
-  // role=status). The exact wording comes from the server message.
-  const errorToast = page.getByText(DECLINE_MSG, { exact: false });
+  // The error surfaces via the toast layer (sonner renders under role=status), in plain words.
+  // The mocked message is not one the database sends (no code, not a known refusal), so the
+  // member gets the payment fallback, never the raw server text (WP 4.0).
+  const errorToast = page.getByText(PAYMENT_SAVE_FAILED_MESSAGE, { exact: false });
   await expect(errorToast).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(DECLINE_MSG, { exact: false })).toHaveCount(0);
 
   // Still on the same pay screen — no redirect on failure.
   await expect(page).toHaveURL(new RegExp(`/games/${GAME_ID}/pay(\\?|$)`));

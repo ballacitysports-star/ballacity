@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { userErrorMessage } from "@/lib/user-error";
 
 /**
  * Following a team, a trainer (both `teams` rows) or a facility (`trainer_orgs`). Person
@@ -23,14 +24,12 @@ function rpc(fn: string, args: Record<string, unknown>): Promise<RpcResult> {
   ).rpc(fn, args);
 }
 
-/** Turns a database refusal into words for the member. Unknown errors pass through. */
+/**
+ * Turns a database refusal into words for the member; any other failure reads as a generic sentence, never as the
+ * database's text. FOLLOW_BLOCKED and INVALID_FOLLOW_TARGET read the same, so a refusal does not reveal a block.
+ */
 export function entityFollowErrorMessage(message: string): string {
-  if (/FOLLOW_LOCKED/.test(message))
-    return "A parent or guardian needs to approve your account first.";
-  if (/NOT_SIGNED_IN/.test(message)) return "Sign in to follow";
-  // Blocked and unavailable read the same, so a refusal does not reveal a block.
-  if (/FOLLOW_BLOCKED|INVALID_FOLLOW_TARGET/.test(message)) return "This page can't be followed.";
-  return message;
+  return userErrorMessage(message, "Couldn't update this follow. Please try again.");
 }
 
 export async function getEntityFollowState(

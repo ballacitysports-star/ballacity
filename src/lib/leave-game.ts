@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getCurrentUserId } from "@/lib/current-user-id";
 import { createNotification } from "@/lib/notifications";
 import { isGameId } from "@/lib/game-flow-status";
 import { withdrawMyApprovedJoinRequest } from "@/lib/payments";
@@ -8,8 +9,7 @@ import { isLateCancel } from "@/lib/cancel-window";
 /** Drop the viewer's unreviewed payment proof for a game. Best effort. */
 export async function clearPendingSubmissions(gameId: string) {
   try {
-    const { data: u } = await supabase.auth.getUser();
-    const uid = u.user?.id;
+    const uid = await getCurrentUserId();
     if (!uid) return;
     await supabase
       .from("payment_submissions")

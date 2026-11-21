@@ -11,6 +11,8 @@
  * module only words its error codes for people.
  */
 
+import { knownErrorMessage } from "@/lib/user-error";
+
 export type FamilyClipVia = "owner" | "child" | "team";
 
 export function familyClipVia(v: unknown): FamilyClipVia | null {
@@ -23,24 +25,6 @@ export function familyClipViaLabel(via: FamilyClipVia): string {
   return via === "child" ? "A clip your parent added of you" : "Shared with your team";
 }
 
-const TEAM_ERRORS: Record<string, string> = {
-  FAMILY_TEAM_SHARE_OFF: "Sharing with a team isn't available yet.",
-  FAMILY_TEAM_NOT_ALLOWED: "Turn on team sharing for this child in the Parent area first.",
-  FAMILY_TEAM_NOT_FAMILY_POST: "Only a family clip can be shared with a team.",
-  FAMILY_POST_NOT_GUARDIAN:
-    "Only a verified parent or guardian of this child can choose who sees their clip.",
-  FAMILY_TEAM_CHILD_NOT_ON_TEAM: "Your child isn't on that team.",
-};
-
 export function teamShareErrorMessage(err: unknown): string | null {
-  const text =
-    typeof err === "string"
-      ? err
-      : err && typeof err === "object" && "message" in err
-        ? String((err as { message?: unknown }).message ?? "")
-        : "";
-  for (const [code, message] of Object.entries(TEAM_ERRORS)) {
-    if (text.includes(code)) return message;
-  }
-  return null;
+  return knownErrorMessage(err) ?? null;
 }

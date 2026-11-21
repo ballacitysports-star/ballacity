@@ -42,8 +42,8 @@ const {
   playerRequestLine,
 } = await import("./guarded-open-join");
 const { joinWait, playerWaitCopy } = await import("./join-guardian-status");
-const { paymentSubmissionErrorMessage, PAYMENTS_GUARDIAN_APPROVAL_MESSAGE } =
-  await import("./payments-policy");
+const { PAYMENTS_GUARDIAN_APPROVAL_MESSAGE } = await import("./payments-policy");
+const { paymentSubmissionErrorMessage } = await import("./user-error");
 const { withoutGuardianOnly } = await import("./payments");
 
 beforeEach(() => {
@@ -153,7 +153,7 @@ describe("where the player stands", () => {
     expect(guardedOpenCopy("waiting_parent", { isPaid: false }).body).toMatch(
       /host doesn't need to answer/,
     );
-    expect(guardedOpenCopy("cleared", { isPaid: false }).body).toMatch(/Join Run/);
+    expect(guardedOpenCopy("cleared", { isPaid: false }).body).toMatch(/Join Game/);
     expect(guardedOpenCopy("cleared", { isPaid: true }).body).toMatch(/Pay the host/);
     expect(guardedOpenCopy("declined", { isPaid: false, declinedByGuardian: true }).title).toMatch(
       /parent said no/,

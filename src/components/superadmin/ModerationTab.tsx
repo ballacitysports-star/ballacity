@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfirmAction } from "./ConfirmAction";
 import { ReviewSignalsPanel } from "./ReviewSignalsPanel";
+import { errorCode, userErrorMessage } from "@/lib/user-error";
 
 /** Kinds whose text is AI-screened and can be held for review. */
 const TEXT_REVIEW_KINDS = new Set(["posts", "network_posts", "events", "comments", "team_chat"]);
@@ -165,7 +166,12 @@ export function ModerationTab() {
       qc.invalidateQueries({ queryKey: ["superadmin-overview"] });
       qc.invalidateQueries({ queryKey: ["superadmin-audit"] });
     },
-    onError: (e: any) => toast.error(e?.message ?? "Action failed"),
+    onError: (e: unknown) => {
+      const code = errorCode(e);
+      toast.error(
+        `${userErrorMessage(e, "Couldn't apply that action.")}${code ? ` (${code})` : ""}`,
+      );
+    },
   });
 
   return (

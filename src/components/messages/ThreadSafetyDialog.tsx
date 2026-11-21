@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Ban, Flag } from "lucide-react";
 import { toast } from "sonner";
+import { userErrorMessage } from "@/lib/user-error";
 import {
   Dialog,
   DialogContent,
@@ -46,7 +47,7 @@ export function ThreadSafetyDialog({
       toast.success(block.blocked ? `${displayName} unblocked.` : `${displayName} blocked.`);
       close(false);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't update the block. Try again.");
+      toast.error(userErrorMessage(e, "Couldn't update the block. Please try again."));
     }
   };
 

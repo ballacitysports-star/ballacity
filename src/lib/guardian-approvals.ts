@@ -9,6 +9,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMyChildren } from "@/lib/child-safety";
 import { isGuardianOnlyRequest } from "@/lib/guarded-open-join";
+import { errorCode, userErrorMessage } from "@/lib/user-error";
 
 export type GuardianTeamInvite = {
   id: string;
@@ -37,27 +38,24 @@ export type GuardianJoinRequest = {
   guardianOnly: boolean;
 };
 
-const ERRORS: Record<string, string> = {
-  NOT_GUARDIAN: "You're not linked as this child's guardian.",
-  GUARDIAN_NOT_ELIGIBLE:
-    "Your account can't approve for a child right now. Contact support if you think this is a mistake.",
-  INVITE_NOT_PENDING: "This invite was already answered.",
-  REQUEST_NOT_PENDING: "This request was already answered.",
-  ALREADY_ON_ROSTER: "They're already in this game. Open the game to cancel their spot instead.",
-  INVITE_NOT_FOUND: "That invite no longer exists.",
-  REQUEST_NOT_FOUND: "That request no longer exists.",
-  WAIVER_REQUIRED: "Sign the team's waiver for your child first.",
-  INVITE_EXPIRED: "This invite has expired. Ask the team for a new one.",
-  CHILD_ACTIVITY_LOCKED: "Your child's activity is paused, so they can't join right now.",
-  AGE_VERIFICATION_REQUIRED:
-    "Your child's account needs a date of birth before they can join a team. Once it's added, approve again.",
-  AUTH_REQUIRED: "Please sign in again.",
-};
+/**
+ * The guardian's own words for a child still waiting on parental consent (CHILD_ACTIVITY_LOCKED). The guardian reads
+ * it in the Parent Center, which has no control to give consent: consent is given only from the emailed link
+ * (parent.consent.$token), and the child asks for a new email from their account (requestParentalConsent).
+ */
+export const GUARDIAN_CONSENT_NEEDED_MESSAGE =
+  "Your child's account is waiting on your parental consent before they can join a team. Approve it from the consent email we sent you (your child can send a new one from their account), then approve this invite again.";
 
+/**
+ * The guardian dashboard's words for a refused approval. guardian_approve_team_invite raises the child's own
+ * WAIVER_REQUIRED (the waiver is the child's, signed on their behalf) and CHILD_ACTIVITY_LOCKED (the child still needs
+ * parental consent), so both are worded for the parent here; the catalog keeps the child's own sentences.
+ */
 export function guardianApprovalError(e: unknown): string {
-  const msg = e instanceof Error ? e.message : String((e as { message?: string })?.message ?? "");
-  const code = Object.keys(ERRORS).find((k) => msg.includes(k));
-  return code ? ERRORS[code]! : "Something went wrong. Please try again.";
+  const code = errorCode(e);
+  if (code === "WAIVER_REQUIRED") return "Sign the team's waiver for your child first.";
+  if (code === "CHILD_ACTIVITY_LOCKED") return GUARDIAN_CONSENT_NEEDED_MESSAGE;
+  return userErrorMessage(e, "Something went wrong. Please try again.");
 }
 
 export function useGuardianApprovals() {

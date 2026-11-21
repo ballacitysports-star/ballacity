@@ -1,4 +1,8 @@
+import { openAlertsAndTap } from "./helpers/invite-alerts";
+import { fulfillRows } from "./helpers/invite-postgrest";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { answerSessionChecks } from "./helpers/signed-in";
 
 /**
  * E2E: tapping a `game_invite` notification for an approval-gated game must
@@ -28,6 +32,11 @@ const GAME_ID = "g2"; // sample-data soccer game — free/no-approval by default
 const FAKE_HOST_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
 
 async function restoreSession(page: Page) {
+  // Answer the session checks every load starts (GET /auth/v1/user and the root gate's
+  // age, onboarding and child-status server functions) from the injected session, as the
+  // pay specs do. They are not what this spec is about, and each signed-in load
+  // otherwise sends the shared sandbox 8-13 requests for them. See helpers/signed-in.ts.
+  await answerSessionChecks(page);
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(
     ([key, value]) => window.localStorage.setItem(key!, value!),
@@ -124,18 +133,14 @@ test("tapping invite -> Request to join CTA posts correct payload with preserved
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
-        await route.fulfill({
-          status: 201,
-          contentType: "application/json",
-          headers: { "content-range": "0-0/1" },
-          body: JSON.stringify([row]),
-        });
+        await fulfillRows(route, [row], { status: 201 });
         return;
       }
       return route.fallback();
     },
   );
 
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
 
   // Seed the invite notification for the viewer.
@@ -156,10 +161,7 @@ test("tapping invite -> Request to join CTA posts correct payload with preserved
   expect(insertRes.ok, `seed insert failed: ${(insertRes as any).message ?? ""}`).toBe(true);
 
   // Open Alerts and tap the invite.
-  await page.goto("/notifications", { waitUntil: "domcontentloaded" });
-  const item = page.getByText(notifTitle, { exact: false }).first();
-  await expect(item).toBeVisible({ timeout: 10_000 });
-  await item.click();
+  await openAlertsAndTap(page, notifTitle);
 
   // URL preserves both invite params on landing.
   await page.waitForURL(

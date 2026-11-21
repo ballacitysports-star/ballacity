@@ -34,7 +34,11 @@ async function restoreSession(page: Page) {
       "openrun:players-search",
       "openrun.feedPrefs.v1",
     ]) {
-      try { window.localStorage.removeItem(k); } catch { /* ignore */ }
+      try {
+        window.localStorage.removeItem(k);
+      } catch {
+        /* ignore */
+      }
     }
   });
 }
@@ -43,7 +47,34 @@ async function countCards(page: Page): Promise<number> {
   // Feed/Players/Teams/Trainers render each result as an anchor link. This
   // covers grid, list, and map-off density variants without depending on
   // internal CSS class names.
-  return await page.locator('a[href^="/games/"], a[href^="/players/"], a[href^="/teams/"], a[href^="/trainers/"], a[href^="/u/"]').count();
+  return await page
+    .locator(
+      'a[href^="/games/"], a[href^="/players/"], a[href^="/teams/"], a[href^="/trainers/"], a[href^="/u/"]',
+    )
+    .count();
+}
+
+/**
+ * Wait until the tab's member page has mounted. PreviewGate keeps it unmounted
+ * until a signed-in user is known, and the root AuthGate holds it behind a
+ * loader until its age and account-type checks answer (each allowed up to
+ * 5 s). usePersistedSearch only restores once the page mounts, so this is the
+ * earliest moment a restored filter can be in the URL. The signed-out preview
+ * draws its chips and buttons as inert spans, so a button role here means the
+ * real page.
+ */
+async function waitForTabMounted(page: Page, route: string) {
+  if (route === "/feed" || route === "/players") {
+    // Feed and Players render SportChips inline.
+    await page
+      .getByRole("button", { name: new RegExp(`\\b${SPORT}\\b`) })
+      .first()
+      .waitFor({ state: "visible", timeout: 15_000 });
+  } else {
+    await page
+      .getByRole("button", { name: "Filters", exact: true })
+      .waitFor({ state: "visible", timeout: 15_000 });
+  }
 }
 
 async function pickSport(page: Page, route: string) {
@@ -65,17 +96,7 @@ for (const route of ["/feed", "/players", "/teams", "/trainers"] as const) {
     await restoreSession(page);
     await page.goto(route, { waitUntil: "domcontentloaded" });
     await page.waitForLoadState("networkidle").catch(() => {});
-    // Wait until the tab has rendered content (any anchor card) OR the
-    // sport chip is visible — whichever proves the page mounted.
-    // For inline SportChips tabs, wait until they render.
-    if (route === "/feed" || route === "/players") {
-      await page
-        .getByRole("button", { name: new RegExp(`\\b${SPORT}\\b`) })
-        .first()
-        .waitFor({ state: "visible", timeout: 15_000 });
-    } else {
-      await page.getByRole("button", { name: "Filters" }).waitFor({ state: "visible", timeout: 15_000 });
-    }
+    await waitForTabMounted(page, route);
 
     const baseline = await countCards(page);
 
@@ -88,6 +109,11 @@ for (const route of ["/feed", "/players", "/teams", "/trainers"] as const) {
     // restore the sport param from localStorage.
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await page.goto(route, { waitUntil: "domcontentloaded" });
+    // The member page (and with it the restore) only mounts once sign-in and
+    // the root gate's age and account-type checks have answered — the same
+    // wait the first visit gets. Asserting on the URL before that measured
+    // how fast those checks were, not whether the filter was restored.
+    await waitForTabMounted(page, route);
     await expect(page).toHaveURL(/[?&]sport=Basketball/, { timeout: 5_000 });
     await page.waitForTimeout(400);
     const restored = await countCards(page);

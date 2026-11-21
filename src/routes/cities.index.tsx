@@ -166,7 +166,7 @@ function PublicFeed() {
       <main className="page-shell-prose py-6 pb-28">
         <h1 className="page-title">Games in {cityLabel(city)}</h1>
         <p className="mt-2 page-subtitle">
-          Upcoming public pickup runs, plus teams and gyms nearby. Browse freely; you only need an
+          Upcoming public pickup games, plus teams and gyms nearby. Browse freely; you only need an
           account to join or host.
         </p>
 
@@ -316,7 +316,7 @@ function PublicFeed() {
         )}
 
         <section className="mt-8 rounded-2xl border border-border bg-surface p-4">
-          <h2 className="text-sm font-bold">Want to join a run?</h2>
+          <h2 className="text-sm font-bold">Want to join a game?</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Create a free account to request a spot, message hosts and get game alerts.
           </p>

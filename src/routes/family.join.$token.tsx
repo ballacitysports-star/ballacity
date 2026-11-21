@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
+import { userErrorMessage } from "@/lib/user-error";
 import { ShieldCheck, Users } from "lucide-react";
 import { pageHead } from "@/lib/seo";
 import { useAuth } from "@/hooks/use-auth";
@@ -45,7 +46,7 @@ function FamilyJoinPage() {
       setDone(true);
       toast.success("You're connected to your parent or guardian.");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not accept that invitation.");
+      toast.error(userErrorMessage(e, "Couldn't accept that invitation. Please try again."));
     } finally {
       setSubmitting(false);
     }

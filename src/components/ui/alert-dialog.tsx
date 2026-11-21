@@ -91,11 +91,22 @@ const AlertDialogDescription = React.forwardRef<
 ));
 AlertDialogDescription.displayName = AlertDialogPrimitive.Description.displayName;
 
+/**
+ * Confirm buttons are 44px tall tap targets (WP 4.3): on a phone the footer stacks them full width, and the destructive
+ * one is the tap that matters most. aria-disabled reads as disabled too, for a dialog that keeps focus on its buttons
+ * while an action runs (a disabled button would drop focus out of the dialog).
+ */
+const CONFIRM_BUTTON = "min-h-11 aria-disabled:cursor-not-allowed aria-disabled:opacity-50";
+
 const AlertDialogAction = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Action>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Action>
 >(({ className, ...props }, ref) => (
-  <AlertDialogPrimitive.Action ref={ref} className={cn(buttonVariants(), className)} {...props} />
+  <AlertDialogPrimitive.Action
+    ref={ref}
+    className={cn(buttonVariants(), CONFIRM_BUTTON, className)}
+    {...props}
+  />
 ));
 AlertDialogAction.displayName = AlertDialogPrimitive.Action.displayName;
 
@@ -105,7 +116,12 @@ const AlertDialogCancel = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Cancel
     ref={ref}
-    className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0", className)}
+    className={cn(
+      buttonVariants({ variant: "outline" }),
+      CONFIRM_BUTTON,
+      "mt-2 sm:mt-0",
+      className,
+    )}
     {...props}
   />
 ));

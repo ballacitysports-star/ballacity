@@ -26,6 +26,7 @@
  * quiet hours for the flush job (or drops it if it would arrive once the game has started) and
  * records each outcome in notification_delivery_log.
  */
+import { guardianLinksInForce } from "@/lib/guardian-links-in-force.server";
 import { formatDatedWhen, formatNotificationWhen } from "@/lib/format";
 import { isAllowedIn, mergeNotifPrefs } from "@/lib/notification-prefs-core";
 import { deliverPush, type PushInput } from "@/lib/push.server";
@@ -142,6 +143,11 @@ export type ReminderAdmin = {
     update: (row: Record<string, unknown>) => Q<unknown>;
     delete: () => Q<unknown>;
   };
+  /** The guardian-link rule (public.guardian_links_in_force); a client without it reads the table, as before. */
+  rpc?: (
+    fn: string,
+    args: Record<string, unknown>,
+  ) => PromiseLike<{ data: unknown; error: { message: string } | null }>;
 };
 
 const pairKey = (gameId: string, userId: string) => `${gameId}\u0000${userId}`;
@@ -182,7 +188,8 @@ function gamesWithoutFee(games: ReminderGame[], settings: SettingsRow[]): Set<st
  * A place is a roster row, or a request the host approved for a game with no fee: nothing on the
  * server rosters that player (reviewJoinRequest only changes the status; the game page's
  * refreshStatus adds the row when they next open it), and they were told "You're in". For a
- * player with an active guardian link (guardian_links, status active) the request also needs the
+ * player with a guardian link in force (guardian_links, status active, the player not yet 18: see
+ * guardian-links-in-force.server) the request also needs the
  * guardian's approval (guardian_approved_at), as the game page and the roster gate require.
  * Pending requests, and approved ones on a paid game, are open requests without a place.
  *
@@ -207,11 +214,7 @@ async function readRecipients(admin: ReminderAdmin, games: ReminderGame[], userI
       .from("game_payment_settings")
       .select("game_id, host_id, entry_fee, created_at")
       .in("game_id", gameIds) as Q<unknown>,
-    admin
-      .from("guardian_links")
-      .select("child_user_id")
-      .in("child_user_id", userIds)
-      .eq("status", "active") as Q<unknown>,
+    guardianLinksInForce(admin, userIds) as unknown as Q<unknown>,
   ]);
   if (roster.error) throw new Error(`roster read failed: ${roster.error.message}`);
   if (requests.error) throw new Error(`join request read failed: ${requests.error.message}`);

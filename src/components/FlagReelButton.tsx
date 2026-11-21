@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Flag, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { userErrorMessage } from "@/lib/user-error";
 import { useAuth } from "@/hooks/use-auth";
 import { REEL_QUALITY_ISSUES, flagReelQuality, type ReelQualityIssue } from "@/lib/moderation";
 import {
@@ -33,7 +34,7 @@ export function FlagReelButton({ reelId, authorId }: Props) {
       setOpen(false);
       toast.success("Thanks — our team will take a look at this clip.");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't send that report");
+      toast.error(userErrorMessage(e, "Couldn't send that report. Please try again."));
     } finally {
       setSending(false);
     }

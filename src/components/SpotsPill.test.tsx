@@ -40,6 +40,7 @@ describe("SpotsPill (a11y)", () => {
   it("pluralises correctly at 1 spot so the announcement is grammatical", () => {
     const html = renderToStaticMarkup(<SpotsPill spotsLeft={1} />);
     expect(html).toContain('aria-label="Only 1 spot left — filling fast"');
+    expect(html).toContain(">1 spot<");
   });
 
   it("announces the full state assertively with an explicit message", () => {

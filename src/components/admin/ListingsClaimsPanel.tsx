@@ -22,7 +22,7 @@ import { ORG_CATEGORIES } from "@/lib/org-listing";
 import {
   CLAIM_RELATIONSHIP_LABEL,
   type ClaimRelationship,
-  listingErrorMessage,
+  adminListingErrorMessage,
 } from "@/lib/listings";
 import {
   listUnclaimedListings,
@@ -108,7 +108,7 @@ function ClaimsQueue() {
       qc.invalidateQueries({ queryKey: ["listing-claims-queue"] });
       qc.invalidateQueries({ queryKey: ["unclaimed-listings"] });
     },
-    onError: (e) => toast.error(listingErrorMessage(e)),
+    onError: (e) => toast.error(adminListingErrorMessage(e)),
   });
 
   if (isLoading) return <Loading />;
@@ -316,7 +316,7 @@ function CreateListing() {
       });
       qc.invalidateQueries({ queryKey: ["unclaimed-listings"] });
     },
-    onError: (e) => toast.error(listingErrorMessage(e)),
+    onError: (e) => toast.error(adminListingErrorMessage(e)),
   });
 
   const valid = form.name.trim().length >= 2 && form.handle.trim().length >= 2;
@@ -507,7 +507,7 @@ function FeaturedGyms() {
       qc.invalidateQueries({ queryKey: ["featurable-orgs"] });
       qc.invalidateQueries({ queryKey: ["orgs-index"] });
     },
-    onError: (e) => toast.error(listingErrorMessage(e)),
+    onError: (e) => toast.error(adminListingErrorMessage(e)),
   });
 
   return (

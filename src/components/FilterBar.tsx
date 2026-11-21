@@ -49,7 +49,11 @@ export function FilterBar({
   return (
     <div className="mb-4">
       <div className="flex gap-2">
-        <div className="flex min-h-11 flex-1 items-center gap-2 rounded-full border border-border bg-surface px-4">
+        {/* min-w-0: a flex item will not shrink below its content's min-content
+            width, and an <input>'s is its intrinsic ~20-character width, which
+            depends on the font. Without it the row ran up to 50px past a 320px
+            screen and the buttons beside it were pushed off the edge. */}
+        <div className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-full border border-border bg-surface px-4">
           <Search className="h-4 w-4 text-muted-foreground" />
           <input
             value={q}

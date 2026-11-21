@@ -18,6 +18,7 @@ import { leaveGame } from "@/lib/games-store";
 import { clearPendingSubmissions, notifyHostOfLeave } from "@/lib/leave-game";
 import { supabase } from "@/integrations/supabase/client";
 import { isLateCancel, lateCancelWarning } from "@/lib/cancel-window";
+import { userErrorMessage } from "@/lib/user-error";
 
 export type LeaveFlowVariant = "link" | "danger";
 
@@ -54,7 +55,7 @@ const COPY: Record<
   cancel: {
     button: "Cancel request",
     title: "Cancel your request?",
-    description: (t) => `Cancel your request to join ${t}? You can request again later.`,
+    description: (t) => `Cancel your request for a spot in ${t}? You can request again later.`,
     confirm: "Cancel request",
     success: "Request canceled.",
     error: "Could not cancel request.",
@@ -149,7 +150,7 @@ export function LeaveFlowButton({
         void navigate({ to: navigateTo });
       }
     } catch (e: any) {
-      toast.error(e?.message ?? copy.error);
+      toast.error(userErrorMessage(e, copy.error));
     } finally {
       setBusy(false);
     }

@@ -1,4 +1,7 @@
+import { openAlertsAndTap } from "./helpers/invite-alerts";
+import { expectOnDiscovery } from "./helpers/invite-discovery";
 import { test, expect, type Page } from "@playwright/test";
+import { answerSessionChecks } from "./helpers/signed-in";
 
 /**
  * E2E: an expired invite deep-link (`invite=1&from=<hostId>&exp=<past-ms>`)
@@ -21,6 +24,11 @@ test.skip(
 );
 
 async function restoreSession(page: Page) {
+  // Answer the session checks every load starts (GET /auth/v1/user and the root gate's
+  // age, onboarding and child-status server functions) from the injected session, as the
+  // pay specs do. They are not what this spec is about, and each signed-in load
+  // otherwise sends the shared sandbox 8-13 requests for them. See helpers/signed-in.ts.
+  await answerSessionChecks(page);
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(
     ([key, value]) => window.localStorage.setItem(key!, value!),
@@ -79,10 +87,7 @@ test("expired invite → renders Invite expired banner, CTA routes to /discover 
   });
 
   // Tap the seeded notification from Alerts.
-  await page.goto("/notifications", { waitUntil: "domcontentloaded" });
-  const item = page.getByText(title, { exact: false }).first();
-  await expect(item).toBeVisible({ timeout: 10_000 });
-  await item.click();
+  await openAlertsAndTap(page, title);
 
   // URL preserves the invite/from/exp params on the game detail page.
   await page.waitForURL(
@@ -111,7 +116,8 @@ test("expired invite → renders Invite expired banner, CTA routes to /discover 
 
   // Following it lands on the discovery route — the safe fallback.
   await fallbackCta.click();
-  await page.waitForURL((u) => u.pathname === "/discover", { timeout: 10_000 });
+  // /discover redirects to /feed, where discovery lives now.
+  await expectOnDiscovery(page);
 
   // No join / payment write ever fired from the expired-invite flow.
   expect(writeAttempts, "expired invite must not trigger join/payment writes").toEqual([]);

@@ -3,6 +3,7 @@ import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteF
 import { pageHead } from "@/lib/seo";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { userErrorMessage } from "@/lib/user-error";
 
 type AuthorizationDetails = {
   client?: { name?: string; client_name?: string; redirect_uri?: string } | null;
@@ -57,7 +58,8 @@ export const Route = createFileRoute("/.lovable/oauth/consent")({
     const authorizationId = new URLSearchParams(location.search).get("authorization_id")!;
     const oauth = (supabase.auth as unknown as WithOAuth).oauth;
     const { data, error } = await oauth.getAuthorizationDetails(authorizationId);
-    if (error) throw new Error(error.message);
+    // The auth error itself, so its status and code still read as an expired session where they are one.
+    if (error) throw error;
     const immediate = data?.redirect_url ?? data?.redirect_to;
     if (immediate && !data?.client) throw redirect({ href: immediate });
     return data;
@@ -66,7 +68,10 @@ export const Route = createFileRoute("/.lovable/oauth/consent")({
   errorComponent: ({ error }) => (
     <RouteFallback
       title="Could not load this authorization request"
-      message={String((error as Error)?.message ?? error)}
+      message={userErrorMessage(
+        error,
+        "This sign-in request has expired or isn't valid. Go back to the app and try again.",
+      )}
       action={
         <Link to="/" className={FALLBACK_ACTION_CLASS}>
           Go home
@@ -96,13 +101,20 @@ function Consent() {
       : await oauth.denyAuthorization(authorization_id);
     if (error) {
       setBusy(false);
-      setError(error.message);
+      setError(
+        userErrorMessage(
+          error,
+          approve
+            ? "Couldn't connect that app. Go back to it and try again."
+            : "Couldn't cancel that request. Please try again.",
+        ),
+      );
       return;
     }
     const target = data?.redirect_url ?? data?.redirect_to;
     if (!target) {
       setBusy(false);
-      setError("No redirect returned by the authorization server.");
+      setError("Something went wrong finishing this sign-in. Go back to the app and try again.");
       return;
     }
     window.location.href = target;

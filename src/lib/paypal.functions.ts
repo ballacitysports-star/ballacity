@@ -309,8 +309,10 @@ async function recordCapturedPayment(
 
   let rostered = false;
   try {
+    // A place that cannot be given is reported to the host and the player by addPaidPlayerToRoster.
     const { addPaidPlayerToRoster } = await import("./roster-on-payment.server");
-    rostered = (await addPaidPlayerToRoster(order.game_id, order.player_id)).added;
+    const placed = await addPaidPlayerToRoster(order.game_id, order.player_id);
+    rostered = placed.added || placed.reason === "already_on_roster";
   } catch (e) {
     console.error("[paypal] roster placement after payment failed", e);
   }

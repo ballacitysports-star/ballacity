@@ -1,9 +1,12 @@
+import { openAlertsAndTap } from "./helpers/invite-alerts";
 import { test, expect, type Page } from "@playwright/test";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
+import { answerSessionChecks } from "./helpers/signed-in";
 
 /**
  * E2E: tapping a `game_invite` notification for a paid game must
  * (a) navigate to /games/$gameId with `invite=1` + `from=<hostId>` preserved,
- * (b) render the "Pay & join" copy in the invite banner, and
+ * (b) render the "Pay Host" copy in the invite banner, and
  * (c) tapping the paid CTA routes to the checkout page
  *     (/games/$gameId/pay) with BOTH invite=1 and from=<hostId> preserved
  *     in the URL.
@@ -25,6 +28,11 @@ const FAKE_HOST_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
 const ENTRY_FEE = 15;
 
 async function restoreSession(page: Page) {
+  // Answer the session checks every load starts (GET /auth/v1/user and the root gate's
+  // age, onboarding and child-status server functions) from the injected session, as the
+  // pay specs do. They are not what this spec is about, and each signed-in load
+  // otherwise sends the shared sandbox 8-13 requests for them. See helpers/signed-in.ts.
+  await answerSessionChecks(page);
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(
     ([key, value]) => window.localStorage.setItem(key!, value!),
@@ -106,6 +114,9 @@ test("tapping invite -> Pay & join CTA routes to checkout with preserved invite 
     },
   );
 
+  // Not a spec about "Before you join": the viewer has acknowledged it, so the pay page (which asks it
+  // before any payment option, docs/paid-path-gates.md section 7) goes straight to the options.
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
 
   // Seed the invite notification for the viewer.
@@ -126,10 +137,7 @@ test("tapping invite -> Pay & join CTA routes to checkout with preserved invite 
   expect(insertRes.ok, `seed insert failed: ${(insertRes as any).message ?? ""}`).toBe(true);
 
   // Open Alerts and tap the invite.
-  await page.goto("/notifications", { waitUntil: "domcontentloaded" });
-  const item = page.getByText(notifTitle, { exact: false }).first();
-  await expect(item).toBeVisible({ timeout: 10_000 });
-  await item.click();
+  await openAlertsAndTap(page, notifTitle);
 
   // URL preserves both invite params on landing.
   await page.waitForURL(
@@ -146,11 +154,14 @@ test("tapping invite -> Pay & join CTA routes to checkout with preserved invite 
     .filter({ hasText: /you're invited to this game/i })
     .first();
   await expect(banner).toBeVisible({ timeout: 10_000 });
-  await expect(banner).toContainText(/Pay & join/i);
+  // The banner names the paid CTA by its label, "Pay Host".
+  await expect(banner).toContainText(/tap\s+[“"']?Pay Host[”"']?\s+below/i);
 
-  // CTA button — paid variant shows "Pay host · $X".
-  const cta = page.getByRole("button", { name: /pay host/i }).first();
+  // Paid CTA — "Pay Host · $X", rendered as a link to the pay page on a paid,
+  // no-approval game.
+  const cta = page.getByRole("link", { name: /pay host/i }).first();
   await expect(cta).toBeVisible({ timeout: 10_000 });
+  await expect(cta).toHaveAttribute("href", new RegExp(`/games/${GAME_ID}/pay`));
   await cta.click();
 
   // Should route to the checkout page with BOTH invite params preserved.

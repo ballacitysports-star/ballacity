@@ -8,6 +8,38 @@ import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { isManagedUser } from "@/lib/managed-children";
 import { useAuthSearchHere } from "@/lib/auth-return";
+import { userErrorMessage } from "@/lib/user-error";
+
+const RATE_LIMITED = "Too many attempts. Wait a few minutes and try again.";
+
+/**
+ * What this form shows when Supabase Auth refuses the new password or email (WP 4.0). The refusals a person can fix
+ * get their own words (Supabase Auth names them in `code`, worded as on the sign-in and reset-password screens);
+ * anything else reads as userErrorMessage reads it, never as the raw text.
+ */
+const CREDENTIAL_ERROR_MESSAGES: ReadonlyMap<string, string> = new Map([
+  ["same_password", "Choose a password you haven't used here before."],
+  [
+    "weak_password",
+    "That password is too easy to guess. Choose a longer one with a mix of letters and numbers.",
+  ],
+  ["user_already_exists", "Another account already uses this email."],
+  ["email_exists", "Another account already uses this email."],
+  ["email_address_invalid", "Enter a valid email address."],
+  [
+    "over_email_send_rate_limit",
+    "Too many emails were sent to this address. Wait a few minutes and try again.",
+  ],
+  ["over_request_rate_limit", RATE_LIMITED],
+]);
+
+function credentialErrorMessage(err: unknown): string {
+  const e = err && typeof err === "object" ? (err as { code?: unknown; status?: unknown }) : {};
+  const own = typeof e.code === "string" ? CREDENTIAL_ERROR_MESSAGES.get(e.code) : undefined;
+  if (own) return own;
+  if (e.status === 429) return RATE_LIMITED;
+  return userErrorMessage(err, "Couldn't update your sign-in details. Please try again.");
+}
 
 export const Route = createFileRoute("/account/security")({
   head: () =>
@@ -90,7 +122,7 @@ function AccountSecurityPage() {
       );
       nav({ to: "/profile" });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not update credentials");
+      toast.error(credentialErrorMessage(err));
     } finally {
       setBusy(false);
     }

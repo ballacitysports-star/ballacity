@@ -7,6 +7,7 @@ import {
   sessionDisplayName,
   throttleProfileReads,
 } from "./helpers/seeded-host-game";
+import { feedGameCard } from "./helpers/realtime-counters";
 
 /**
  * E2E: with the `profiles` read deliberately slowed, the host name on both the
@@ -41,10 +42,7 @@ test("host name stays on display_name under throttled profile reads", async ({ p
 
   // Feed card for the same game.
   await page.goto("/feed");
-  const card = page
-    .locator('article, [data-testid="game-card"]')
-    .filter({ hasText: game.title })
-    .first();
+  const card = feedGameCard(page, game.title);
   await card.waitFor({ state: "visible", timeout: 15_000 });
   await expectHostName(page, displayName, emailPrefix);
 });

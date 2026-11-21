@@ -438,11 +438,16 @@ function TrainersPage() {
         </motion.div>
       )}
 
-      <TrainersView />
+      {renderTrainersView()}
     </div>
   );
 
-  function TrainersView() {
+  // Called, never rendered as <TrainersView />: a component declared inside
+  // this one is a new component type on every render, so React unmounted and
+  // remounted the whole list on each filter change. That reset the filter
+  // sheet's open state (picking a venue closed the sheet) and dropped focus
+  // from the search box after every keystroke.
+  function renderTrainersView() {
     return (
       <>
         <ViewDensityToggle
@@ -731,7 +736,7 @@ function TrainersPage() {
                       {availabilityLabel(score)}
                     </span>
                   </div>
-                  <TrainerActions org={o} defaultVenue={venue || null} />
+                  <TrainerActions org={o} />
                   {/* P2-5: follow from the list (request and message are above). */}
                   <DiscoverCardActions org={o} followOnly />
                 </div>

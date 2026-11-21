@@ -13,6 +13,22 @@ import {
   useGymReviews,
   type GymReview,
 } from "@/lib/gym-reviews";
+import { errorText, userErrorMessage } from "@/lib/user-error";
+
+/** The sentences useGymReviewActions throws itself (its form checks); shown as they are. */
+const OWN_REVIEW_SENTENCES: ReadonlySet<string> = new Set([
+  "Sign in to leave a review",
+  "Pick a star rating",
+  "Review must be at least 10 characters",
+  "You already reviewed this gym — edit your review instead.",
+  "Sign in to vote",
+]);
+
+/** Our own sentence when the review action threw one, else userErrorMessage's words; never the raw database text. */
+function reviewErrorMessage(e: unknown, fallback: string): string {
+  const text = errorText(e);
+  return text && OWN_REVIEW_SENTENCES.has(text) ? text : userErrorMessage(e, fallback);
+}
 
 function Stars({ value, size = 14 }: { value: number; size?: number }) {
   return (
@@ -87,7 +103,7 @@ export function GymReviews({
       toast.success(mine ? "Review updated" : "Thanks for your review");
       setEditing(false);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not save review");
+      toast.error(reviewErrorMessage(e, "Couldn't save your review. Please try again."));
     }
   }
 
@@ -226,7 +242,11 @@ export function GymReviews({
                       onClick={() =>
                         toggleHelpful
                           .mutateAsync(r)
-                          .catch((e) => toast.error(e instanceof Error ? e.message : "Failed"))
+                          .catch((e) =>
+                            toast.error(
+                              reviewErrorMessage(e, "Couldn't update that. Please try again."),
+                            ),
+                          )
                       }
                       className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 font-semibold ${
                         r.helpful_by_me
@@ -254,7 +274,12 @@ export function GymReviews({
                               await remove.mutateAsync(r.id);
                               toast.success("Review deleted");
                             } catch (e) {
-                              toast.error(e instanceof Error ? e.message : "Failed");
+                              toast.error(
+                                reviewErrorMessage(
+                                  e,
+                                  "Couldn't delete your review. Please try again.",
+                                ),
+                              );
                             }
                           }}
                           className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-1 font-semibold text-muted-foreground"
@@ -282,7 +307,12 @@ export function GymReviews({
                             await moderate.mutateAsync({ id: r.id, hidden: !r.flagged });
                             toast.success(r.flagged ? "Review restored" : "Review hidden");
                           } catch (e) {
-                            toast.error(e instanceof Error ? e.message : "Failed");
+                            toast.error(
+                              reviewErrorMessage(
+                                e,
+                                "Couldn't update this review. Please try again.",
+                              ),
+                            );
                           }
                         }}
                         className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 font-semibold text-amber-500"

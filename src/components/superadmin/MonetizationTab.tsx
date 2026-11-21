@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { monetizationAnalytics } from "@/lib/monetization/analytics.functions";
 import { formatCents } from "@/lib/monetization/fees";
+import { errorCode, userErrorMessage } from "@/lib/user-error";
 import { MonetizationSettingsPanel } from "@/components/superadmin/MonetizationSettingsPanel";
 
 /** Small labelled figure. Wraps freely so the grid works on a phone. */
@@ -50,7 +51,12 @@ export function MonetizationTab() {
           </div>
 
           {isLoading ? <p className="text-sm text-muted-foreground">Loading revenue…</p> : null}
-          {error ? <p className="text-sm text-destructive">{(error as Error).message}</p> : null}
+          {error ? (
+            <p className="text-sm text-destructive">
+              {userErrorMessage(error, "Couldn't load revenue. Please try again.")}
+              {errorCode(error) ? ` (${errorCode(error)})` : ""}
+            </p>
+          ) : null}
 
           {data ? (
             <div className="space-y-5">

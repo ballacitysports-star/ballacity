@@ -49,16 +49,16 @@ const org: OrgListingRow = {
 const hrefs = () => screen.getAllByRole("link").map((a) => a.getAttribute("href"));
 
 describe("OrgListingHeader host action", () => {
-  it("gives managers a Host a run here action tagged with the facility", () => {
+  it("gives managers a Host a game here action tagged with the facility", () => {
     render(<OrgListingHeader org={org} memberCount={0} isAdmin isOwner />);
-    expect(screen.getByRole("link", { name: "Host a run here" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Host a game here" })).toBeTruthy();
     expect(hrefs()).toContain("/create?orgId=org-1&kind=run");
     expect(screen.queryByRole("button", { name: /book court/i })).toBeNull();
   });
 
-  it("shows visitors Book court and a community Host a run here action", () => {
+  it("shows visitors Book court and a community Host a game here action", () => {
     render(<OrgListingHeader org={org} memberCount={0} isAdmin={false} isOwner={false} />);
-    expect(screen.getByRole("link", { name: "Host a run here" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Host a game here" })).toBeTruthy();
     expect(hrefs()).toContain("/create?orgId=org-1&kind=run");
     expect(screen.getByRole("button", { name: /book court/i })).toBeTruthy();
   });

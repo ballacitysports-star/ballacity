@@ -1,5 +1,7 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { restoreSession } from "./helpers/signed-in";
+import { payFixtureGameRow, serveFixtureGame } from "./helpers/pay-fixtures";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
 
 /**
  * E2E: tapping the "Pay host" button on the game detail page must
@@ -161,6 +163,13 @@ test("Pay host button on a custom (sample) game routes to the pay screen", async
   const writeAttempts: string[] = [];
 
   await mockPaymentBackend(page, CUSTOM_GAME_ID, { writeAttempts });
+  // Not a spec about "Before you join": the viewer has acknowledged it, so the pay page (which asks it
+  // before any payment option, docs/paid-path-gates.md section 7) goes straight to the options.
+  await stubRiskAcknowledged(page);
+  // The game itself: g2 is not a sample game, so the pay page looks it up in
+  // hosted_games. Served here, hosted by the spec's mocked host, so the screen
+  // never waits on the real row (unanswered, a slow read ended on "Game not found").
+  await serveFixtureGame(page, payFixtureGameRow(CUSTOM_GAME_ID, { host_id: FAKE_HOST_ID }));
   await restoreSession(page);
 
   await page.goto(`/games/${CUSTOM_GAME_ID}`, { waitUntil: "domcontentloaded" });
@@ -252,6 +261,8 @@ test("Pay host still renders when optional status lookups hang", async ({ browse
     },
   );
 
+  await stubRiskAcknowledged(page);
+  await serveFixtureGame(page, payFixtureGameRow(CUSTOM_GAME_ID, { host_id: FAKE_HOST_ID }));
   await restoreSession(page);
   await page.goto(`/games/${CUSTOM_GAME_ID}`, { waitUntil: "domcontentloaded" });
 
@@ -306,6 +317,8 @@ test("Pay screen exits payment-options loading when payment settings hang", asyn
     },
   );
 
+  await stubRiskAcknowledged(page);
+  await serveFixtureGame(page, payFixtureGameRow(CUSTOM_GAME_ID, { host_id: FAKE_HOST_ID }));
   await restoreSession(page);
   await page.goto(`/games/${CUSTOM_GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
 
@@ -326,6 +339,8 @@ test("Pay host button remains a pay link when local joined state is stale", asyn
   const writeAttempts: string[] = [];
 
   await mockPaymentBackend(page, CUSTOM_GAME_ID, { writeAttempts });
+  await stubRiskAcknowledged(page);
+  await serveFixtureGame(page, payFixtureGameRow(CUSTOM_GAME_ID, { host_id: FAKE_HOST_ID }));
   await restoreSession(page);
   await page.evaluate(
     (gameId) => window.localStorage.setItem("openrun.joinedGameIds.v1", JSON.stringify([gameId])),
@@ -356,6 +371,8 @@ test("Payment status button with a pending submission still routes to the pay sc
     submissions: [mockPendingSubmission(CUSTOM_GAME_ID)],
     writeAttempts,
   });
+  await stubRiskAcknowledged(page);
+  await serveFixtureGame(page, payFixtureGameRow(CUSTOM_GAME_ID, { host_id: FAKE_HOST_ID }));
   await restoreSession(page);
   await page.evaluate(
     (gameId) => window.localStorage.setItem("openrun.joinedGameIds.v1", JSON.stringify([gameId])),
@@ -390,6 +407,8 @@ test("Payment rejected button routes back to the pay screen without deleting the
     submissions: [mockRejectedSubmission(CUSTOM_GAME_ID)],
     writeAttempts,
   });
+  await stubRiskAcknowledged(page);
+  await serveFixtureGame(page, payFixtureGameRow(CUSTOM_GAME_ID, { host_id: FAKE_HOST_ID }));
   await restoreSession(page);
   await page.evaluate(
     (gameId) => window.localStorage.setItem("openrun.joinedGameIds.v1", JSON.stringify([gameId])),
@@ -470,6 +489,7 @@ test("Pay host button on a hosted game routes to the pay screen", async ({ brows
   );
 
   await mockPaymentBackend(page, HOSTED_GAME_ID);
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
 
   await page.goto(`/games/${HOSTED_GAME_ID}`, { waitUntil: "domcontentloaded" });

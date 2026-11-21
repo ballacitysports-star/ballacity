@@ -11,10 +11,13 @@ const INTERVAL_MS = 60_000;
  */
 export function useSessionHeartbeat() {
   const { user } = useAuth();
+  const userId = user?.id ?? null;
   const beat = useServerFn(recordSessionHeartbeat);
 
+  // Keyed on the user id, not the user object: a re-published auth state for
+  // the same member must not send an extra heartbeat.
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
     let stopped = false;
     const timezone = (() => {
       try {
@@ -37,5 +40,5 @@ export function useSessionHeartbeat() {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", tick);
     };
-  }, [user, beat]);
+  }, [userId, beat]);
 }

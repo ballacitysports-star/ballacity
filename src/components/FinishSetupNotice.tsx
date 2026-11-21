@@ -6,6 +6,7 @@ import { AlertCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { ACCOUNT_TYPE_META, type AccountType } from "@/lib/account-type";
 import { continueAsPlayer, myProfilesKey } from "@/lib/account-profiles";
+import { userErrorMessage } from "@/lib/user-error";
 
 /**
  * Shown on a team/trainer/gym creation screen the user was routed to because
@@ -28,7 +29,7 @@ export function FinishSetupNotice({ kind }: { kind: Exclude<AccountType, "player
       toast.success("You're set up as a player");
       navigate({ to: "/feed", replace: true });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not switch to a player account");
+      toast.error(userErrorMessage(e, "Couldn't switch to a player account. Please try again."));
     } finally {
       setBusy(false);
     }

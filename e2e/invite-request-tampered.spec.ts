@@ -1,4 +1,8 @@
+import { openAlertsAndTap } from "./helpers/invite-alerts";
+import { fulfillRows } from "./helpers/invite-postgrest";
+import { mockRiskNotAcknowledged, watchRiskDialog } from "./helpers/risk-ack";
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { answerSessionChecks } from "./helpers/signed-in";
 
 /**
  * E2E: the "Request to join" CTA on an approval-gated game must show an error
@@ -12,6 +16,9 @@ import { test, expect, type Page, type Route as PWRoute } from "@playwright/test
  * assert:
  *   - a Sonner error toast renders ("invalid or has been tampered with"),
  *   - no POST to /rest/v1/join_requests is ever made,
+ *   - the "Before you join" risk dialog never opens and no acknowledgment is
+ *     recorded, although the viewer has not acknowledged this game yet: a
+ *     refused request must not ask for (and store) consent first,
  *   - the tampered/missing invite params still stick on the URL (the app
  *     doesn't silently rewrite them).
  *
@@ -31,6 +38,11 @@ const REAL_HOST_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
 const TAMPERED_HOST_ID = "ffffffff-0000-1111-2222-333333333333";
 
 async function restoreSession(page: Page) {
+  // Answer the session checks every load starts (GET /auth/v1/user and the root gate's
+  // age, onboarding and child-status server functions) from the injected session, as the
+  // pay specs do. They are not what this spec is about, and each signed-in load
+  // otherwise sends the shared sandbox 8-13 requests for them. See helpers/signed-in.ts.
+  await answerSessionChecks(page);
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(
     ([key, value]) => window.localStorage.setItem(key!, value!),
@@ -92,11 +104,7 @@ async function installMocks(page: Page, onJoinPost: () => void) {
       if (method === "POST") {
         // Fail loudly — this test asserts the POST never fires.
         onJoinPost();
-        await route.fulfill({
-          status: 201,
-          contentType: "application/json",
-          body: JSON.stringify([{ id: "should-not-happen" }]),
-        });
+        await fulfillRows(route, [{ id: "should-not-happen" }], { status: 201 });
         return;
       }
       return route.fallback();
@@ -138,14 +146,15 @@ async function runTamperedCase(
   await installMocks(page, () => {
     joinPostFired = true;
   });
+  // The acknowledgment is due, so the dialog would open if the page asked for
+  // it before checking the link.
+  const riskAck = await mockRiskNotAcknowledged(page);
+  const riskDialogSeen = await watchRiskDialog(page);
   await restoreSession(page);
   await seedInvite(page, userId, notifTitle, link);
 
   // Tap invite in Alerts.
-  await page.goto("/notifications", { waitUntil: "domcontentloaded" });
-  const item = page.getByText(notifTitle, { exact: false }).first();
-  await expect(item).toBeVisible({ timeout: 10_000 });
-  await item.click();
+  await openAlertsAndTap(page, notifTitle);
 
   // Land on game with the tampered/missing params exactly as encoded.
   await page.waitForURL(
@@ -167,6 +176,12 @@ async function runTamperedCase(
   // Give any (illegitimate) network fire a chance to land before asserting no POST.
   await page.waitForTimeout(500);
   expect(joinPostFired, "join_requests POST must NOT fire for a tampered invite").toBe(false);
+
+  // Refused before the risk acknowledgment: no dialog, nothing recorded.
+  expect(await riskDialogSeen(), "the risk dialog must not open for a refused request").toBe(false);
+  expect(riskAck.writes, "no risk acknowledgment may be recorded for a refused request").toEqual(
+    [],
+  );
 
   // URL still reflects the tampered/missing invite params — the app didn't
   // silently rewrite the link.

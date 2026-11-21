@@ -1,4 +1,8 @@
+import { stickyRequestCta } from "./helpers/invite-join-cta";
+import { fulfillRows } from "./helpers/invite-postgrest";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { answerSessionChecks } from "./helpers/signed-in";
 
 /**
  * E2E: if the first "Request to join" POST fails with a network error,
@@ -24,6 +28,11 @@ const INVITE_URL = `/games/${GAME_ID}?invite=1&from=${FAKE_HOST_ID}&exp=${FUTURE
 const FIRST_POST_DELAY_MS = 1_200;
 
 async function restoreSession(page: Page) {
+  // Answer the session checks every load starts (GET /auth/v1/user and the root gate's
+  // age, onboarding and child-status server functions) from the injected session, as the
+  // pay specs do. They are not what this spec is about, and each signed-in load
+  // otherwise sends the shared sandbox 8-13 requests for them. See helpers/signed-in.ts.
+  await answerSessionChecks(page);
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(
     ([key, value]) => window.localStorage.setItem(key!, value!),
@@ -128,18 +137,14 @@ test("network error on first Request-to-join blocks a mid-flight second tap, the
         }
         // Retry succeeds.
         retrySucceeded = true;
-        await route.fulfill({
-          status: 201,
-          contentType: "application/json",
-          headers: { "content-range": "0-0/1" },
-          body: JSON.stringify([pendingRow()]),
-        });
+        await fulfillRows(route, [pendingRow()], { status: 201 });
         return;
       }
       return route.fallback();
     },
   );
 
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
   await page.goto(INVITE_URL, { waitUntil: "domcontentloaded" });
 
@@ -149,8 +154,11 @@ test("network error on first Request-to-join blocks a mid-flight second tap, the
     .first();
   await expect(banner).toBeVisible({ timeout: 10_000 });
 
-  const cta = page.getByRole("button", { name: /request spot/i }).first();
+  // The same sticky button through both labels: it reads "Request pending"
+  // while the first request is in flight.
+  const cta = stickyRequestCta(page);
   await expect(cta).toBeVisible({ timeout: 10_000 });
+  await expect(cta).toHaveAccessibleName(/^request spot/i);
 
   // First tap — starts the doomed POST.
   await cta.click({ force: true });
@@ -182,9 +190,15 @@ test("network error on first Request-to-join blocks a mid-flight second tap, the
   ).toBe(1);
 
   // Error surfaces via a toast + the CTA returns to "Request to join" (not pending).
-  await expect(page.getByText(/could not send request|failed|network/i).first()).toBeVisible({
+  await expect(
+    page
+      .getByText(/we couldn't connect\. check your internet connection|couldn't send your request/i)
+      .first(),
+  ).toBeVisible({
     timeout: 5_000,
   });
+  // WP 4.0: the member sees plain words, never the raw fetch error.
+  await expect(page.getByText(/failed to fetch|net::err|typeerror/i)).toHaveCount(0);
 
   const retryCta = page.getByRole("button", { name: /request spot/i }).first();
   await expect(retryCta).toBeVisible({ timeout: 5_000 });

@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { isAllowed } from "@/lib/notification-prefs";
-import { openDeepLink, toAbsoluteDeepLink } from "@/lib/deep-links";
+import { openDeepLink } from "@/lib/deep-links";
 
 export type Notification = {
   id: string;
@@ -28,23 +28,7 @@ export async function createNotification(input: {
   } catch (e: any) {
     console.warn("notification insert failed", e?.message ?? e);
   }
-
-  // Best-effort OneSignal push (background/closed-app delivery). Never blocks.
-  try {
-    const { sendPushToUser } = await import("@/lib/push.functions");
-    void sendPushToUser({
-      data: {
-        userId: input.user_id,
-        title: input.title,
-        body: input.body ?? null,
-        // Push providers need an absolute URL so tapping the alert opens the
-        // exact game / chat / profile the notification refers to.
-        url: toAbsoluteDeepLink(input.link ?? null, input.type),
-      },
-    }).catch((e) => console.warn("push send failed", e));
-  } catch (e) {
-    console.warn("push module load failed", e);
-  }
+  // The push (background/closed-app delivery) is sent by createNotificationForUser from the stored notification.
 }
 
 export async function listMyNotifications(): Promise<Notification[]> {
@@ -58,17 +42,19 @@ export async function listMyNotifications(): Promise<Notification[]> {
 }
 
 export async function markNotificationRead(id: string) {
-  await supabase
+  const { error } = await supabase
     .from("notifications" as any)
     .update({ read_at: new Date().toISOString() } as any)
     .eq("id", id);
+  if (error) throw error;
 }
 
 export async function markNotificationUnread(id: string) {
-  await supabase
+  const { error } = await supabase
     .from("notifications" as any)
     .update({ read_at: null } as any)
     .eq("id", id);
+  if (error) throw error;
 }
 
 export async function deleteNotification(id: string) {
@@ -79,41 +65,78 @@ export async function deleteNotification(id: string) {
   if (error) throw error;
 }
 
-export async function markAllNotificationsRead() {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) return;
-  await supabase
+/**
+ * Marks every unread notification of the signed-in user as read, not just the rows on screen: one update on the
+ * server, filtered by user and `read_at is null`. RLS ("Users update own notifications") limits it to the caller's
+ * own rows. Returns how many rows it changed; throws the PostgREST error so the caller can word it.
+ */
+export async function markAllNotificationsRead(userId?: string): Promise<number> {
+  let uid = userId;
+  if (!uid) {
+    const { data: u } = await supabase.auth.getUser();
+    uid = u.user?.id;
+  }
+  if (!uid) throw new Error("AUTH_REQUIRED");
+  const { error, count } = await supabase
     .from("notifications" as any)
-    .update({ read_at: new Date().toISOString() } as any)
-    .eq("user_id", u.user.id)
+    .update({ read_at: new Date().toISOString() } as any, { count: "exact" })
+    .eq("user_id", uid)
     .is("read_at", null);
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/** The signed-in user's true number of unread notifications, counted on the server (not the loaded rows). */
+export async function countUnreadNotifications(
+  userId: string,
+  opts: { excludeType?: string } = {},
+): Promise<number> {
+  let q = supabase
+    .from("notifications" as any)
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .is("read_at", null);
+  if (opts.excludeType) q = q.neq("type", opts.excludeType);
+  const { count, error } = await q;
+  if (error) throw error;
+  return count ?? 0;
 }
 
 /**
+ * The signed-in user's unread notification count from the server, kept fresh by realtime, with `refresh` and
+ * `setCount` so a screen that changes read state can update it at once. `count` is null while unknown (not
+ * answered yet, or the first read failed).
+ *
  * `scope` keeps each caller's realtime channel separate: two components asking
  * for the same channel name at once would subscribe to it twice.
  */
-export function useUnreadNotificationCount(scope = "", opts: { excludeType?: string } = {}) {
+export function useUnreadNotificationCountState(
+  scope = "",
+  opts: { excludeType?: string } = {},
+): { count: number | null; refresh: () => void; setCount: (next: number | null) => void } {
   const excludeType = opts.excludeType;
   const { user } = useAuth();
-  const [count, setCount] = useState(0);
+  // null until the server has answered: "unknown" is not "nothing unread".
+  const [count, setCount] = useState<number | null>(null);
+  const fetchRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (!user) {
       setCount(0);
+      fetchRef.current = () => {};
       return;
     }
     let cancelled = false;
+    setCount(null);
     const fetchCount = async () => {
-      let q = supabase
-        .from("notifications" as any)
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .is("read_at", null);
-      if (excludeType) q = q.neq("type", excludeType);
-      const { count: c } = await q;
-      if (!cancelled) setCount(c ?? 0);
+      try {
+        const c = await countUnreadNotifications(user.id, { excludeType });
+        if (!cancelled) setCount(c);
+      } catch {
+        // Keep the last known count (or null, "unknown"): a failed read is not "nothing unread".
+      }
     };
+    fetchRef.current = () => void fetchCount();
     fetchCount();
 
     const channel = supabase
@@ -126,11 +149,17 @@ export function useUnreadNotificationCount(scope = "", opts: { excludeType?: str
       .subscribe();
     return () => {
       cancelled = true;
+      fetchRef.current = () => {};
       supabase.removeChannel(channel);
     };
   }, [user?.id, excludeType]);
 
-  return count;
+  const refresh = useCallback(() => fetchRef.current(), []);
+  return { count, refresh, setCount };
+}
+
+export function useUnreadNotificationCount(scope = "", opts: { excludeType?: string } = {}) {
+  return useUnreadNotificationCountState(scope, opts).count ?? 0;
 }
 
 export function useUnreadMessageCount() {
@@ -180,25 +209,40 @@ export function pushPermissionState(): "granted" | "denied" | "default" | "unsup
   return window.Notification.permission;
 }
 
-export async function requestPushPermission(): Promise<NotificationPermission | "unsupported"> {
-  if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
+export type PushEnableResult = {
+  permission: NotificationPermission | "unsupported";
+  /** Whether this device now has a push subscription, so alerts can arrive while the app is closed. */
+  subscribed: boolean;
+};
+
+/**
+ * The app's one way to turn push on for this device: asks the browser if needed and creates the device's push
+ * subscription. A "granted" permission alone is not success: the subscription can still fail (a blocked SDK, a
+ * failed opt-in), and `subscribed` says whether it exists.
+ */
+export async function requestPushPermission(): Promise<PushEnableResult> {
+  if (typeof window === "undefined" || !("Notification" in window)) {
+    return { permission: "unsupported", subscribed: false };
+  }
+  if (window.Notification.permission === "denied") {
+    return { permission: "denied", subscribed: false };
+  }
   if (window.Notification.permission === "granted") {
-    // Already allowed in the browser, but the device may still lack a OneSignal
-    // subscription (needed for delivery while the app is closed).
-    void ensureOneSignalSubscription();
-    return "granted";
+    // Already allowed in the browser, but the device may still lack a push subscription
+    // (needed for delivery while the app is closed).
+    return { permission: "granted", subscribed: await ensureOneSignalSubscription() };
   }
-  if (window.Notification.permission === "denied") return "denied";
   // Prompt through OneSignal so permission AND the push subscription are created.
-  const subscribed = await ensureOneSignalSubscription();
-  if (subscribed) return "granted";
+  if (await ensureOneSignalSubscription()) return { permission: "granted", subscribed: true };
+  let permission: NotificationPermission;
   try {
-    const result = await window.Notification.requestPermission();
-    if (result === "granted") void ensureOneSignalSubscription();
-    return result;
+    permission = await window.Notification.requestPermission();
   } catch {
-    return window.Notification.permission;
+    permission = window.Notification.permission;
   }
+  // Allowed now, but the first opt-in failed: try once more and report what actually happened.
+  const subscribed = permission === "granted" ? await ensureOneSignalSubscription() : false;
+  return { permission, subscribed };
 }
 
 /** Best-effort opt-in to OneSignal web push for closed-app delivery. */

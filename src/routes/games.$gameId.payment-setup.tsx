@@ -21,6 +21,21 @@ import {
 import { LegalNotice } from "@/components/LegalNotice";
 import { RefundPolicyFields } from "@/components/RefundPolicyFields";
 import { DEFAULT_REFUND_RULE, normalizeRefundPolicy, type RefundPolicy } from "@/lib/refund-policy";
+import { errorText, userErrorMessage } from "@/lib/user-error";
+
+/** The sentences the payments helpers throw themselves (sign-in and form checks); shown as they are. */
+const OWN_PAYMENT_SENTENCES: ReadonlySet<string> = new Set([
+  "Sign in to configure payments.",
+  "BallaCity does not process game payments yet — hosts collect directly.",
+  "Sign in to connect PayPal.",
+  "Enter your PayPal Merchant ID (13 letters/numbers, from your PayPal business settings).",
+]);
+
+/** Our own sentence when a payments helper threw one, else userErrorMessage's words; never the raw database text. */
+function setupErrorMessage(e: unknown, fallback: string): string {
+  const text = errorText(e);
+  return text && OWN_PAYMENT_SENTENCES.has(text) ? text : userErrorMessage(e, fallback);
+}
 
 export const Route = createFileRoute("/games/$gameId/payment-setup")({
   head: () =>
@@ -37,6 +52,7 @@ export const Route = createFileRoute("/games/$gameId/payment-setup")({
   errorComponent: ({ error, reset }) => (
     <RouteFallback
       title="Couldn't open payment setup"
+      message="We couldn't open payment setup. Please try again."
       error={error}
       onRetry={reset}
       action={
@@ -181,8 +197,8 @@ function SetupForm({ game }: { game: Game }) {
       });
       toast.success("Settings saved");
       nav({ to: "/games/$gameId", params: { gameId: game.id } });
-    } catch (e: any) {
-      toast.error(e.message);
+    } catch (e) {
+      toast.error(setupErrorMessage(e, "Couldn't save your payment settings. Please try again."));
     } finally {
       setSaving(false);
     }
@@ -235,8 +251,10 @@ function SetupForm({ game }: { game: Game }) {
                   setPaypalMerchantId("");
                   setPaypalEmail("");
                   toast.success("PayPal disconnected");
-                } catch (e: any) {
-                  toast.error(e.message);
+                } catch (e) {
+                  toast.error(
+                    setupErrorMessage(e, "Couldn't disconnect PayPal. Please try again."),
+                  );
                 } finally {
                   setPaypalSaving(false);
                 }
@@ -273,8 +291,13 @@ function SetupForm({ game }: { game: Game }) {
                   const saved = await getMyPayPalAccount();
                   setPaypal(saved);
                   toast.success("PayPal connected — players can now pay in-app");
-                } catch (e: any) {
-                  toast.error(e.message);
+                } catch (e) {
+                  toast.error(
+                    setupErrorMessage(
+                      e,
+                      "Couldn't connect PayPal. Check the Merchant ID and email and try again.",
+                    ),
+                  );
                 } finally {
                   setPaypalSaving(false);
                 }
@@ -313,7 +336,7 @@ function SetupForm({ game }: { game: Game }) {
           <div className="min-w-0">
             <div className="font-semibold text-sm">Require my approval to join</div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Players send a request and you decide who's in. Useful for skill-matched or
+              Players request a spot and you decide who's in. Useful for skill-matched or
               invite-only games.
             </p>
           </div>

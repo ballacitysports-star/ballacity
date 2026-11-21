@@ -3,7 +3,10 @@
  *
  * `player_activity_stats` is a SECURITY DEFINER aggregate: it returns counts
  * only (games attended, no-shows, hosted totals, review averages) and never
- * PII, so it is safe to read for any profile the viewer can already see.
+ * PII. It answers only the person themselves, their verified guardian and the
+ * server; anyone else gets the same zero row for every account (SEC-2b), so
+ * the app asks it only about the signed-in user. `player_trait_counts` follows
+ * the same rule.
  * Reliability is derived here so every surface — profile header, player card,
  * badge list — reports the same number.
  */

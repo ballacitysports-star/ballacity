@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { isChunkLoadError } from "@/lib/chunk-error";
+import { userErrorMessage } from "@/lib/user-error";
 
 /**
  * What a route shows when it cannot render: a not-found, or a loader that
@@ -35,7 +36,9 @@ export type RouteFallbackProps = {
   /**
    * What actually went wrong, when the route has it. A page open across an update
    * gets a Reload button (retrying cannot fix a missing file); any other error is
-   * logged and its message shown small, so a report says what failed.
+   * logged, and shown small only as the catalog or generic sentence it maps to
+   * (offline, signed out, a known refusal). Its raw text, which can be a database
+   * or render error, is never shown (WP 4.0); the console keeps it.
    */
   error?: unknown;
   className?: string;
@@ -53,10 +56,8 @@ export function RouteFallback({
   useEffect(() => {
     if (error) console.error("[route-error]", error);
   }, [error]);
-  const detail =
-    !stale && error instanceof Error && error.message && error.message !== message
-      ? error.message.slice(0, 160)
-      : null;
+  const known = !stale && error ? userErrorMessage(error, "") : "";
+  const detail = known && known !== message ? known : null;
   return (
     <div className={cn("grid min-h-dvh place-items-center px-6 text-center", className)}>
       <div className="max-w-sm">
@@ -71,7 +72,7 @@ export function RouteFallback({
           </p>
         ) : null}
         {detail ? (
-          <p className="mt-2 break-words text-[11px] text-muted-foreground/70">Details: {detail}</p>
+          <p className="mt-2 break-words text-xs text-muted-foreground/80">{detail}</p>
         ) : null}
         <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
           {stale ? (

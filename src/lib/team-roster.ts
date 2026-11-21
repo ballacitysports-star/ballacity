@@ -10,6 +10,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { fetchHasGuardianLinkInForce } from "@/lib/guardian-link-in-force";
+import { errorText, knownErrorMessage } from "@/lib/user-error";
 
 export const TEAM_ROLES = ["owner", "manager", "coach", "captain", "player"] as const;
 export type TeamRole = (typeof TEAM_ROLES)[number];
@@ -105,39 +107,12 @@ const ROSTER_ORDER: Record<TeamRole, number> = {
  * either as one of these messages or as "nothing changed".
  */
 export function teamRosterErrorMessage(err: unknown): string {
-  const raw =
-    err instanceof Error
-      ? err.message
-      : String((err as { message?: string })?.message ?? err ?? "");
-  if (raw.includes("NOT_TEAM_MANAGER"))
-    return "Only the team's owner, managers or coaches can do that.";
-  if (raw.includes("NOT_TEAM_OWNER")) return "Only the team's owner can hand the team over.";
-  if (raw.includes("TARGET_NOT_MANAGER"))
-    return "A team can only be handed to a manager. Promote them first.";
-  if (raw.includes("ALREADY_OWNER")) return "You already own this team.";
-  if (raw.includes("TEAM_NOT_FOUND")) return "That team no longer exists.";
-  if (raw.includes("ALREADY_MEMBER")) return "That player is already on the roster.";
-  if (raw.includes("SELF_INVITE")) return "You're already on this team.";
-  if (raw.includes("OWNER_NOT_INVITABLE") || raw.includes("OWNER_ROLE_FIXED"))
-    return "The owner role follows team ownership and can't be assigned.";
-  if (raw.includes("OWNER_NOT_REMOVABLE"))
-    return "The team owner can't be removed from the roster.";
-  if (raw.includes("BLOCKED")) return "You can't invite this player.";
-  if (raw.includes("INVITE_NOT_FOUND")) return "That invitation no longer exists.";
-  if (raw.includes("INVITE_NOT_PENDING")) return "That invitation was already answered.";
-  if (raw.includes("INVITE_EXPIRED"))
-    return "That invitation expired. Ask the team to send a new one.";
-  if (raw.includes("CHILD_ACTIVITY_LOCKED"))
-    return "A parent or guardian has paused team activity on this account.";
-  if (raw.includes("WAIVER_REQUIRED")) return "Sign the team's waiver before joining.";
-  if (raw.includes("GUARDIAN_APPROVAL_REQUIRED"))
-    return "A parent or guardian must approve this invite first.";
-  if (raw.includes("AGE_VERIFICATION_REQUIRED"))
-    return "Add your date of birth in your profile before joining a team.";
-  if (raw.includes("NOT_INVITEE")) return "That invitation was sent to someone else.";
-  if (raw.includes("NOT_A_MEMBER")) return "That player isn't on the roster.";
-  if (raw.includes("duplicate key")) return "That player already has a pending invitation.";
-  if (raw.includes("AUTH_REQUIRED")) return "Sign in to manage a team roster.";
+  const known = knownErrorMessage(err);
+  if (known) return known;
+  // The unique index on pending invites (23505): here it can only mean one is already waiting.
+  if ((errorText(err) ?? "").includes("duplicate key")) {
+    return "This player already has an invite waiting for an answer.";
+  }
   return "Couldn't update the roster. Try again.";
 }
 
@@ -264,13 +239,8 @@ export function useMyTeamInvites() {
         .order("created_at", { ascending: false });
       if (error) throw error;
       const rows = (data ?? []) as Record<string, any>[];
-      const { data: links } = await supabase
-        .from("guardian_links")
-        .select("id")
-        .eq("child_user_id", user!.id)
-        .eq("status", "active")
-        .limit(1);
-      const hasGuardian = (links ?? []).length > 0;
+      // A link ends when the child turns 18 (20261125200000): an adult is not asked for a guardian's approval.
+      const hasGuardian = await fetchHasGuardianLinkInForce(user!.id);
       const teamIds = [...new Set(rows.map((r) => String(r["team_id"])))];
       const names = new Map<string, string>();
       if (teamIds.length) {

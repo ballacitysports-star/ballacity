@@ -102,10 +102,10 @@ describe("RouteFallback with the error that caused it", () => {
     expect(onRetry).not.toHaveBeenCalled();
   });
 
-  it("shows what actually failed, small, and keeps Try again for other errors", () => {
+  it("logs a raw error but never shows its text, and keeps Try again for other errors", () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     const onRetry = vi.fn();
-    render(
+    const { container } = render(
       <RouteFallback
         title="Something went wrong"
         message="This game couldn't be loaded."
@@ -113,21 +113,52 @@ describe("RouteFallback with the error that caused it", () => {
         onRetry={onRetry}
       />,
     );
-    expect(screen.getByText(/Details: Cannot read properties of undefined/)).toBeTruthy();
+    expect(container.textContent).not.toMatch(/Cannot read properties/);
+    expect(screen.queryByText(/Details:/)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(onRetry).toHaveBeenCalledTimes(1);
     expect(spy).toHaveBeenCalled();
     spy.mockRestore();
   });
 
-  it("does not repeat a message the page already shows", () => {
-    render(
+  it("never shows raw database text", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { container } = render(
       <RouteFallback
         title="Couldn't load this gym"
-        message="Gym is hidden"
-        error={new Error("Gym is hidden")}
+        message="Something went wrong."
+        error={{ message: 'relation "public.orgs" does not exist', code: "42P01" }}
       />,
     );
-    expect(screen.queryByText(/Details:/)).toBeNull();
+    expect(container.textContent).not.toMatch(/relation|public\.orgs/);
+    vi.restoreAllMocks();
+  });
+
+  it("shows the sentence a known error maps to, small", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    render(
+      <RouteFallback
+        title="Couldn't load this game"
+        message="This game couldn't be loaded."
+        error={new Error("TypeError: Failed to fetch")}
+      />,
+    );
+    expect(
+      screen.getByText("We couldn't connect. Check your internet connection and try again."),
+    ).toBeTruthy();
+    vi.restoreAllMocks();
+  });
+
+  it("does not repeat a message the page already shows", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    render(
+      <RouteFallback
+        title="Couldn't load this game"
+        message="This game was cancelled by the host."
+        error={new Error("GAME_CANCELLED")}
+      />,
+    );
+    expect(screen.getAllByText("This game was cancelled by the host.")).toHaveLength(1);
+    vi.restoreAllMocks();
   });
 });

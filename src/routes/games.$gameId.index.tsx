@@ -37,11 +37,26 @@ import {
   Ban,
   UserCheck,
   UserX,
+  Loader2,
 } from "lucide-react";
 import { ReportDialog } from "@/components/ReportDialog";
 import { RiskAcknowledgmentDialog } from "@/components/safety/RiskAcknowledgmentDialog";
+import { JoinGameDialog } from "@/components/game-detail/JoinGameDialog";
+import { isFreeInstantJoin, joinTapRoute, recordAckThenJoin } from "@/lib/join-dialog";
 import { needsRiskAcknowledgment, RISK_ACKNOWLEDGMENT } from "@/lib/safety";
 import { recordSafetyAck, useSafetyAck } from "@/lib/safety-acks";
+import { planRiskAckTap, riskAckReadFrom, settleRiskAckTap } from "@/lib/risk-ack-tap";
+import { createLocalWriteGuard } from "@/lib/local-write-guard";
+import {
+  GAME_FULL_MESSAGE,
+  INVITE_EXPIRED_MESSAGE,
+  INVITE_TAMPERED_MESSAGE,
+  NO_REQUEST_HOST_MESSAGE,
+  joinPreflightRefusal,
+  joinTapStep,
+  type JoinPreflightInput,
+  type JoinRefusal,
+} from "@/lib/join-preflight";
 import { ShieldAlert } from "lucide-react";
 import { GAMES, SPORTS } from "@/lib/sample-data";
 import {
@@ -69,7 +84,8 @@ import {
   markAttendance,
   useHostAttendanceStats,
 } from "@/lib/game-lifecycle";
-import { resolveGameStatus, GAME_STATUS_TONE_CLASS } from "@/lib/game-status";
+import { resolveGameStatus, GAME_STATUS_TONE_CLASS, joinGateErrorMessage } from "@/lib/game-status";
+import { errorCode, errorText, knownErrorMessage, userErrorMessage } from "@/lib/user-error";
 import { viewerGamePolicy, type GamePolicy, type HostTrust } from "@/lib/game-policy";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
@@ -110,7 +126,7 @@ import {
   usePaymentHoldSweep,
 } from "@/lib/payment-hold";
 import { shouldTriggerLeaveBranch } from "@/lib/leave-branch";
-import { useMyFlowStatus } from "@/lib/game-flow-status";
+import { refreshMyFlowStatus, useMyFlowStatus } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 import { LeaveFlowButton } from "@/components/LeaveFlowButton";
 import { useHasActiveGuardian } from "@/lib/use-has-guardian";
@@ -188,6 +204,14 @@ import { GamePaymentTerms } from "@/components/game-detail/GameInfoSections";
 import { GameHostSection } from "@/components/game-detail/GameHostSection";
 import { GamePlayersSection } from "@/components/game-detail/GamePlayersSection";
 import { GameApprovalBanner } from "@/components/game-detail/GameApprovalBanner";
+import { GameInviteBanner } from "@/components/game-detail/GameInviteBanner";
+import { pluralize } from "@/lib/pluralize";
+import { GameInvitesPanel } from "@/components/game-detail/GameInvitesPanel";
+import {
+  gameTakesNoPayment,
+  payHostLinkShown,
+  unpaidOnGameTakingNoPayment,
+} from "@/lib/pay-entry-gate";
 import {
   ASK_PARENT_AGAIN_LABEL,
   ASK_PARENT_LABEL,
@@ -197,16 +221,23 @@ import {
   guardianOnlyJoin,
   guardianOnlyRequestKey,
 } from "@/lib/guarded-open-join";
+import { clearOfHelpLauncher } from "@/lib/support/launcher-clearance";
 
 const emojiBySport: Record<string, string> = Object.fromEntries(
   SPORTS.map((s) => [s.name, s.emoji]),
 );
 
 export const Route = createFileRoute("/games/$gameId/")({
+  // A new game is a new page. Without this the router reuses GameDetail when
+  // only gameId changes, and per-game state (the viewer's request, the status
+  // read guards, an open write's late answer) would carry over to the next game.
+  remountDeps: ({ params }) => params.gameId,
   validateSearch: (search: Record<string, unknown>) => {
     const out: {
       invite?: true;
       from?: string;
+      /** WP 2.0: the server-side invitation (game_invites.id) the notification links to. */
+      inv?: string;
       exp?: number;
       expInvalid?: true;
       tab?: "overview" | "payments";
@@ -214,6 +245,7 @@ export const Route = createFileRoute("/games/$gameId/")({
     } = {};
     if (search.invite === "1" || search.invite === 1 || search.invite === true) out.invite = true;
     if (typeof search.from === "string" && search.from.length > 0) out.from = search.from;
+    if (typeof search.inv === "string" && /^[0-9a-f-]{36}$/i.test(search.inv)) out.inv = search.inv;
     const rawExp = search.exp;
     if (rawExp !== undefined && rawExp !== null && rawExp !== "") {
       const expNum =
@@ -270,6 +302,26 @@ export const Route = createFileRoute("/games/$gameId/")({
  * preview; everything else, including the join and pay actions, is the
  * signed-in page below.
  */
+/**
+ * createJoinRequest's own sentences (signed out, resubmit cap, cooldown) and the resubmit trigger's: ours, so they
+ * show as they are.
+ */
+const JOIN_REQUEST_OWN_TEXT =
+  /^(?:Sign in to request a spot\.|You(?:'ve| have) reached the maximum of \d+ resubmit attempts for this game\.(?: Message the host instead\.)?|Please wait [\w ]{1,40} before resubmitting this request\.)$/;
+
+/** What a failed request to join (to the host, or to a parent) reads as: never the raw database text (WP 4.0). */
+function joinRequestErrorMessage(e: unknown, game: { allowWaitlist?: boolean | null }): string {
+  const text = errorText(e) ?? "";
+  if (JOIN_REQUEST_OWN_TEXT.test(text)) return text;
+  if (errorCode(e) === "BLOCKED_BY_HOST") return "You can't request a spot in this game.";
+  return knownErrorMessage(e)
+    ? joinGateErrorMessage(e, game)
+    : userErrorMessage(e, "Couldn't send your request. Please try again.");
+}
+
+/** joinWaitlist's own sentence for a signed-out tap. */
+const WAITLIST_SIGN_IN = "Sign in to join the waitlist.";
+
 function GameRoute() {
   const { user, loading } = useAuth();
   const { seo } = Route.useLoaderData();
@@ -284,7 +336,13 @@ function GameDetail() {
   useEffect(() => {
     trackEvent("view_game", { game_id: gameId });
   }, [gameId]);
-  const { invite: isInvite, from: inviteFrom, exp: inviteExp, expInvalid } = Route.useSearch();
+  const {
+    invite: isInvite,
+    from: inviteFrom,
+    exp: inviteExp,
+    expInvalid,
+    inv: inviteId,
+  } = Route.useSearch();
   const inviteExpired = !!(isInvite && ((inviteExp && inviteExp < Date.now()) || expInvalid));
 
   const hosted = useHostedGames();
@@ -330,6 +388,11 @@ function GameDetail() {
   const publicRequiresApproval = useGameJoinPolicy(gameId, settings);
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
+  // A status read that answers after the page wrote the viewer's own rows (the
+  // Request Spot tap, cancel, leave) must not put back what it read before that
+  // write (src/lib/local-write-guard.ts).
+  const [myReqGuard] = useState(createLocalWriteGuard);
+  const [mySubsGuard] = useState(createLocalWriteGuard);
   const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
   const [messaging, setMessaging] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -414,10 +477,20 @@ function GameDetail() {
   // Risk-acknowledgment gate state (physical activity safety).
   const [riskAckOpen, setRiskAckOpen] = useState(false);
   const pendingJoinPositionRef = useRef<string | null>(null);
-  const { data: riskAckVersion, refetch: refetchRiskAck } = useSafetyAck(
-    gameId,
-    "participant_risk",
-  );
+  const {
+    data: riskAckVersion,
+    refetch: refetchRiskAck,
+    status: riskAckStatus,
+  } = useSafetyAck(gameId, "participant_risk");
+  // A tap is waiting (briefly) for the acknowledgment read: the CTA says so.
+  const [checkingRiskAck, setCheckingRiskAck] = useState(false);
+  // The one dialog for joining a free game ("Join this game?"): the reminder
+  // picker plus, when it is due, the risk acknowledgment. `position` carries a
+  // "Join as {position}" tap through it.
+  const [joinDialog, setJoinDialog] = useState<{
+    needsAck: boolean;
+    position: string | null;
+  } | null>(null);
 
   // effectiveJoined is computed below, after settings/myReq/isHost resolve.
   // Placeholder removed — see definition near line 161.
@@ -519,6 +592,8 @@ function GameDetail() {
   const refreshStatus = async () => {
     if (!game) return;
     if (leavingRef.current) return;
+    const reqTicket = myReqGuard.beginRead();
+    const subsTicket = mySubsGuard.beginRead();
     try {
       // The settings decide the join button, so they land as soon as they arrive;
       // the viewer's own rows are not waited for (see loadGameViewerStatus).
@@ -531,7 +606,14 @@ function GameDetail() {
       });
       if (leavingRef.current) return;
       setSettings(s);
-      setMySubs(subs);
+      // The viewer's own rows land only if the page has not written them since
+      // this read went out: a read sent before a Request Spot tap would answer
+      // "no request" and wipe the pending request the tap just showed.
+      const subsVerdict = mySubsGuard.settle(subsTicket);
+      const reqVerdict = myReqGuard.settle(reqTicket);
+      if (subsVerdict === "apply") setMySubs(subs);
+      if (subsVerdict === "reread" || reqVerdict === "reread") void refreshStatus();
+      if (reqVerdict !== "apply") return;
       setMyReq(req);
       // Auto-join locally only when there's nothing left to pay. Otherwise the
       // Join CTA would flip to "leave" and hide the Pay flow after approval.
@@ -542,10 +624,26 @@ function GameDetail() {
         const attempt = `${req.id}:${subs[0]?.id ?? ""}:${subs[0]?.status ?? ""}`;
         if (autoJoinTriedRef.current !== attempt) {
           autoJoinTriedRef.current = attempt;
-          void joinGame(game.id);
+          void joinGame(game.id, undefined, viewerPolicy);
         }
       }
     } catch {}
+  };
+
+  /**
+   * Mark a write of the viewer's own rows (see myReqGuard). Call the result once
+   * the write has settled; it reads the status again if a read was dropped
+   * while the write was out.
+   */
+  const beginOwnRowWrite = (rows: { req?: boolean; subs?: boolean }) => {
+    const ends = [
+      ...(rows.req ? [myReqGuard.beginWrite()] : []),
+      ...(rows.subs ? [mySubsGuard.beginWrite()] : []),
+    ];
+    return () => {
+      const reread = ends.map((end) => end()).some(Boolean);
+      if (reread) void refreshStatus();
+    };
   };
 
   const refreshHostRequests = async () => {
@@ -610,7 +708,7 @@ function GameDetail() {
       // Rollback.
       setHostRequests(prevHostReqs);
       void refetchRoster();
-      toast.error(e?.message ?? "Could not remove player.");
+      toast.error(userErrorMessage(e, "Couldn't remove this player. Please try again."));
     } finally {
       setRemovingId(null);
       setRemoveTarget(null);
@@ -636,7 +734,7 @@ function GameDetail() {
       setCancelReason("");
     } catch (err) {
       trackTaskError("cancel_game");
-      toast.error((err as { message?: string })?.message ?? "Couldn't cancel this game.");
+      toast.error(userErrorMessage(err, "Couldn't cancel this game. Please try again."));
     } finally {
       setCancelling(false);
     }
@@ -649,7 +747,7 @@ function GameDetail() {
       await markAttendance(game.id, playerId, attended);
       await refetchRoster();
     } catch (err) {
-      toast.error((err as { message?: string })?.message ?? "Couldn't save attendance.");
+      toast.error(userErrorMessage(err, "Couldn't save attendance. Please try again."));
     } finally {
       setAttendanceBusy(null);
     }
@@ -825,7 +923,7 @@ function GameDetail() {
   const now = useNow();
   const { age: myAge } = useMyAge();
   const gate = useJoinGate(game);
-  const [confirmAction, setConfirmAction] = useState<"join" | "leave" | null>(null);
+  const [confirmAction, setConfirmAction] = useState<"leave" | null>(null);
   // Reminder lead times the player picks while RSVPing.
   const [reminderOffsets, setReminderOffsets] = useState<number[]>([
     ...DEFAULT_GAME_REMINDER_OFFSETS,
@@ -949,7 +1047,7 @@ function GameDetail() {
   const executeJoinAction = async (preselectedPosition?: string) => {
     // Expired invite → block all join actions and steer to discovery.
     if (inviteExpired && !isHost && !viewerCountsAsJoined && !viewerPending) {
-      toast.error("This invite has expired. Browse open games instead.");
+      toast.error(INVITE_EXPIRED_MESSAGE);
       nav({ to: "/discover" });
       return;
     }
@@ -967,12 +1065,12 @@ function GameDetail() {
         return;
       }
       if (spotsLeft <= 0) {
-        toast.error("This game is full.");
+        toast.error(GAME_FULL_MESSAGE);
         return;
       }
       const requestHostId = settings?.host_id ?? game.hostUserId ?? null;
       if (!requestHostId) {
-        toast.error("This host can't take requests yet.");
+        toast.error(NO_REQUEST_HOST_MESSAGE);
         return;
       }
       if (myReq?.status === "rejected") {
@@ -989,6 +1087,7 @@ function GameDetail() {
         }
       }
       setRequesting(true);
+      const endWrite = beginOwnRowWrite({ req: true });
       try {
         const created = await createJoinRequest({
           game_id: game.id,
@@ -1000,14 +1099,10 @@ function GameDetail() {
         toast.success("Asked your parent. You can join once they say yes.");
       } catch (e) {
         trackTaskError("request_to_join");
-        const msg = e instanceof Error ? e.message : "";
-        toast.error(
-          msg.includes("BLOCKED_BY_HOST")
-            ? "You can't request to join this game."
-            : msg || "Could not send the request.",
-        );
+        toast.error(joinRequestErrorMessage(e, viewerPolicy));
       } finally {
         setRequesting(false);
+        endWrite();
       }
       return;
     }
@@ -1035,6 +1130,10 @@ function GameDetail() {
       // CTA immediately collapses `isConfirmed` back to false and re-enables
       // "Request to join" / "Pay to join" without waiting for a refetch.
       leavingRef.current = true;
+      // The reconcile read below runs once the leave has settled, so a read that
+      // was dropped meanwhile needs no read of its own.
+      const endReqWrite = myReqGuard.beginWrite();
+      const endSubsWrite = mySubsGuard.beginWrite();
       setMyReq(null);
       setMySubs([]);
       leaveGame(game.id);
@@ -1088,12 +1187,17 @@ function GameDetail() {
         // Rollback optimistic state.
         setMyReq(prevReq);
         setMySubs(prevSubs);
-        if (wasJoined) void joinGame(game.id);
-        toast.error(e.message ?? "Could not leave.");
+        if (wasJoined) void joinGame(game.id, undefined, viewerPolicy);
+        toast.error(userErrorMessage(e, "Couldn't leave this game. Please try again."));
       } finally {
         leavingRef.current = false;
-        // Single reconcile pass now that all deletes have committed.
+        endReqWrite();
+        endSubsWrite();
+        // Single reconcile pass now that all deletes have committed. The
+        // status strip and banner read the shared flow status, which otherwise
+        // waits on realtime, and a DELETE event does not say which game it was.
         void refreshStatus();
+        refreshMyFlowStatus(game.id);
         void refetchRoster();
       }
       return;
@@ -1102,17 +1206,21 @@ function GameDetail() {
     if (isPending) {
       const prevReq = myReq;
       const prevSubs = mySubs;
+      const endWrite = beginOwnRowWrite({ req: true, subs: true });
       // Optimistic clear.
       if (myReq?.status === "pending") setMyReq(null);
       setMySubs((subs) => subs.filter((s) => s.status !== "pending"));
       try {
         if (latestSub?.status === "pending") await deleteMyPendingSubmission(latestSub.id);
         if (prevReq?.status === "pending") await cancelMyJoinRequest(game.id);
+        refreshMyFlowStatus(game.id);
         toast("Request canceled.");
       } catch (e: any) {
         setMyReq(prevReq);
         setMySubs(prevSubs);
-        toast.error(e.message ?? "Could not cancel.");
+        toast.error(userErrorMessage(e, "Couldn't cancel your request. Please try again."));
+      } finally {
+        endWrite();
       }
       return;
     }
@@ -1125,7 +1233,7 @@ function GameDetail() {
     }
 
     if (spotsLeft <= 0) {
-      toast.error("This game is full.");
+      toast.error(GAME_FULL_MESSAGE);
       return;
     }
     // Approval gate takes priority over payment: on games that require
@@ -1135,14 +1243,14 @@ function GameDetail() {
       // still get request-to-join, so fall back to the game's host id.
       const requestHostId = settings?.host_id ?? game.hostUserId ?? null;
       if (!requestHostId) {
-        toast.error("This host can't take requests yet.");
+        toast.error(NO_REQUEST_HOST_MESSAGE);
         return;
       }
       // Invite-link integrity: if the URL claims invite=1, `from` must be present
       // and must match the actual host. Otherwise the link is missing context or
       // has been tampered with — refuse to send the request.
       if (isInvite && (!inviteFrom || inviteFrom !== requestHostId)) {
-        toast.error("This invite link is invalid or has been tampered with.");
+        toast.error(INVITE_TAMPERED_MESSAGE);
         return;
       }
       // Client-side gate on resubmit: mirror the DB trigger so the user gets
@@ -1177,6 +1285,11 @@ function GameDetail() {
         reviewed_at: null,
       };
       setMyReq(optimistic);
+      // Until the request settles, a status read sent before it must not put
+      // back "no request" over the pending row. Opened right before `try`, so
+      // nothing that can throw sits between it and the `finally` that ends it:
+      // a write left open would drop every later status read on this page.
+      const endWrite = beginOwnRowWrite({ req: true });
       try {
         const wasRejected = prevReq?.status === "rejected";
         const created = await createJoinRequest({ game_id: game.id, host_id: requestHostId });
@@ -1189,7 +1302,7 @@ function GameDetail() {
           type: isResubmit ? "join_resubmitted" : "join_request",
           title: isResubmit
             ? `Resubmitted request: ${game.title}`
-            : `New request to join ${game.title}`,
+            : `New spot request: ${game.title}`,
           body: isResubmit
             ? "A player resubmitted their request — pending your review."
             : "Tap to review.",
@@ -1205,13 +1318,10 @@ function GameDetail() {
       } catch (e: any) {
         setMyReq(prevReq);
         trackTaskError("request_to_join");
-        toast.error(
-          String(e?.message ?? "").includes("BLOCKED_BY_HOST")
-            ? "You can't request to join this game."
-            : (e.message ?? "Could not send request."),
-        );
+        toast.error(joinRequestErrorMessage(e, viewerPolicy));
       } finally {
         setRequesting(false);
+        endWrite();
       }
       return;
     }
@@ -1232,7 +1342,7 @@ function GameDetail() {
     // Wait for the server: a full roster, a closed game or a missing approval
     // answers with its own message, and neither the "You're in!" toast nor the
     // host's notification should go out for a join that did not happen.
-    const joinedOk = await joinGame(game.id, preselectedPosition);
+    const joinedOk = await joinGame(game.id, preselectedPosition, viewerPolicy);
     if (!joinedOk) return;
     void saveMyGameReminderOffsets(game.id, reminderOffsets).catch(() => {});
     trackEvent("join_game", { game_id: game.id, kind: "instant" });
@@ -1259,23 +1369,127 @@ function GameDetail() {
     }
   };
 
+  // Refusals a new join runs into before anything is written (src/lib/join-preflight.ts).
+  const joinPreflight: JoinPreflightInput = {
+    inviteExpired,
+    locked: gate.locked,
+    lockedReason: gate.reason,
+    spotsLeft,
+    asksParent: !!parentAsk,
+    goesToPayment: isPaid && !paymentCleared && approvalCleared,
+    asksHost: requiresApproval && !isApproved,
+    requestHostId: settings?.host_id ?? game.hostUserId ?? null,
+    isInvite: !!isInvite,
+    inviteFrom,
+  };
+  const refuseJoin = (refusal: JoinRefusal) => {
+    // eslint-disable-next-line local/no-raw-toast-error -- a JoinRefusal carries our own sentence (join-preflight.ts), not an error's text.
+    toast.error(refusal.message);
+    if (refusal.kind === "invite_expired") nav({ to: refusal.redirectTo });
+  };
+
   // Physical-activity risk acknowledgment gate. Players see it once per
   // acknowledgment version per game; hosts and confirmed players skip it.
-  const handleJoin = async (preselectedPosition?: string) => {
-    const gate = needsRiskAcknowledgment({
-      signedIn: !!user,
-      isHost,
-      // Taking back a pending request or payment is not joining: never ask for
-      // the risk acknowledgment in front of it.
-      alreadyJoined: viewerCountsAsJoined || isPending,
-      acknowledgedVersion: riskAckVersion ?? null,
+  const decideRiskAck = async (): Promise<boolean> => {
+    const needsAck = (acknowledgedVersion: string | null) =>
+      needsRiskAcknowledgment({
+        signedIn: !!user,
+        isHost,
+        // Taking back a pending request or payment is not joining: never ask for
+        // the risk acknowledgment in front of it.
+        alreadyJoined: viewerCountsAsJoined || isPending,
+        acknowledgedVersion,
+      });
+    // src/lib/risk-ack-tap.ts: answered -> ask unless the current version is on
+    // file; failed -> ask; not answered yet (a tap right after the page opened)
+    // -> wait for it, "Checking…" on the CTA, for at most RISK_ACK_WAIT_MS, then
+    // ask. A player who acknowledged is not asked because the read was a moment
+    // late, and a held-up read (slow network, retries) cannot hold the tap.
+    const plan = planRiskAckTap(riskAckReadFrom(riskAckStatus, riskAckVersion), needsAck);
+    if (plan.kind === "decided") return plan.needsRiskAck;
+    setProcessing(true);
+    setCheckingRiskAck(true);
+    try {
+      return await settleRiskAckTap(async () => {
+        // Joins the read in flight rather than starting another.
+        const r = await refetchRiskAck({ cancelRefetch: false });
+        return riskAckReadFrom(r.status, r.data);
+      }, needsAck);
+    } finally {
+      setCheckingRiskAck(false);
+      setProcessing(false);
+    }
+  };
+
+  // `confirm`: the sticky CTA's free join, which always asks "Join this game?"
+  // first (with the reminder picker). Every other tap (Join as {position},
+  // Request Spot, Ask parent, Pay Host, leave, cancel) goes ahead unless the
+  // risk acknowledgment is due.
+  const handleJoin = async (preselectedPosition?: string, opts?: { confirm?: boolean }) => {
+    // The acknowledgment is decided before any dialog opens, so the dialog never
+    // switches content under the player; a slow or failed read asks (fail closed).
+    const needsRiskAck = await decideRiskAck();
+    // A free game joins on the spot (executeJoinAction's instant join): it gets
+    // the one merged dialog. Requests to the host or a parent and paid games
+    // keep the standalone "Before you join". Refusals still come first.
+    const next = joinTapRoute(joinTapStep({ ...joinPreflight, needsRiskAck }), {
+      freeInstantJoin: isFreeInstantJoin({
+        asksParent: !!parentAsk,
+        asksHost: requiresApproval && !isApproved,
+        isPaid,
+      }),
+      confirm: !!opts?.confirm,
     });
-    if (gate) {
+    if (next.route === "refuse") {
+      refuseJoin(next.refusal);
+      return;
+    }
+    if (next.route === "join-dialog") {
+      setJoinDialog({ needsAck: next.needsAck, position: preselectedPosition ?? null });
+      return;
+    }
+    if (next.route === "risk-dialog") {
       pendingJoinPositionRef.current = preselectedPosition ?? null;
       setRiskAckOpen(true);
       return;
     }
     await runJoin(preselectedPosition);
+  };
+
+  // "Join this game?" confirmed. With the acknowledgment due, it is recorded for
+  // the current version first and the join runs only once that write succeeded.
+  const confirmFreeJoin = async () => {
+    const pending = joinDialog;
+    if (!pending) return;
+    const pos = pending.position ?? undefined;
+    if (!pending.needsAck) {
+      setJoinDialog(null);
+      await runJoin(pos);
+      return;
+    }
+    setProcessing(true);
+    try {
+      const result = await recordAckThenJoin({
+        recordAck: async () => {
+          await recordSafetyAck({ gameId: game.id, kind: "participant_risk" });
+          await refetchRiskAck();
+        },
+        join: async () => {
+          setJoinDialog(null);
+          await executeJoinAction(pos);
+        },
+      });
+      // A failed acknowledgment write keeps the dialog open, with nothing joined.
+      if (!result.ok && result.stage === "ack") {
+        toast.error(
+          userErrorMessage(result.error, "Couldn't record your acknowledgment. Please try again."),
+        );
+      } else if (!result.ok) {
+        toast.error(userErrorMessage(result.error, "Couldn't join this game. Please try again."));
+      }
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const confirmRiskAck = async () => {
@@ -1288,7 +1502,7 @@ function GameDetail() {
       pendingJoinPositionRef.current = null;
       await executeJoinAction(pos);
     } catch (e: any) {
-      toast.error(e?.message ?? "Couldn't record your acknowledgment");
+      toast.error(userErrorMessage(e, "Couldn't record your acknowledgment. Please try again."));
     } finally {
       setProcessing(false);
     }
@@ -1373,6 +1587,19 @@ function GameDetail() {
         submitting={processing}
         onConfirm={() => void confirmRiskAck()}
       />
+      <JoinGameDialog
+        open={joinDialog !== null}
+        onOpenChange={(v) => {
+          if (!v) setJoinDialog(null);
+        }}
+        gameTitle={game.title}
+        rosterNote={`You'll be added to the roster. ${cancelPolicyNote(game.cancelCutoffMin)}`}
+        needsAck={joinDialog?.needsAck ?? false}
+        submitting={processing}
+        onConfirm={() => void confirmFreeJoin()}
+      >
+        <GameReminderPicker value={reminderOffsets} onChange={setReminderOffsets} />
+      </JoinGameDialog>
 
       {shareOpen && !game.isPrivate && (
         <ShareSheet
@@ -1524,7 +1751,7 @@ function GameDetail() {
             )}
             {game.urgent && spotsLeft > 0 && (
               <span className="rounded-full bg-coral-gradient px-3 py-1 text-xs font-bold text-white">
-                ⚡ {spotsLeft} spots left
+                ⚡ {pluralize(spotsLeft, "spot")} left
               </span>
             )}
           </div>
@@ -1535,7 +1762,7 @@ function GameDetail() {
       {/* Multi-day series: switch between sessions */}
       {game.seriesId && (
         <div className="page-shell mt-4">
-          <SeriesSessionsStrip game={game} />
+          <SeriesSessionsStrip game={game} isHost={isHost} />
         </div>
       )}
 
@@ -1546,7 +1773,7 @@ function GameDetail() {
             <button
               type="button"
               onClick={() => setActiveTab("overview")}
-              className={`flex-1 rounded-full px-3 py-2 font-semibold transition ${
+              className={`min-h-11 flex-1 rounded-full px-3 py-2 font-semibold transition ${
                 activeTab === "overview"
                   ? "bg-lime text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground"
@@ -1557,7 +1784,7 @@ function GameDetail() {
             <button
               type="button"
               onClick={() => setActiveTab("payments")}
-              className={`flex-1 rounded-full px-3 py-2 font-semibold transition inline-flex items-center justify-center gap-1.5 ${
+              className={`inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 font-semibold transition ${
                 activeTab === "payments"
                   ? "bg-lime text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground"
@@ -1595,8 +1822,17 @@ function GameDetail() {
       <div
         className={`page-shell mt-5 space-y-5 ${isPaid && activeTab !== "overview" ? "hidden" : ""}`}
       >
-        {/* Invite deep-link banner */}
+        {/* WP 2.0: the server-side invitation, with Accept and Decline (replaces the banner below). */}
+        {inviteId && !isHost && (
+          <GameInviteBanner
+            inviteId={inviteId}
+            viewerId={user?.id ?? null}
+            onAnswered={() => void refreshStatus()}
+          />
+        )}
+        {/* Invite deep-link banner (links from before WP 2.0) */}
         {isInvite &&
+          !inviteId &&
           !isHost &&
           !viewerCountsAsJoined &&
           !viewerPending &&
@@ -1613,8 +1849,7 @@ function GameDetail() {
               <div className="min-w-0 flex-1">
                 <div className="font-display text-sm font-bold">Invite expired</div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  This invitation is no longer valid. Browse other open games to find a run near
-                  you.
+                  This invitation is no longer valid. Browse other open games to find one near you.
                 </p>
                 <Link
                   to="/discover"
@@ -1642,7 +1877,7 @@ function GameDetail() {
                       ? "“Request Spot”"
                       : isPaid
                         ? "“Pay Host”"
-                        : "“Join Run”"}{" "}
+                        : "“Join Game”"}{" "}
                   below to confirm your spot.
                 </p>
               </div>
@@ -1696,6 +1931,7 @@ function GameDetail() {
             gameId={gameId}
             settings={flowSettings ?? settings}
             status={myFlowStatus}
+            takesPayment={!gameTakesNoPayment(gate.joinState, joined)}
           />
         )}
 
@@ -1838,6 +2074,15 @@ function GameDetail() {
 
         <GameLocationCard game={game} />
 
+        {/* WP 2.1: the host invites players available near the game and follows their answers. */}
+        {isHost && (
+          <GameInvitesPanel
+            game={game}
+            hostId={settings?.host_id ?? game.hostUserId ?? null}
+            rosterIds={liveRoster.map((p) => p.userId)}
+          />
+        )}
+
         <GameHostSection
           canReviewHost={canReviewHost}
           game={game}
@@ -1851,7 +2096,7 @@ function GameDetail() {
 
         {/* About */}
         <div>
-          <h2 className="section-eyebrow text-muted-foreground mb-2">About the run</h2>
+          <h2 className="section-eyebrow text-muted-foreground mb-2">About the game</h2>
           <p className="text-sm leading-relaxed">{game.description}</p>
           {/* Safety: risk notice + safety reporting entry point */}
           <div className="mt-3 rounded-2xl border border-border bg-surface px-4 py-3">
@@ -1968,7 +2213,7 @@ function GameDetail() {
                       aria-label={
                         isFull
                           ? `${name}: filled, ${posWaitlist.length} on waitlist`
-                          : `${name}: ${remaining} of ${count} spots remaining`
+                          : `${name}: ${remaining} of ${pluralize(count, "spot")} remaining`
                       }
                     >
                       <span>{name}</span>
@@ -2021,7 +2266,14 @@ function GameDetail() {
                               }).catch(() => {});
                             }
                           } catch (e: any) {
-                            toast.error(e.message ?? "Could not join waitlist.");
+                            toast.error(
+                              errorText(e) === WAITLIST_SIGN_IN
+                                ? WAITLIST_SIGN_IN
+                                : userErrorMessage(
+                                    e,
+                                    "Couldn't join the waitlist. Please try again.",
+                                  ),
+                            );
                           }
                         }}
                         aria-label={`Join ${name} waitlist`}
@@ -2046,7 +2298,9 @@ function GameDetail() {
                             await leaveWaitlist(game.id, name);
                             toast(`Removed from the ${name} waitlist.`);
                           } catch (e: any) {
-                            toast.error(e.message ?? "Could not leave waitlist.");
+                            toast.error(
+                              userErrorMessage(e, "Couldn't leave the waitlist. Please try again."),
+                            );
                           }
                         }}
                         aria-label={`Leave ${name} waitlist`}
@@ -2084,7 +2338,9 @@ function GameDetail() {
                             : `Removed from the ${mine[0]!.position} waitlist.`,
                         );
                       } catch (e: any) {
-                        toast.error(e.message ?? "Could not leave waitlist.");
+                        toast.error(
+                          userErrorMessage(e, "Couldn't leave the waitlist. Please try again."),
+                        );
                       }
                     }}
                     aria-label={mine.length > 1 ? "Leave all waitlists" : "Leave waitlist"}
@@ -2355,7 +2611,7 @@ function GameDetail() {
                         toast.success("Game marked as ended. You can now mark attendance.");
                       } catch (err) {
                         toast.error(
-                          (err as { message?: string })?.message ?? "Couldn't end this game.",
+                          userErrorMessage(err, "Couldn't end this game. Please try again."),
                         );
                       }
                     })();
@@ -2446,7 +2702,9 @@ function GameDetail() {
                         toast.error("Couldn't delete this game.");
                       }
                     }}
-                    className="mt-2 w-full inline-flex items-center justify-center gap-2 rounded-xl border border-coral/40 bg-coral/10 text-coral py-2.5 text-xs font-bold disabled:opacity-50"
+                    // Solid destructive-strong behind white text (4.8:1). Coral text on its own 10% tint
+                    // over the card read 4.4:1, under WCAG AA (destructive-contrast.test.ts).
+                    className="mt-2 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-destructive-strong text-destructive-foreground py-2.5 text-xs font-bold disabled:opacity-50"
                   >
                     <Trash2 className="h-4 w-4" /> Delete game
                   </button>
@@ -2482,7 +2740,7 @@ function GameDetail() {
             </div>
           ) : requiresApproval ? (
             <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-3 text-xs text-muted-foreground">
-              No pickup requests yet. You'll see them here as players ask to join.
+              No pickup requests yet. You'll see them here as players request a spot.
             </div>
           ) : null}
 
@@ -2700,7 +2958,10 @@ function GameDetail() {
       )}
 
       {/* Sticky CTA */}
-      <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+6rem)] left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 backdrop-blur-xl bg-background/80 border-t border-border">
+      <div
+        ref={clearOfHelpLauncher}
+        className="fixed bottom-[calc(env(safe-area-inset-bottom)+6rem)] left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 backdrop-blur-xl bg-background/80 border-t border-border"
+      >
         <div className="mx-auto w-[min(100%,28rem)]">
           {!isParentMode && !isHost && !joined && !isPending && !isConfirmed && !isApproved && (
             <JoinBlockedReason gate={viewerGate} className="mb-2" waitlistHint />
@@ -2748,7 +3009,13 @@ function GameDetail() {
                   const cid = await getOrCreateDirectConversation(hostUid, game.id);
                   nav({ to: "/messages/$conversationId", params: { conversationId: cid } });
                 } catch (e: any) {
-                  toast.error(describeMessagingError(e, undefined, "host"));
+                  toast.error(
+                    describeMessagingError(
+                      e,
+                      "Couldn't open a chat with the host. Please try again.",
+                      "host",
+                    ),
+                  );
                 } finally {
                   setMessaging(false);
                 }
@@ -2762,8 +3029,23 @@ function GameDetail() {
               (() => {
                 // Locked games (started / host-closed / inside the blackout window)
                 // block NEW joins, but keep leave/cancel and payment actions live.
+                // An approval does not reopen a cancelled game, or an ended one to a player without a place: the
+                // server refuses them a place and PayPal refuses the payment (gameTakesNoPayment).
+                // A player on the roster who still owes the fee on a cancelled game gets the disabled "Cancelled"
+                // button too, not "Pay Host" (unpaidOnGameTakingNoPayment).
                 const lockedForNewJoin =
-                  gate.locked && !joined && !isPending && !isConfirmed && !isApproved;
+                  (gate.locked &&
+                    !joined &&
+                    !isPending &&
+                    !isConfirmed &&
+                    (!isApproved || gameTakesNoPayment(gate.joinState, joined))) ||
+                  unpaidOnGameTakingNoPayment({
+                    joinState: gate.joinState,
+                    holdsPlace: joined,
+                    isPaid,
+                    paymentCleared,
+                    pending: isPending,
+                  });
                 const alreadyInFlow = joined || isPending || isConfirmed;
                 // A parent/guardian must approve this account before a NEW
                 // join; leaving/withdrawing a join made before consent was
@@ -2786,8 +3068,21 @@ function GameDetail() {
                   latestSub?.status === "pending" || latestSub?.status === "rejected";
                 const canEnterPaymentFlow =
                   spotsLeft > 0 || joined || hasPaymentAttempt || isApproved;
-                const paymentAction =
-                  isPaid && !paymentCleared && approvalCleared && canEnterPaymentFlow && !parentAsk;
+                // The paid CTA is a link straight to /pay, so handleJoin's checks never run for it: a locked game or a
+                // consent-blocked account gets the disabled button below instead ("Signup closed", "Parent approval
+                // needed"), as on the button path. The pay page asks again (payEntryView) for a direct visit.
+                const paymentAction = payHostLinkShown({
+                  joinState: gate.joinState,
+                  holdsPlace: joined,
+                  paymentPending: latestSub?.status === "pending",
+                  isPaid,
+                  paymentCleared,
+                  approvalCleared,
+                  canEnterPaymentFlow,
+                  parentAsk: !!parentAsk,
+                  lockedForNewJoin,
+                  consentBlocksNewJoin,
+                });
                 const paymentSearch: { invite?: true; from?: string } = {};
                 if (isInvite) paymentSearch.invite = true;
                 if (inviteFrom) paymentSearch.from = inviteFrom;
@@ -2885,7 +3180,13 @@ function GameDetail() {
                         return;
                       }
                       if (wantsFreeJoin) {
-                        setConfirmAction("join");
+                        // Refuse before "Join this game?" too, not after it.
+                        const refusal = joinPreflightRefusal(joinPreflight);
+                        if (refusal) {
+                          refuseJoin(refusal);
+                          return;
+                        }
+                        void handleJoin(undefined, { confirm: true });
                         return;
                       }
                       void handleJoin();
@@ -2931,7 +3232,9 @@ function GameDetail() {
                           ? "In progress"
                           : gate.joinState === "completed"
                             ? "Game ended"
-                            : "Signup closed"}
+                            : gate.joinState === "cancelled"
+                              ? "Cancelled"
+                              : "Signup closed"}
                       </>
                     ) : spotsLeft <= 0 ? (
                       <>
@@ -2940,6 +3243,10 @@ function GameDetail() {
                           aria-hidden
                         />
                         Join Waitlist
+                      </>
+                    ) : checkingRiskAck ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Checking…
                       </>
                     ) : parentAsk ? (
                       <>
@@ -2956,7 +3263,7 @@ function GameDetail() {
                       </>
                     ) : (
                       <>
-                        Join Run · <LiveSpots />
+                        Join Game · <LiveSpots />
                       </>
                     )}
                   </motion.button>
@@ -2988,29 +3295,18 @@ function GameDetail() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {confirmAction === "leave"
-                ? "Leave this game?"
-                : requiresApproval && !isApproved
-                  ? "Request a spot?"
-                  : "Join this run?"}
-            </AlertDialogTitle>
+            <AlertDialogTitle>Leave this game?</AlertDialogTitle>
             <AlertDialogDescription>
-              {confirmAction === "leave"
-                ? "Your spot will open up for someone else. You can rejoin if there's still space."
-                : `You'll be added to the roster. ${cancelPolicyNote(game.cancelCutoffMin)}`}
+              Your spot will open up for someone else. You can rejoin if there's still space.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {confirmAction === "leave" && isLateCancel(game.date, game.cancelCutoffMin) && (
+          {isLateCancel(game.date, game.cancelCutoffMin) && (
             <p
               role="alert"
               className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs font-medium text-amber-500"
             >
               {lateCancelWarning(game.cancelCutoffMin)}
             </p>
-          )}
-          {confirmAction === "join" && (
-            <GameReminderPicker value={reminderOffsets} onChange={setReminderOffsets} />
           )}
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -3022,19 +3318,9 @@ function GameDetail() {
                 setConfirmAction(null);
                 if (action) void handleJoin();
               }}
-              className={
-                confirmAction === "leave"
-                  ? "bg-destructive-strong text-destructive-foreground hover:bg-destructive-strong/90"
-                  : undefined
-              }
+              className="bg-destructive-strong text-destructive-foreground hover:bg-destructive-strong/90"
             >
-              {confirmAction === "leave"
-                ? isLateCancel(game.date, game.cancelCutoffMin)
-                  ? "Leave anyway"
-                  : "Leave game"
-                : requiresApproval && !isApproved
-                  ? "Request Spot"
-                  : "Join Run"}
+              {isLateCancel(game.date, game.cancelCutoffMin) ? "Leave anyway" : "Leave game"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -3052,7 +3338,7 @@ function GameDetail() {
               Remove {removeTarget?.name ?? "player"} from this game?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              They'll be notified and their spot will open up. They can request to join again later.
+              They'll be notified and their spot will open up. They can request a spot again later.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

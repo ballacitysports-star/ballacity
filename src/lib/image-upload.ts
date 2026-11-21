@@ -3,6 +3,7 @@ import { buildMediaRef } from "@/lib/media-refs";
 import { warmImageVariants } from "@/lib/image-variants";
 import { finalizeImageUpload } from "@/lib/image-uploads.functions";
 import { refreshBlockedImages } from "@/lib/blocked-images";
+import { IMAGE_FLAGGED_MESSAGE } from "@/lib/image-upload-errors";
 import {
   MAX_IMAGE_BYTES,
   isAllowedImageMime,
@@ -75,7 +76,7 @@ export async function uploadDataUrlToBucket(
   const check = await finalizeImageUpload({ data: { bucket, path } });
   if (check?.quarantined) {
     void refreshBlockedImages();
-    throw new Error("This image was flagged by our automated safety check and is pending review.");
+    throw new Error(IMAGE_FLAGGED_MESSAGE);
   }
 
   if ((PRIVATE_BUCKETS as Record<string, true>)[bucket]) {

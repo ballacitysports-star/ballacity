@@ -181,6 +181,9 @@ describe("the minimum-age refusal from the database", () => {
     const { resolve } = await import("node:path");
     const fns = readFileSync(resolve(__dirname, "age-verification.functions.ts"), "utf8");
     const { MIN_AGE_MESSAGE } = await import("./age-verification");
-    expect(fns).toContain(`if (m.includes("MIN_AGE")) return ${JSON.stringify(MIN_AGE_MESSAGE)};`);
+    const { USER_ERROR_MESSAGES } = await import("./user-error");
+    // The server function words the database's refusals from the shared catalog (WP 4.0).
+    expect(fns).toMatch(/knownErrorMessage\(message\)/);
+    expect(USER_ERROR_MESSAGES.MIN_AGE).toBe(MIN_AGE_MESSAGE);
   });
 });

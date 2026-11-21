@@ -29,6 +29,7 @@ import {
 import { autocompletePlaces, getPlaceDetails } from "@/lib/places.functions";
 import { toast } from "sonner";
 import { setActiveProfileByRef, myProfilesKey } from "@/lib/account-profiles";
+import { errorText, userErrorMessage } from "@/lib/user-error";
 
 const STEP_LABELS = ["Basics", "Expertise", "Where", "Availability"] as const;
 const SKILL_LABELS = ["Beginner", "Recreational", "Intermediate", "Advanced", "Pro"] as const;
@@ -404,8 +405,12 @@ export function CreateTrainerWizard() {
       toast.success("Trainer profile published");
       nav({ to: "/trainers/$trainerId", params: { trainerId: saved.id } });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Failed to create trainer profile.";
-      setSubmitError(/unauthor/i.test(msg) ? "Please sign in to create a trainer profile." : msg);
+      // The sign-in nudge, else the catalog or a generic sentence, never the raw database text (WP 4.0).
+      setSubmitError(
+        /unauthor/i.test(errorText(e) ?? "")
+          ? "Please sign in to create a trainer profile."
+          : userErrorMessage(e, "Couldn't create your trainer profile. Please try again."),
+      );
       setSubmitting(false);
     }
   }
@@ -662,9 +667,7 @@ export function CreateTrainerWizard() {
                 {draft.orgChoice.mode === "existing" && draft.orgChoice.orgId ? (
                   <div className="flex items-center justify-between rounded-2xl border border-lime/40 bg-lime/10 px-3 py-2.5">
                     <div className="min-w-0">
-                      <div className="micro-label text-lime font-bold">
-                        Join request on publish
-                      </div>
+                      <div className="micro-label text-lime font-bold">Join request on publish</div>
                       <div className="truncate text-sm font-bold">{draft.orgChoice.name}</div>
                     </div>
                     <button
@@ -847,9 +850,7 @@ export function CreateTrainerWizard() {
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
-                      <div className="micro-label text-muted-foreground">
-                        Min
-                      </div>
+                      <div className="micro-label text-muted-foreground">Min</div>
                       <select
                         value={draft.skillMin}
                         onChange={(e) => {
@@ -870,9 +871,7 @@ export function CreateTrainerWizard() {
                       </select>
                     </label>
                     <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
-                      <div className="micro-label text-muted-foreground">
-                        Max
-                      </div>
+                      <div className="micro-label text-muted-foreground">Max</div>
                       <select
                         value={draft.skillMax}
                         onChange={(e) => {
@@ -917,9 +916,7 @@ export function CreateTrainerWizard() {
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-1.5">
                                 {isPrimary && (
-                                  <span className="micro-label text-lime font-bold">
-                                    ★ Primary
-                                  </span>
+                                  <span className="micro-label text-lime font-bold">★ Primary</span>
                                 )}
                                 {!v.placeId && (
                                   <span className="micro-label text-coral font-bold">
@@ -984,9 +981,7 @@ export function CreateTrainerWizard() {
                 )}
 
                 <div className="space-y-2">
-                  <label className="micro-label text-muted-foreground font-bold">
-                    Add a venue
-                  </label>
+                  <label className="micro-label text-muted-foreground font-bold">Add a venue</label>
                   <LocationAutocomplete
                     value={venueInput}
                     onChange={setVenueInput}

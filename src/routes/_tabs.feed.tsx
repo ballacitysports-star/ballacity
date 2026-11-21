@@ -49,6 +49,7 @@ import { collapseSeriesGames } from "@/lib/game-series";
 import { LocationAccessDialog } from "@/components/LocationAccessDialog";
 import { PreviewGate } from "@/components/public/PreviewGate";
 import { NeedsActionStrip } from "@/components/home/NeedsActionStrip";
+import { AvailabilityHome } from "@/components/home/AvailabilityHome";
 import { KidsUpcomingSection } from "@/components/home/KidsUpcomingSection";
 import { FeedEventsList, FeedTypeChips } from "@/components/feed/FeedEvents";
 import { NetworkPostsSection } from "@/components/posts/NetworkPostsSection";
@@ -61,6 +62,7 @@ import {
 import { isAppSwitchOn, isEventsV2Enabled, type EventsClient } from "@/lib/events-read";
 import { supabase as feedEventsClient } from "@/integrations/supabase/client";
 import { useQuery as useFeedQuery } from "@tanstack/react-query";
+import { pluralize } from "@/lib/pluralize";
 
 // URL-persisted feed state. Refreshing or sharing the URL preserves search
 // text, sport chip, sort, distance cap, position, view/density toggles, and
@@ -582,7 +584,22 @@ function Feed() {
         </div>
       </div>
 
-      <h1 className="sr-only">{tab === "archive" ? "Finished games" : "Pickup runs"}</h1>
+      <h1 className="sr-only">{tab === "archive" ? "Finished games" : "Pickup games"}</h1>
+      {/* WP 1.6: availability first (switch: app_settings home_availability_first). */}
+      {tab !== "archive" && (
+        <AvailabilityHome
+          className="mb-4"
+          onGames={(which) => {
+            // Home's shortcuts: everyone's games, or the ones you joined (the "My games" filter), then the list.
+            setFeedPrefs({ ...getFeedPrefsSnapshot(), mineFilter: which });
+            requestAnimationFrame(() =>
+              document
+                .getElementById("feed-games")
+                ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+            );
+          }}
+        />
+      )}
       {tab !== "archive" && <NeedsActionStrip />}
       {tab !== "archive" && <KidsUpcomingSection className="mb-4" />}
       {tab !== "archive" && eventsOn && (
@@ -602,12 +619,13 @@ function Feed() {
       {tab !== "archive" && feedType === "all" && <NetworkPostsSection />}
       {showGames && (
         <>
-          {/* Tier 2: where you are + run count on the left (tap to update
+          {/* Tier 2: where you are + game count on the left (tap to update
           location), one Map/List switch on the right. */}
           <motion.div
+            id="feed-games"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-3 flex items-center justify-between gap-3"
+            className="mb-3 flex scroll-mt-4 items-center justify-between gap-3"
           >
             {tab === "archive" ? (
               <button
@@ -632,7 +650,7 @@ function Feed() {
                       : profile?.city || (coords ? "Near you" : "Set location")}
                   </span>
                   {" · "}
-                  {filtered.length} {filtered.length === 1 ? "run" : "runs"}
+                  {pluralize(filtered.length, "game")}
                 </span>
               </button>
             )}
@@ -666,7 +684,7 @@ function Feed() {
                 <FilterBar
                   q={q}
                   onQChange={setQ}
-                  searchPlaceholder="Search pickup runs"
+                  searchPlaceholder="Search pickup games"
                   activeFilterCount={activeFilterCount + (positionFilter ? 1 : 0)}
                   create={{ to: "/create", label: "Create game" }}
                   sheetTitle="Feed filters"
@@ -901,7 +919,9 @@ const InfiniteSentinel = ({
       {hasMore ? (
         <span className="sr-only">Loading more games…</span>
       ) : (
-        <span className="text-xs text-muted-foreground">You're all caught up · {total} games</span>
+        <span className="text-xs text-muted-foreground">
+          You're all caught up · {pluralize(total, "game")}
+        </span>
       )}
     </div>
   );

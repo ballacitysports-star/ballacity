@@ -5,6 +5,7 @@ import { Link } from "@tanstack/react-router";
 import { Loader2, Pencil, SmilePlus, Trash2, X, Check } from "lucide-react";
 import { toast } from "sonner";
 import { heldNotice } from "@/lib/post-moderation";
+import { errorText, userErrorMessage } from "@/lib/user-error";
 import {
   REACTION_EMOJI,
   createComment,
@@ -24,6 +25,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatWhen } from "@/lib/format";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuthSearchHere } from "@/lib/auth-return";
+
+/** updateComment's own refusal (post-engagement.functions.ts) when no row was changed: shown as it is. */
+const COMMENT_EDIT_REFUSED = "You can't edit this comment.";
 
 type Props = {
   subjectType: EngagementSubjectType;
@@ -108,13 +112,15 @@ export function PostEngagement({ subjectType, subjectId }: Props) {
       setBody("");
       qc.invalidateQueries({ queryKey: commentsKey });
     },
-    onError: (e: any) => toast.error(e?.message ?? "Could not post comment"),
+    onError: (e: unknown) =>
+      toast.error(userErrorMessage(e, "Couldn't post your comment. Please try again.")),
   });
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => deleteCommentFn({ data: { id } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: commentsKey }),
-    onError: (e: any) => toast.error(e?.message ?? "Could not delete"),
+    onError: (e: unknown) =>
+      toast.error(userErrorMessage(e, "Couldn't delete your comment. Please try again.")),
   });
 
   const updateMut = useMutation({
@@ -127,7 +133,12 @@ export function PostEngagement({ subjectType, subjectId }: Props) {
       setEditBody("");
       qc.invalidateQueries({ queryKey: commentsKey });
     },
-    onError: (e: any) => toast.error(e?.message ?? "Could not update"),
+    onError: (e: unknown) =>
+      toast.error(
+        errorText(e) === COMMENT_EDIT_REFUSED
+          ? COMMENT_EDIT_REFUSED
+          : userErrorMessage(e, "Couldn't update your comment. Please try again."),
+      ),
   });
 
   const toggleMut = useMutation({
@@ -137,7 +148,8 @@ export function PostEngagement({ subjectType, subjectId }: Props) {
       qc.invalidateQueries({ queryKey: reactionsKey });
       qc.invalidateQueries({ queryKey: myReactionsKey });
     },
-    onError: (e: any) => toast.error(e?.message ?? "Could not react"),
+    onError: (e: unknown) =>
+      toast.error(userErrorMessage(e, "Couldn't add your reaction. Please try again.")),
   });
 
   const mine = new Set(myReactionsQ.data ?? []);

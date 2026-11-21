@@ -106,6 +106,30 @@ export function fingerprintOf(message: string, route: string | null): string {
   return h.toString(36);
 }
 
+/**
+ * The failure each errorInsteadOf error stands for. A WeakMap, never a property of the error: the server-function
+ * serializer copies every own property, `cause` included, to the browser.
+ */
+const FAILURE_BEHIND = new WeakMap<object, unknown>();
+
+/**
+ * An Error with words for the member (`message`) that a server function throws in place of `failure`, a database or
+ * network error the member must not read. The server-function reporter (error-report-middleware.ts) classifies and
+ * records `failure` as if it had been thrown; the browser only ever gets `message`.
+ */
+export function errorInsteadOf(failure: unknown, message: string): Error {
+  const error = new Error(message);
+  FAILURE_BEHIND.set(error, failure);
+  return error;
+}
+
+/** The failure an errorInsteadOf error was thrown in place of, else the error itself. */
+export function failureBehind(error: unknown): unknown {
+  return error !== null && typeof error === "object" && FAILURE_BEHIND.has(error)
+    ? FAILURE_BEHIND.get(error)
+    : error;
+}
+
 /** The message an Error or an error-shaped object carries (without its name), or null if none. */
 export function messageOf(error: unknown): string | null {
   if (error instanceof Error) return error.message;
@@ -117,10 +141,33 @@ export function messageOf(error: unknown): string | null {
 }
 
 /**
+ * A stack frame line as V8 and the Workers runtime write it: indented, "at", and a file position or a frame with no
+ * file ("    at fn (file.js:1:2)", "    at file.js:1:2", "    at new Promise (<anonymous>)", "    at async
+ * Promise.all (index 0)"). Strict, so a value Postgres repeats in its details is never taken for one.
+ */
+const STACK_FRAME_LINE = /^\s+at\s(?:.*:\d+:\d+\)?|.*\((?:<anonymous>|native|index \d+)\))\s*$/;
+
+/**
+ * An error object's details without stack frames. When postgrest-js cannot reach the server it puts the fetch error's
+ * stack (or its cause's) in `details`; the lines that name the error and its cause stay, the frames go. Details that
+ * only repeat the message are dropped.
+ */
+function detailsWithoutStack(details: string, message: string): string {
+  const kept = details
+    .split("\n")
+    .filter((line) => !STACK_FRAME_LINE.test(line))
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join(" ");
+  return kept === message.trim() ? "" : kept;
+}
+
+/**
  * The message of anything thrown, without the stack. It is not cut short here: scrubMessage removes
  * the values first and caps after, so a cap never leaves a value its rule can no longer find. An
  * error-shaped object (a PostgREST error thrown as is) reads as its message, code and details, in
- * that order, so the details, where Postgres repeats a key or a whole row, come last.
+ * that order, so the details, where Postgres repeats a key or a whole row, come last. Stack frames
+ * in the details are left out, as an Error's stack is.
  */
 export function errorMessageOf(error: unknown): string {
   if (error instanceof Error) return `${error.name}: ${error.message}`;
@@ -131,7 +178,7 @@ export function errorMessageOf(error: unknown): string {
     return [
       typeof name === "string" && name ? `${name}: ${message}` : message,
       typeof code === "string" && code ? `(${code})` : "",
-      typeof details === "string" ? details : "",
+      typeof details === "string" ? detailsWithoutStack(details, message) : "",
     ]
       .filter(Boolean)
       .join(" ");

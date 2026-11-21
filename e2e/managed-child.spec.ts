@@ -23,6 +23,14 @@ const PUBLISHABLE_KEY =
 
 const CHILD_FIRST = "Eetwoemanaged";
 
+/**
+ * How many managed children one guardian may have (MAX_MANAGED in
+ * src/lib/managed-children.functions.ts, a server-function module the spec
+ * cannot import). More matching cards than this means the card locator is
+ * matching something else, not that there is more to clean up.
+ */
+const MAX_MANAGED = 10;
+
 test.describe("Add your child form", () => {
   test("needs a name, a birthday and the guardian's confirmation — not a sport", async ({
     page,
@@ -111,12 +119,6 @@ test.describe("managed child, end to end", () => {
     );
   });
 
-  const appears = (locator: ReturnType<Page["getByRole"]>, timeout: number) =>
-    locator.waitFor({ state: "visible", timeout }).then(
-      () => true,
-      () => false,
-    );
-
   /**
    * A child's card button in the Parent Center roster. Found by its stable id prefix rather than a
    * role: the cards were tabs until the roster stopped using tab semantics (axe), and are buttons now.
@@ -124,28 +126,79 @@ test.describe("managed child, end to end", () => {
   const childCard = (page: Page, first: string) =>
     page.locator('button[id^="child-tab-"]', { hasText: new RegExp(first) });
 
-  async function deleteChild(page: Page) {
+  /**
+   * Delete every test child this guardian has, not just one.
+   *
+   * The project is shared and a run can stop between "add" and "delete" (a
+   * failed step, a cancelled job), leaving a child behind. Deleting only the
+   * first match used to leave the rest for good: with two or more left over,
+   * the card locator matched several buttons, `appears` failed on the strict
+   * match, and cleanup returned without deleting anything, so leftovers only
+   * ever grew (eight in CI by 2026-11-13) — and the guardian's managed-child
+   * limits refuse new children once enough pile up.
+   */
+  async function deleteTestChildren(page: Page) {
     await page.goto("/parent", { waitUntil: "domcontentloaded" });
+    // The roster loads after the page; wait until it has settled (some child
+    // card, or the empty state) rather than sampling once.
+    const roster = page
+      .locator('button[id^="child-tab-"]')
+      .first()
+      .or(page.getByText("No children yet", { exact: true }));
     // Still inside the child's profile (a step failed mid-way)? The banner is
-    // on every page there; go back to the guardian first.
+    // on every page there, rendered with the page itself; go back to the
+    // guardian first. Wait for whichever the page shows rather than giving the
+    // banner a fixed 5 s to appear, which every clean run paid twice.
     const back = page.getByRole("button", { name: /^back to /i });
-    if (await appears(back, 5_000)) {
+    await expect(back.or(roster).first()).toBeVisible({ timeout: 20_000 });
+    // The roster can paint a moment before the banner while the page is still
+    // in the child's identity: give the banner a short look before deciding.
+    const inChild = await back
+      .waitFor({ state: "visible", timeout: 2_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (inChild) {
       await back.click();
       await expect(page).toHaveURL(/\/parent/, { timeout: 30_000 });
     }
-    // The roster loads after the page; wait for it rather than sampling once.
-    const tab = childCard(page, CHILD_FIRST);
-    if (!(await appears(tab, 15_000))) return;
-    await tab.click();
-    page.once("dialog", (d) => void d.accept(CHILD_FIRST));
-    await page
-      .getByRole("button", { name: new RegExp(`delete ${CHILD_FIRST}'s profile`, "i") })
-      .click();
-    await expect(tab).toBeHidden({ timeout: 20_000 });
+    await expect(roster).toBeVisible({ timeout: 20_000 });
+    const cards = childCard(page, CHILD_FIRST);
+    const leftovers = await cards.count();
+    expect(
+      leftovers,
+      `${leftovers} "${CHILD_FIRST}" cards, more than a guardian can have: the card locator matches something else`,
+    ).toBeLessThanOrEqual(MAX_MANAGED);
+    // Each leftover is a real delete round trip: budget for it.
+    if (leftovers > 0) test.setTimeout(test.info().timeout + leftovers * 20_000);
+    for (let left = leftovers; left > 0; left -= 1) {
+      await cards.first().click();
+      page.once("dialog", (d) => void d.accept(CHILD_FIRST));
+      await page
+        .getByRole("button", { name: new RegExp(`delete ${CHILD_FIRST}'s profile`, "i") })
+        .click();
+      await expect(cards).toHaveCount(left - 1, { timeout: 20_000 });
+    }
   }
 
   test("add, switch in, switch back, delete", async ({ page }) => {
+    // This journey is a chain of full page loads and two identity switches
+    // (sign in, /parent, /players/add, /parent, into the child's /profile,
+    // /settings, back to /parent, /parent again for cleanup). Each one has to
+    // hear from the auth server before it can go on: the auth store verifies
+    // the session on every load, the root gate's age and account-type checks
+    // verify the token on the server, and switching back re-checks the
+    // guardian's session. Those calls take 1-8 s on a loaded sandbox. Measured:
+    // ~15-20 s against the fast local stack, 21-37 s on CI's sandbox, and
+    // 50-60 s with the local gateway's E2E_LOCAL_AUTH_LATENCY_MS=500-4000, where
+    // the default 60 s no longer holds it. The waits inside keep their own
+    // limits; this is the budget for the whole chain of them.
+    test.setTimeout(120_000);
     await signInAs(page, "host");
+    // Start from a guardian with no test child, so the one created below is
+    // the only card that can match.
+    await deleteTestChildren(page);
+    let flowFailed = false;
+    let flowError: unknown;
     try {
       await page.goto("/players/add?from=parent", { waitUntil: "domcontentloaded" });
       await page.locator("#first-name").fill(CHILD_FIRST);
@@ -178,17 +231,37 @@ test.describe("managed child, end to end", () => {
         timeout: 20_000,
       });
 
-      // No credential surfaces inside a child's profile.
+      // No credential surfaces inside a child's profile. First wait for the
+      // page itself, still as the child (the banner survives the full load):
+      // on the loading screen both absence checks would pass unread.
       await page.goto("/settings", { waitUntil: "domcontentloaded" });
+      const back = page.getByRole("button", { name: /^back to /i });
+      await expect(back).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByRole("button", { name: /^sign out$/i })).toBeVisible();
       await expect(page.getByText(/password & sign-in/i)).toHaveCount(0);
       await expect(page.getByText(/^delete account$/i)).toHaveCount(0);
 
       // One tap back to the guardian.
-      await page.getByRole("button", { name: /^back to /i }).click();
+      await back.click();
       await expect(page).toHaveURL(/\/parent/, { timeout: 30_000 });
       await expect(page.getByText(/managing .*'s profile/i)).toHaveCount(0);
-    } finally {
-      await deleteChild(page);
+    } catch (error) {
+      flowFailed = true;
+      flowError = error;
     }
+    try {
+      await deleteTestChildren(page);
+    } catch (cleanupError) {
+      // When the flow passed, a failed cleanup fails the test. When the flow
+      // already failed, its error is the one to report, so the cleanup error
+      // is attached as an annotation instead; the next run's opening cleanup
+      // removes whatever was left.
+      if (!flowFailed) throw cleanupError;
+      test.info().annotations.push({
+        type: "cleanup-failed",
+        description: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+      });
+    }
+    if (flowFailed) throw flowError;
   });
 });

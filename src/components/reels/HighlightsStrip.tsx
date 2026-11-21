@@ -35,7 +35,10 @@ export function HighlightsStrip({
       <div className="flex items-center justify-between">
         <h3 className="section-eyebrow text-muted-foreground">{heading}</h3>
         {!following && (
-          <Link to="/highlights" className="text-xs font-semibold text-lime">
+          <Link
+            to="/highlights"
+            className="-mr-2 inline-flex min-h-11 items-center px-2 text-xs font-semibold text-lime"
+          >
             See all
           </Link>
         )}

@@ -1,11 +1,17 @@
+import { expectOnDiscovery } from "./helpers/invite-discovery";
+import { fulfillRows } from "./helpers/invite-postgrest";
+import { mockRiskNotAcknowledged, watchRiskDialog } from "./helpers/risk-ack";
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { answerSessionChecks } from "./helpers/signed-in";
 
 /**
  * E2E: on an approval-gated game, tapping "Request to join" from an invite
  * deep-link with a malformed `exp` param (non-numeric, negative, zero, NaN)
  * must be blocked — the app shows the expired error state, surfaces a toast,
  * routes safely to the /discover fallback, and never POSTs to
- * /rest/v1/join_requests.
+ * /rest/v1/join_requests. The viewer has not acknowledged the game's risks yet,
+ * and the refusal comes first: the "Before you join" dialog never opens and no
+ * acknowledgment is recorded.
  *
  * Complements `invite-malformed-exp.spec.ts` (which only asserts the banner
  * on a free/no-approval game) by exercising the CTA guard end-to-end on an
@@ -26,6 +32,11 @@ const GAME_ID = "g2";
 const REAL_HOST_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
 
 async function restoreSession(page: Page) {
+  // Answer the session checks every load starts (GET /auth/v1/user and the root gate's
+  // age, onboarding and child-status server functions) from the injected session, as the
+  // pay specs do. They are not what this spec is about, and each signed-in load
+  // otherwise sends the shared sandbox 8-13 requests for them. See helpers/signed-in.ts.
+  await answerSessionChecks(page);
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(
     ([key, value]) => window.localStorage.setItem(key!, value!),
@@ -78,11 +89,7 @@ async function installMocks(page: Page, onJoinPost: () => void) {
       }
       if (method === "POST") {
         onJoinPost();
-        await route.fulfill({
-          status: 201,
-          contentType: "application/json",
-          body: JSON.stringify([{ id: "should-not-happen" }]),
-        });
+        await fulfillRows(route, [{ id: "should-not-happen" }], { status: 201 });
         return;
       }
       return route.fallback();
@@ -108,6 +115,10 @@ for (const { label, expParam } of MALFORMED_CASES) {
     await installMocks(page, () => {
       joinPostFired = true;
     });
+    // The acknowledgment is due, so the dialog would open if the page asked
+    // for it before checking the invite's expiry.
+    const riskAck = await mockRiskNotAcknowledged(page);
+    const riskDialogSeen = await watchRiskDialog(page);
     await restoreSession(page);
 
     await page.goto(
@@ -131,15 +142,23 @@ for (const { label, expParam } of MALFORMED_CASES) {
     await expect(cta).toBeVisible({ timeout: 10_000 });
     await cta.click();
 
-    // Guard fires: toast surfaces + navigation to /discover fallback.
+    // Guard fires: toast surfaces + navigation to /discover fallback, without
+    // the risk dialog opening first.
     const toast = page.getByText(/invite has expired/i).first();
     await expect(toast).toBeVisible({ timeout: 5_000 });
-    await page.waitForURL((u) => u.pathname === "/discover", { timeout: 10_000 });
+    expect(await riskDialogSeen(), "the risk dialog must not open for a refused request").toBe(
+      false,
+    );
+    // /discover redirects to /feed, where discovery lives now.
+    await expectOnDiscovery(page);
 
     // Give any illegitimate POST a chance to land before asserting.
     await page.waitForTimeout(500);
     expect(joinPostFired, "join_requests POST must NOT fire for a malformed-exp invite").toBe(
       false,
+    );
+    expect(riskAck.writes, "no risk acknowledgment may be recorded for a refused request").toEqual(
+      [],
     );
 
     await ctx.close();

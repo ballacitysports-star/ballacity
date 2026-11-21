@@ -2,19 +2,16 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { ogImageUrl, pageHead, SITE_DESCRIPTION, SITE_TITLE, SITE_URL } from "@/lib/seo";
 import {
   ArrowRight,
+  BellRing,
   Building2,
   CalendarClock,
-  ShieldCheck,
-  ClipboardList,
   Dumbbell,
-  MapPin,
   Search,
-  UserPlus,
   Users,
+  type LucideIcon,
 } from "lucide-react";
 import { useEffect, useRef, type CSSProperties } from "react";
 import { Logo } from "@/components/Logo";
-import { HERO_IMAGE } from "@/lib/sample-data";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { GameCard } from "@/components/GameCard";
 import { AuthRedirectSkeleton } from "@/components/AuthRedirectSkeleton";
@@ -25,14 +22,43 @@ import { clearStartHint, isAccountType, routeForSetup, startSetupOf } from "@/li
 import { supabase } from "@/integrations/supabase/client";
 import { hideFinishedGames } from "@/lib/game-time";
 import { SPORT_GUIDES } from "@/lib/sports-guide";
+import { orderSportsByPriority } from "@/lib/sport-hubs";
 import { TryoutsSection } from "@/components/tryouts/TryoutsSection";
 import { FeaturedFacilityTrainer } from "@/components/landing/FeaturedFacilityTrainer";
 import { useLandingListingsConfig } from "@/hooks/useLandingListingsConfig";
 
+/** Every sport stays on the landing page; Basketball leads, then the usual priority order. */
+const LANDING_SPORTS = orderSportsByPriority(SPORT_GUIDES.map((g) => ({ name: g.sport, g }))).map(
+  (s) => s.g,
+);
+
+/** The pickup loop the landing page leads with: post when you're free, get invited, play. */
+const HOW_STEPS: { icon: LucideIcon; title: string; body: string }[] = [
+  {
+    icon: CalendarClock,
+    title: "Post when you're free",
+    body: "Pick your sport, your level and the times you can play. It takes under a minute.",
+  },
+  {
+    icon: BellRing,
+    title: "Get invited",
+    body: "Hosts near you see you're free and invite you to a game that fits your time and level.",
+  },
+  {
+    icon: Users,
+    title: "Show up and play",
+    body: "Accept, get the details and meet your crew at the court. Rate the game and run it back.",
+  },
+];
+
 const FAQS = [
   {
-    q: "How do I find pickup games near me?",
-    a: "Open BallaCity, allow location or pick your city, and browse open games by sport, skill level and distance. Tap a game to see the time, place and open spots.",
+    q: "How do invites work?",
+    a: "Post your availability: your sport, skill level and when you're free. Hosts nearby can invite you to a game, and you choose which invites to accept.",
+  },
+  {
+    q: "How do I find pickup basketball near me?",
+    a: "Open BallaCity, allow location or pick your city, and browse open games by sport, skill level and distance. Tap a game to see the time, place and open spots. Soccer, pickleball, volleyball and other sports work the same way.",
   },
   {
     q: "Do I need a team to join?",
@@ -44,11 +70,11 @@ const FAQS = [
   },
   {
     q: "Can I host my own game?",
-    a: "Yes. Set the sport, place, time and number of players, and your game appears for nearby players in about a minute.",
+    a: "Yes. Set the sport, place, time and number of players, and your game appears for nearby players in about a minute. You can also invite players who have posted that they're free.",
   },
   {
     q: "How do teams and coaches find me?",
-    a: "Post your availability on the Players tab — your sport, skill level and when you're free. Teams and coaches browse available players and send invites straight to you.",
+    a: "The same availability post works for teams too. Teams and coaches browse available players by sport, skill and distance, and send invites straight to you.",
   },
   {
     q: "Is it safe for young players?",
@@ -64,9 +90,9 @@ export const Route = createFileRoute("/")({
       description: SITE_DESCRIPTION,
       image: ogImageUrl({
         kind: "page",
-        title: "Find games. Join teams.",
-        subtitle: "Your city's sports network — pickup, tryouts, trainers and facilities.",
-        meta: ["Basketball", "Soccer", "Baseball"],
+        title: "Post when you're free. Get invited to play.",
+        subtitle: "Pickup basketball near you, plus soccer, pickleball and more.",
+        meta: ["Basketball", "Pickup games", "Every sport"],
       }),
       jsonLd: [
         {
@@ -101,6 +127,12 @@ function Landing() {
 
   useEffect(() => {
     if (loading || !user || startedSetup.current) return;
+    // Only from the landing page itself. While another navigation is still
+    // loading its route, the router keeps this page on screen with the new URL
+    // already in place; a new user object then (a sign-in event, a refresh)
+    // re-ran this and dragged the member back from wherever they were sent,
+    // e.g. from the account-type picker an OAuth return routes to.
+    if (router.state.location.pathname !== "/") return;
     // A returning member has nothing to route through first: go straight on.
     // A member who has not picked a role is caught by the app shell's own
     // account-type check, so the profile lookup below is only for a pending setup.
@@ -115,7 +147,7 @@ function Landing() {
         .select("account_type")
         .eq("id", user.id)
         .maybeSingle();
-      if (cancelled) return;
+      if (cancelled || router.state.location.pathname !== "/") return;
       const t = (data as { account_type?: string } | null)?.account_type;
       if (!isAccountType(t)) {
         router.navigate({ to: "/onboarding/account-type", replace: true });
@@ -156,26 +188,19 @@ function Landing() {
           <Logo />
           <div className="flex items-center gap-5">
             <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-muted-foreground">
+              <a href="#how" className="hover:text-foreground">
+                How it works
+              </a>
               {visible.pickupGames && (
                 <a href="#trending" className="hover:text-foreground">
                   Games
                 </a>
               )}
-              {visible.tryouts && (
-                <a href="#tryouts" className="hover:text-foreground">
-                  Tryouts
-                </a>
-              )}
-              {visible.availability && (
-                <a href="#availability" className="hover:text-foreground">
-                  Get found
-                </a>
-              )}
-              <a href="#for-teams" className="hover:text-foreground">
-                Teams &amp; trainers
+              <a href="#more" className="hover:text-foreground">
+                Tryouts &amp; trainers
               </a>
-              <a href="#for-facilities" className="hover:text-foreground">
-                Facilities
+              <a href="#sports" className="hover:text-foreground">
+                Sports
               </a>
             </nav>
             <Link
@@ -188,61 +213,81 @@ function Landing() {
         </div>
       </header>
 
-      {/* Hero */}
+      {/* Hero: basketball first, availability first */}
       <section className="relative overflow-hidden bg-hero">
         <div className="absolute inset-0 grid-noise opacity-30" />
         <div className="relative page-shell pt-12 pb-16 md:pt-20 md:pb-24">
           <div className="max-w-3xl">
+            <p
+              style={{ "--enter-delay": "0ms" } as CSSProperties}
+              className="enter-up inline-flex items-center gap-2 rounded-full border border-lime/30 bg-lime/10 px-3.5 py-1.5 text-sm font-semibold text-lime"
+            >
+              <span aria-hidden>🏀</span> Pickup basketball in your city
+            </p>
             <h1
               style={{ "--enter-delay": "50ms" } as CSSProperties}
-              className="enter-up font-display text-5xl md:text-7xl font-bold leading-[0.95] tracking-tight"
+              className="enter-up mt-5 font-display text-5xl md:text-7xl font-bold leading-[0.95] tracking-tight"
             >
-              Find games. Join teams.
+              Post when you're free.
               <br />
-              <span className="text-lime">Your city's sports network.</span>
+              <span className="text-lime">Get invited to play.</span>
             </h1>
             <p
               style={{ "--enter-delay": "120ms" } as CSSProperties}
               className="enter-up mt-5 max-w-xl text-lg text-muted-foreground"
             >
-              Pickup runs, team tryouts and camps, trainers and local facilities — plus a place to
-              post your availability so coaches can find you.
+              Tell hoopers nearby when you can play, and hosts invite you to runs that fit your time
+              and level. Or jump into an open game today. Soccer, pickleball, volleyball and more
+              are here too.
             </p>
             <div
               style={{ "--enter-delay": "180ms" } as CSSProperties}
               className="enter-up mt-7 flex flex-wrap gap-3"
             >
               <Link
-                to="/feed"
-                className="inline-flex items-center gap-2 rounded-full bg-lime-gradient px-6 py-3.5 font-bold text-primary-foreground glow-lime hover:scale-[1.02] transition-transform"
+                to="/availability"
+                search={{ compose: "quick" }}
+                className="inline-flex min-h-11 items-center gap-2 rounded-full bg-lime-gradient px-6 py-3.5 font-bold text-primary-foreground glow-lime hover:scale-[1.02] transition-transform"
               >
-                Find a game near me <ArrowRight className="h-4 w-4" />
+                Post when you're free <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
-                to="/create"
-                className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-6 py-3.5 font-semibold text-foreground hover:border-lime/40"
+                to="/feed"
+                className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border bg-surface px-6 py-3.5 font-semibold text-foreground hover:border-lime/40"
               >
-                Host a game
+                Find a game near me
               </Link>
             </div>
+            <p
+              style={{ "--enter-delay": "220ms" } as CSSProperties}
+              className="enter-up mt-4 text-sm text-muted-foreground"
+            >
+              Running a game?{" "}
+              <Link
+                to="/create"
+                className="inline-flex min-h-11 items-center font-semibold text-foreground underline-offset-4 hover:text-lime hover:underline"
+              >
+                Host a game
+              </Link>{" "}
+              and invite players who are free.
+            </p>
             <nav
-              aria-label="Explore BallaCity"
-              style={{ "--enter-delay": "240ms" } as CSSProperties}
-              className="enter-up mt-8 flex flex-wrap gap-2"
+              aria-label="On this page"
+              style={{ "--enter-delay": "260ms" } as CSSProperties}
+              className="enter-up mt-6 flex flex-wrap gap-2"
             >
               {[
-                visible.pickupGames && ["#trending", "🏀 Games & runs"],
-                visible.tryouts && ["#tryouts", "📋 Tryouts & camps"],
-                visible.availability && ["#availability", "🙋 Get found"],
-                ["#for-teams", "🧢 Teams & trainers"],
-                ["#for-facilities", "🏢 Venues & facilities"],
+                ["#how", "🙋 How invites work"],
+                visible.pickupGames && ["#trending", "🏀 Games near you"],
+                ["#more", "📋 Tryouts, trainers & facilities"],
+                ["#sports", "⚽ Every sport"],
               ]
                 .filter((x): x is string[] => !!x)
                 .map(([href, label]) => (
                   <a
                     key={href}
                     href={href}
-                    className="rounded-full border border-border bg-background/50 px-3.5 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-lime/40 transition-colors"
+                    className="inline-flex min-h-11 items-center rounded-full border border-border bg-background/50 px-3.5 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-lime/40 transition-colors"
                   >
                     {label}
                   </a>
@@ -252,14 +297,64 @@ function Landing() {
         </div>
       </section>
 
+      {/* How it works: post when you're free, get invited */}
+      <section id="how" className="page-shell py-16 scroll-mt-20" aria-labelledby="how-heading">
+        <div className="mb-8">
+          <h2 id="how-heading" className="font-display text-3xl md:text-4xl font-bold">
+            Post when you're free. Get invited.
+          </h2>
+          <p className="text-muted-foreground mt-1 max-w-2xl">
+            No more group-chat chasing. Say when you can play and let the game come to you.
+          </p>
+        </div>
+        <ol className="grid md:grid-cols-3 gap-4">
+          {HOW_STEPS.map((s, i) => {
+            const Icon = s.icon;
+            return (
+              <li key={s.title} className="rounded-3xl border border-border bg-surface p-6">
+                <div className="flex items-center gap-3">
+                  <div className="inline-grid h-11 w-11 place-items-center rounded-2xl bg-lime/15 text-lime">
+                    <Icon className="h-5 w-5" aria-hidden />
+                  </div>
+                  <span className="font-display text-2xl font-bold text-lime">{i + 1}</span>
+                </div>
+                <h3 className="mt-4 font-display text-xl font-semibold">{s.title}</h3>
+                <p className="text-muted-foreground mt-1.5 text-sm">{s.body}</p>
+              </li>
+            );
+          })}
+        </ol>
+        <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-2">
+          <Link
+            to="/availability"
+            search={{ compose: "quick" }}
+            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-lime-gradient px-6 py-3.5 font-bold text-primary-foreground glow-lime hover:scale-[1.02] transition-transform"
+          >
+            Post your availability <ArrowRight className="h-4 w-4" />
+          </Link>
+          <Link
+            to="/feed"
+            className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground"
+          >
+            <Search className="h-4 w-4" aria-hidden /> Or browse open games
+          </Link>
+        </div>
+      </section>
+
       {/* Trending */}
       {visible.pickupGames && (
-        <section id="trending" className="page-shell py-16">
-          <div className="flex items-end justify-between mb-6">
-            <h2 className="font-display text-3xl md:text-4xl font-bold">Trending near you</h2>
+        <section
+          id="trending"
+          className="page-shell py-16 scroll-mt-20"
+          aria-labelledby="trending-heading"
+        >
+          <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 mb-6">
+            <h2 id="trending-heading" className="font-display text-3xl md:text-4xl font-bold">
+              Games near you
+            </h2>
             <Link
               to="/feed"
-              className="text-sm font-semibold text-lime hover:underline inline-flex items-center gap-1"
+              className="text-sm font-semibold text-lime hover:underline inline-flex min-h-11 items-center gap-1"
             >
               See all <ArrowRight className="h-4 w-4" />
             </Link>
@@ -287,161 +382,92 @@ function Landing() {
         </section>
       )}
 
-      {/* How it works */}
-      <section id="how" className="page-shell py-16" aria-labelledby="how-heading">
-        <h2 id="how-heading" className="font-display text-3xl md:text-4xl font-bold mb-8">
-          How to join a game
-        </h2>
-        <ol className="grid md:grid-cols-3 gap-4">
-          {[
-            [
-              "Find a game nearby",
-              "Browse open games by sport, skill level and distance on a live map.",
-            ],
-            [
-              "Grab your spot",
-              "Request to join in a tap. The host confirms and you get the details.",
-            ],
-            [
-              "Show up and play",
-              "Meet your crew at the court or field. Rate the run and play again.",
-            ],
-          ].map(([t, b], i) => (
-            <li key={t} className="rounded-3xl border border-border bg-surface p-6">
-              <span className="font-display text-2xl font-bold text-lime">{i + 1}</span>
-              <h3 className="mt-2 font-display text-xl font-semibold">{t}</h3>
-              <p className="text-muted-foreground mt-1.5 text-sm">{b}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      {/* Availability */}
-      {visible.availability && (
-        <section
-          id="availability"
-          className="page-shell py-16"
-          aria-labelledby="availability-heading"
-        >
-          <div className="mb-8">
-            <h2 id="availability-heading" className="font-display text-3xl md:text-4xl font-bold">
-              List your availability — let teams find you.
-            </h2>
-            <p className="text-muted-foreground mt-1">
-              Post when you're free to play, and teams and coaches can find you and invite you
-              directly.
-            </p>
-          </div>
-          <ol className="grid md:grid-cols-3 gap-4">
-            {[
-              {
-                icon: CalendarClock,
-                title: "Post your availability",
-                body: "List your sport, skill level and when you're free to play.",
-              },
-              {
-                icon: Search,
-                title: "Teams and coaches find you",
-                body: "They browse available players by sport, skill and distance.",
-              },
-              {
-                icon: UserPlus,
-                title: "Invites come to you",
-                body: "Accept an invite and you're on the roster.",
-              },
-            ].map((s) => {
-              const Icon = s.icon;
-              return (
-                <li key={s.title} className="rounded-3xl border border-border bg-surface p-6">
-                  <div className="inline-grid h-11 w-11 place-items-center rounded-2xl mb-4 bg-lime/15 text-lime">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <h3 className="font-display text-xl font-semibold">{s.title}</h3>
-                  <p className="text-muted-foreground mt-1.5 text-sm">{s.body}</p>
-                </li>
-              );
-            })}
-          </ol>
-          <Link
-            to="/players"
-            className="mt-8 inline-flex items-center gap-2 rounded-full bg-lime-gradient px-6 py-3.5 font-bold text-primary-foreground glow-lime hover:scale-[1.02] transition-transform"
-          >
-            Post your availability <ArrowRight className="h-4 w-4" />
-          </Link>
-        </section>
-      )}
-
-      {visible.tryouts && <TryoutsSection />}
-
-      {/* Teams, coaches & trainers */}
-      <section id="for-teams" className="page-shell py-16" aria-labelledby="for-teams-heading">
-        <div className="mb-8">
-          <h2 id="for-teams-heading" className="font-display text-3xl md:text-4xl font-bold">
-            Built for teams, coaches &amp; trainers
+      {/* Sports: Basketball leads, every other sport stays one tap away */}
+      <section
+        id="sports"
+        className="page-shell py-16 scroll-mt-20"
+        aria-labelledby="sports-heading"
+      >
+        <div className="mb-6">
+          <h2 id="sports-heading" className="font-display text-3xl md:text-4xl font-bold">
+            Basketball first. Every sport welcome.
           </h2>
           <p className="text-muted-foreground mt-1">
-            Recruit players, run your roster and fill your sessions — all in one place.
+            The same post-and-get-invited pickup works for soccer, pickleball, volleyball, baseball
+            and more.
           </p>
         </div>
-        <ul className="grid md:grid-cols-3 gap-4">
+        <ul className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {LANDING_SPORTS.map((g, i) => (
+            <li key={g.slug}>
+              <Link
+                to="/guide/$sport"
+                params={{ sport: g.slug }}
+                style={{ "--enter-delay": `${i * 40}ms` } as CSSProperties}
+                className={
+                  i === 0
+                    ? "enter-up block h-full rounded-2xl border border-lime/50 bg-lime/10 p-4 hover:border-lime transition-all hover:-translate-y-0.5"
+                    : "enter-up block h-full rounded-2xl border border-border bg-surface p-4 hover:border-lime/40 transition-all hover:-translate-y-0.5"
+                }
+              >
+                <span aria-hidden className="block text-3xl mb-2">
+                  {g.emoji}
+                </span>
+                <span className="font-semibold">{g.sport}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* Tryouts, teams, trainers & facilities: one compact section */}
+      <section id="more" className="page-shell py-16 scroll-mt-20" aria-labelledby="more-heading">
+        <div className="mb-6">
+          <h2 id="more-heading" className="font-display text-3xl md:text-4xl font-bold">
+            Tryouts, trainers &amp; facilities
+          </h2>
+          <p className="text-muted-foreground mt-1 max-w-2xl">
+            Beyond pickup: find a team, train with a coach, or put your gym on the map.
+          </p>
+        </div>
+        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {[
             {
               icon: Users,
-              title: "For teams",
-              points: [
-                "Post tryouts, camps and open runs",
-                "Find local players who are looking for a team",
-                "Send roster invites and track who's in",
-                "Collect signed waivers — parents sign for minors",
-              ],
-              cta: { to: "/teams/create" as const, label: "Create a team" },
-              cta2: { to: "/teams" as const, label: "Browse teams" },
-            },
-            {
-              icon: ClipboardList,
-              title: "For coaches",
-              points: [
-                "Announce open tryouts to athletes nearby",
-                "Browse available players by sport, skill and distance",
-                "Invite players with a personal note",
-                "Parents of young players can message you directly",
-              ],
-              cta: { to: "/players" as const, label: "Find players" },
-              cta2: { to: "/teams/create" as const, label: "Post a tryout" },
+              title: "Teams & tryouts",
+              body: "Teams post tryouts and camps and invite players who are free. Parents sign waivers for minors.",
+              cta: { to: "/teams" as const, label: "Browse teams" },
+              cta2: { to: "/teams/create" as const, label: "Create a team" },
             },
             {
               icon: Dumbbell,
-              title: "For trainers",
-              points: [
-                "Get discovered by athletes and parents nearby",
-                "Host private sessions, group clinics and skill workouts",
-                "Collect fees directly — no platform cut",
-              ],
-              cta: { to: "/trainers/create" as const, label: "Become a trainer" },
-              cta2: { to: "/trainers" as const, label: "Find a trainer" },
+              title: "Trainers",
+              body: "Private sessions, group clinics and skill workouts. Fees are paid to the trainer directly.",
+              cta: { to: "/trainers" as const, label: "Find a trainer" },
+              cta2: { to: "/trainers/create" as const, label: "Become a trainer" },
+            },
+            {
+              icon: Building2,
+              title: "Gyms & facilities",
+              body: "List your courts and fields so players, teams and trainers nearby can find them.",
+              cta: { to: "/orgs" as const, label: "Explore facilities" },
+              cta2: { to: "/orgs/create" as const, label: "List your facility" },
             },
           ].map((c) => {
             const Icon = c.icon;
             return (
               <li
                 key={c.title}
-                className="flex flex-col rounded-3xl border border-border bg-surface p-6"
+                className="flex flex-col rounded-2xl border border-border bg-surface p-5"
               >
-                <div className="inline-grid h-11 w-11 place-items-center rounded-2xl mb-4 bg-lime/15 text-lime">
-                  <Icon className="h-5 w-5" />
+                <div className="flex items-center gap-3">
+                  <div className="inline-grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-lime/15 text-lime">
+                    <Icon className="h-5 w-5" aria-hidden />
+                  </div>
+                  <h3 className="font-display text-lg font-semibold">{c.title}</h3>
                 </div>
-                <h3 className="font-display text-xl font-semibold">{c.title}</h3>
-                <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-                  {c.points.map((p) => (
-                    <li key={p} className="flex gap-2">
-                      <span aria-hidden className="text-lime">
-                        ✓
-                      </span>
-                      {p}
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-auto pt-5 flex flex-wrap gap-x-4 gap-y-2">
+                <p className="mt-2 text-sm text-muted-foreground">{c.body}</p>
+                <div className="mt-auto pt-3 flex flex-wrap gap-x-4">
                   <Link
                     to={c.cta.to}
                     className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-lime hover:underline"
@@ -459,103 +485,21 @@ function Landing() {
             );
           })}
         </ul>
-      </section>
-
-      {/* Venues & facilities */}
-      <section
-        id="for-facilities"
-        className="page-shell py-16"
-        aria-labelledby="for-facilities-heading"
-      >
-        <div className="rounded-3xl border border-border bg-surface p-6 md:p-10">
-          <div className="inline-grid h-11 w-11 place-items-center rounded-2xl mb-4 bg-lime/15 text-lime">
-            <Building2 className="h-5 w-5" />
-          </div>
-          <h2 id="for-facilities-heading" className="font-display text-3xl md:text-4xl font-bold">
-            For gyms &amp; facilities
-          </h2>
-          <p className="text-muted-foreground mt-1 max-w-2xl">
-            Put your courts, fields and training space in front of local players, parents, teams and
-            trainers.
-          </p>
-          <ul className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[
-              {
-                icon: MapPin,
-                title: "Get discovered",
-                body: "A listing with your address, hours, photos and amenities, shown to players nearby.",
-              },
-              {
-                icon: CalendarClock,
-                title: "Host more play",
-                body: "Your venue becomes the home for pickup runs, tryouts, camps and clinics.",
-              },
-              {
-                icon: Dumbbell,
-                title: "Work with trainers",
-                body: "Local trainers can list your facility as where they run their sessions.",
-              },
-              {
-                icon: ShieldCheck,
-                title: "Build trust",
-                body: "Claim your listing, keep details accurate and collect reviews from players.",
-              },
-            ].map((f) => {
-              const Icon = f.icon;
-              return (
-                <li key={f.title} className="rounded-2xl border border-border bg-background/40 p-5">
-                  <Icon className="h-5 w-5 text-lime" />
-                  <h3 className="font-display text-lg font-semibold mt-3">{f.title}</h3>
-                  <p className="text-muted-foreground mt-1 text-sm">{f.body}</p>
-                </li>
-              );
-            })}
-          </ul>
-          {visible.trainerSpotlight && <FeaturedFacilityTrainer />}
-          <div className="mt-8 flex flex-wrap gap-3">
+        {visible.availability && (
+          <p className="mt-4 text-sm text-muted-foreground">
+            Looking for a team? Your availability post lets teams and coaches find you and invite
+            you to try out.{" "}
             <Link
-              to="/orgs/create"
-              className="inline-flex items-center gap-2 rounded-full bg-lime-gradient px-6 py-3.5 font-bold text-primary-foreground glow-lime hover:scale-[1.02] transition-transform"
+              to="/availability"
+              search={{ compose: "quick" }}
+              className="inline-flex min-h-11 items-center font-semibold text-lime hover:underline"
             >
-              List your facility <ArrowRight className="h-4 w-4" />
+              Get found by teams
             </Link>
-            <Link
-              to="/orgs"
-              className="inline-flex items-center gap-2 rounded-full border border-border px-6 py-3.5 font-semibold hover:bg-surface transition-colors"
-            >
-              Explore facilities
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Sports */}
-      <section id="sports" className="page-shell py-16" aria-labelledby="sports-heading">
-        <div className="mb-6">
-          <h2 id="sports-heading" className="font-display text-3xl md:text-4xl font-bold">
-            Sports on BallaCity
-          </h2>
-          <p className="text-muted-foreground mt-1">
-            Find games, tryouts, teams and trainers across every sport in your area.
           </p>
-        </div>
-        <ul className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          {SPORT_GUIDES.map((g, i) => (
-            <li key={g.slug}>
-              <Link
-                to="/guide/$sport"
-                params={{ sport: g.slug }}
-                style={{ "--enter-delay": `${i * 40}ms` } as CSSProperties}
-                className="enter-up block h-full rounded-2xl border border-border bg-surface p-4 hover:border-lime/40 transition-all hover:-translate-y-0.5"
-              >
-                <span aria-hidden className="block text-3xl mb-2">
-                  {g.emoji}
-                </span>
-                <span className="font-semibold">{g.sport}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        )}
+        {visible.tryouts && <TryoutsSection compact />}
+        {visible.trainerSpotlight && <FeaturedFacilityTrainer />}
       </section>
 
       {/* FAQ */}
@@ -591,16 +535,18 @@ function Landing() {
           <div className="absolute inset-0 bg-hero opacity-60" />
           <div className="relative">
             <h2 className="font-display text-4xl md:text-6xl font-bold tracking-tight">
-              Your next game is <span className="text-lime">already happening.</span>
+              Free tonight? <span className="text-lime">Let the run find you.</span>
             </h2>
             <p className="mt-4 text-muted-foreground max-w-xl mx-auto">
-              Join the players running it back tonight.
+              Post when you're free and get invited to pickup basketball near you, or any sport you
+              play.
             </p>
             <Link
-              to="/feed"
+              to="/availability"
+              search={{ compose: "quick" }}
               className="inline-flex items-center gap-2 mt-7 rounded-full bg-lime-gradient px-7 py-4 font-bold text-primary-foreground glow-lime hover:scale-[1.02] transition-transform"
             >
-              Open BallaCity <ArrowRight className="h-4 w-4" />
+              Get started <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </div>

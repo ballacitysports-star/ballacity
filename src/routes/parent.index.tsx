@@ -44,6 +44,23 @@ import { FollowRequestsPanel } from "@/components/follow/FollowRequestsPanel";
 import { useDeleteManagedChild, useSwitchToManagedChild } from "@/lib/use-managed-children";
 import { ProfileSwitcher } from "@/components/ProfileSwitcher";
 import { useAuthSearchHere } from "@/lib/auth-return";
+import { errorText, userErrorMessage } from "@/lib/user-error";
+
+/**
+ * Our own sentences the Parent Center's calls throw (the guardian checks in family-clips.functions.ts and
+ * public-xp.functions.ts, switchToManagedChild in managed-session.ts, revokeGuardianLink). They already say what to
+ * do, so they are shown as they are; anything else reads as userErrorMessage reads it, never as raw text.
+ */
+const OWN_SENTENCES: ReadonlySet<string> = new Set([
+  "Only a verified parent or guardian can change this.",
+  "Sign in again to switch profiles.",
+  "That family link is no longer active.",
+]);
+
+function parentErrorMessage(e: unknown, fallback: string): string {
+  const text = errorText(e);
+  return text && OWN_SENTENCES.has(text) ? text : userErrorMessage(e, fallback);
+}
 
 export const Route = createFileRoute("/parent/")({
   head: () =>
@@ -147,8 +164,8 @@ function FamilyPostLink({ child }: { child: GuardianChild }) {
               await setViewFn({ data: { childUserId: child.childUserId, enabled: v } });
               await qc.invalidateQueries({ queryKey: ["child-family-view", child.childUserId] });
               toast.success("Setting saved");
-            } catch (e: any) {
-              toast.error(e?.message ?? "Could not save this setting");
+            } catch (e) {
+              toast.error(parentErrorMessage(e, "Couldn't save this setting. Please try again."));
             }
           }}
           aria-label={`${child.displayName} can watch family clips`}
@@ -182,8 +199,8 @@ function FamilyPostLink({ child }: { child: GuardianChild }) {
                     ? "Turned on"
                     : "Turned off, and anything already shared this way has been stopped",
                 );
-              } catch (e: any) {
-                toast.error(e?.message ?? "Could not save this setting");
+              } catch (e) {
+                toast.error(parentErrorMessage(e, "Couldn't save this setting. Please try again."));
               }
             }}
             aria-label={`${row.label} for ${child.displayName}`}
@@ -225,8 +242,8 @@ function PublicXpToggle({ child }: { child: GuardianChild }) {
             await setFn({ data: { childUserId: child.childUserId, enabled: v } });
             await qc.invalidateQueries({ queryKey: ["child-public-xp", child.childUserId] });
             toast.success(v ? "Level and XP are now public" : "Level and XP are no longer public");
-          } catch (e: any) {
-            toast.error(e?.message ?? "Could not save this setting");
+          } catch (e) {
+            toast.error(parentErrorMessage(e, "Couldn't save this setting. Please try again."));
           }
         }}
         aria-label={`Show ${child.displayName}'s level and XP publicly`}
@@ -286,7 +303,8 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
       { childUserId, controls },
       {
         onSuccess: () => toast.success("Setting saved"),
-        onError: (e) => toast.error(e instanceof Error ? e.message : "Could not save"),
+        onError: (e) =>
+          toast.error(parentErrorMessage(e, "Couldn't save this setting. Please try again.")),
       },
     );
   };
@@ -296,7 +314,8 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
       { childUserId, kind },
       {
         onSuccess: () => toast.success("Request submitted — we'll confirm by email."),
-        onError: (e) => toast.error(e instanceof Error ? e.message : "Could not submit"),
+        onError: (e) =>
+          toast.error(parentErrorMessage(e, "Couldn't submit your request. Please try again.")),
       },
     );
   };
@@ -346,7 +365,7 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
                 {
                   onError: (e) =>
                     toast.error(
-                      e instanceof Error ? e.message : "Could not switch to that profile",
+                      parentErrorMessage(e, "Couldn't switch to that profile. Please try again."),
                     ),
                 },
               )
@@ -547,7 +566,9 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
                 {
                   onSuccess: () => toast.success(`${child.displayName}'s profile was deleted.`),
                   onError: (e) =>
-                    toast.error(e instanceof Error ? e.message : "Could not delete that profile"),
+                    toast.error(
+                      parentErrorMessage(e, "Couldn't delete that profile. Please try again."),
+                    ),
                 },
               );
             }}
@@ -567,7 +588,9 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
                   {
                     onSuccess: () => toast.success("Consent withdrawn and restrictions applied."),
                     onError: (e) =>
-                      toast.error(e instanceof Error ? e.message : "Could not withdraw"),
+                      toast.error(
+                        parentErrorMessage(e, "Couldn't withdraw consent. Please try again."),
+                      ),
                   },
                 )
               }
@@ -588,7 +611,9 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
                   {
                     onSuccess: () => toast.success("Family link ended."),
                     onError: (e) =>
-                      toast.error(e instanceof Error ? e.message : "Could not end that link"),
+                      toast.error(
+                        parentErrorMessage(e, "Couldn't end that link. Please try again."),
+                      ),
                   },
                 );
               }}
@@ -652,6 +677,11 @@ function ParentCenterPage() {
       <p className="mt-2 page-subtitle">
         Everyone you manage, who is waiting on you, and their settings — consent, messaging, videos,
         discoverability and data requests. You only ever see information about your own children.
+      </p>
+      <p className="mt-1 text-xs text-muted-foreground" data-testid="family-link-ends-at-18">
+        A family link ends on the day a child turns 18. They leave this list and you stop seeing or
+        changing their account; you and they each get a notice. A child account you manage, with no
+        login of its own, stays linked to you.
       </p>
 
       <GuardianProfileCard />

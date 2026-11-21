@@ -12,7 +12,9 @@ import { classifyOAuthFailure } from "@/lib/oauth-outcome";
 import { sanitizeNextPath } from "@/lib/safe-next-path";
 import { readLastVisited } from "@/lib/last-visited";
 import { postAuthDestination } from "@/lib/post-auth-destination";
+import { clearOAuthProvider, oauthNextForPage, stashOAuthProvider } from "@/lib/oauth-next";
 import { validateCredentials } from "@/lib/auth-credentials";
+import { userErrorMessage } from "@/lib/user-error";
 import { RolePicker } from "@/components/RolePicker";
 import { ConfirmEmailPanel } from "@/components/auth/ConfirmEmailPanel";
 import {
@@ -43,12 +45,42 @@ import {
   usePublishedLegalDocuments,
 } from "@/lib/legal-consent";
 
+const RATE_LIMITED = "Too many attempts. Wait a few minutes and try again.";
+
+/**
+ * What the sign-in form shows for a Supabase Auth refusal. The few refusals a person can fix get their own words
+ * (Supabase Auth names them in `code`); anything else reads as userErrorMessage reads it, never as the raw text.
+ */
+const AUTH_ERROR_MESSAGES: ReadonlyMap<string, string> = new Map([
+  [
+    "weak_password",
+    "That password is too easy to guess. Choose a longer one with a mix of letters and numbers.",
+  ],
+  ["user_already_exists", "An account with this email already exists. Try signing in."],
+  ["email_exists", "An account with this email already exists. Try signing in."],
+  ["email_address_invalid", "Enter a valid email address."],
+  [
+    "over_email_send_rate_limit",
+    "Too many emails were sent to this address. Wait a few minutes and try again.",
+  ],
+  ["over_request_rate_limit", RATE_LIMITED],
+]);
+
+function authErrorMessage(err: unknown, fallback: string): string {
+  const e = err && typeof err === "object" ? (err as { code?: unknown; status?: unknown }) : {};
+  const own = typeof e.code === "string" ? AUTH_ERROR_MESSAGES.get(e.code) : undefined;
+  if (own) return own;
+  if (e.status === 429) return RATE_LIMITED;
+  return userErrorMessage(err, fallback);
+}
+
 export const Route = createFileRoute("/auth")({
   head: () =>
     pageHead({
       path: "/auth",
       title: "Sign in — BallaCity",
-      description: "Sign in or create a BallaCity account to join and host pickup games.",
+      description:
+        "Sign in or create a BallaCity account to post when you're free, get invited to pickup games and host your own.",
       noindex: true,
     }),
   validateSearch: (s: Record<string, unknown>) => {
@@ -143,8 +175,11 @@ function AuthPage() {
     }
   };
 
-  const needsAccountType = async (currentUser: User | null | undefined) => {
-    if (!currentUser) return false;
+  /** `undefined` when the check could not tell; the caller then carries on as if not. */
+  const needsAccountType = async (
+    currentUser: User | null | undefined,
+  ): Promise<boolean | undefined> => {
+    if (!currentUser) return undefined;
     const query = supabase
       .from("profiles")
       .select("account_type")
@@ -153,12 +188,12 @@ function AuthPage() {
     const res = await withTimeout(query, 2500, null as unknown as Awaited<typeof query> | null);
     if (!res) {
       console.warn("[auth] account type check timed out; continuing");
-      return false;
+      return undefined;
     }
     const { data, error } = res;
     if (error) {
       console.warn("[auth] account type check failed", error.message);
-      return false;
+      return undefined;
     }
     const t = (data as { account_type?: string } | null)?.account_type;
     return !isAccountType(t);
@@ -181,6 +216,13 @@ function AuthPage() {
   // another. Once one of them has used the hint the rest stand down: a later one
   // sees no hint and would send the member to the feed instead of their setup.
   const usedStartHint = useRef(false);
+  // The page stashed by the Google/Apple button, read once for this page (see
+  // oauthNextForPage): the calls below for one sign-in must all agree on it, even
+  // when the root's sign-in listener removes it from storage in between.
+  const oauthNext = useRef<ReturnType<typeof oauthNextForPage> | null>(null);
+  if (oauthNext.current === null && typeof window !== "undefined") {
+    oauthNext.current = oauthNextForPage();
+  }
 
   const goPostAuth = async (currentUser: User | null | undefined = user) => {
     if (usedStartHint.current) return;
@@ -201,15 +243,28 @@ function AuthPage() {
       /* ignore */
     }
 
+    // A page stashed before a Google/Apple round trip stands in for a missing
+    // `next` (see postAuthDestination), so /auth agrees with the root listener.
+    const savedNext = oauthNext.current?.get();
     const startSetup = startSetupOf(currentUser);
     const startDestination = startSetup ? hrefForSetup(startSetup) : undefined;
+    const needsType = await needsAccountType(currentUser);
     const dest = postAuthDestination({
       next: sanitizeNextPath(next),
-      needsAccountType: await needsAccountType(currentUser),
+      savedNext,
+      needsAccountType: needsType === true,
       startDestination,
       lastVisited: readLastVisited() ?? undefined,
       referrer,
     });
+    // Used now, so it must not send a later sign-in in this tab there. An
+    // account that still needs a type (or that the check could not answer for)
+    // keeps it stashed for after the picker.
+    if (savedNext && dest === savedNext && needsType === false) oauthNext.current?.used();
+    // The account has a type, so the provider stash has done its job (it only routes a new social account to the
+    // picker). Clear it here: the root listener clears it too, but only once its own onboarding check answers, and
+    // leave() below is a full-page navigation that can discard that.
+    if (needsType === false) clearOAuthProvider();
     // Once the hint is what sends them on it has done its job. Wait for that, or
     // the full-page navigation below can cancel the update and send them again.
     if (startDestination && dest === startDestination) {
@@ -280,6 +335,7 @@ function AuthPage() {
         const dobCheck = checkDobParts(dob);
         if (!dobCheck.ok) {
           setErrors((p) => ({ ...p, dob: dobCheck.message }));
+          // eslint-disable-next-line local/no-raw-toast-error -- checkDobParts' own validation sentence, not an error's text.
           toast.error(dobCheck.message);
           dobRef.current?.focus();
           return;
@@ -367,7 +423,12 @@ function AuthPage() {
         }
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Auth failed";
+      const message = authErrorMessage(
+        err,
+        mode === "signup"
+          ? "We couldn't create your account. Please try again."
+          : "We couldn't sign you in. Please try again.",
+      );
       setErrors((p) => ({ ...p, form: message }));
       toast.error(message);
     } finally {
@@ -392,7 +453,7 @@ function AuthPage() {
       setNotice(null);
       setErrors((p) => ({
         ...p,
-        form: err instanceof Error ? err.message : "Could not send reset email",
+        form: authErrorMessage(err, "We couldn't send the reset email. Try again in a minute."),
       }));
     }
   };
@@ -404,7 +465,9 @@ function AuthPage() {
       email: addr,
       options: { emailRedirectTo: window.location.origin },
     });
-    return error ? error.message || "Could not send the email. Try again shortly." : null;
+    return error
+      ? authErrorMessage(error, "We couldn't send the email. Try again in a minute.")
+      : null;
   };
 
   const switchMode = (nextMode: "signin" | "signup") => {
@@ -456,14 +519,8 @@ function AuthPage() {
     // Stash the intended destination so we can navigate to it AFTER the
     // session is confirmed. `redirect_uri` MUST stay a public same-origin URL —
     // passing protected routes to Google/Apple causes vendor rejection.
-    try {
-      const safeNext = sanitizeNextPath(next);
-      if (safeNext) window.sessionStorage.setItem("openrun:oauth-next", safeNext);
-      else window.sessionStorage.removeItem("openrun:oauth-next");
-      window.sessionStorage.setItem("openrun:oauth-provider", provider);
-    } catch {
-      /* sessionStorage may be unavailable in private mode */
-    }
+    oauthNext.current?.stash(next);
+    stashOAuthProvider(provider);
 
     setBusy(true);
     trackSigninEvent(opts.isRetry ? "retry_clicked" : "attempt");
@@ -526,7 +583,8 @@ function AuthPage() {
           duration: 10000,
         });
       } else {
-        toast.error(raw || `${providerLabel} sign-in failed`);
+        // The raw text is logged and tracked above; the member gets plain words.
+        toast.error(`${providerLabel} sign-in didn't work. Please try again.`);
       }
     };
 
@@ -644,7 +702,7 @@ function AuthPage() {
         <div className="text-center">
           <div className="font-display text-3xl font-bold">BallaCity</div>
           <p className="text-sm text-muted-foreground mt-1">
-            Save games, write reviews, and build your reputation.
+            Post when you're free. Get invited to play.
           </p>
         </div>
 

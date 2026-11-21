@@ -115,7 +115,7 @@ export function guardedOpenCopy(
             title: "Your parent said yes",
             body: "Pay the host to lock in your spot. You're on the roster once they confirm it.",
           }
-        : { title: "Your parent said yes", body: "Tap Join Run to take your spot." };
+        : { title: "Your parent said yes", body: "Tap Join Game to take your spot." };
   }
 }
 

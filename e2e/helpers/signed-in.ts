@@ -7,9 +7,16 @@
  * test could render, none of which the specs are about:
  *
  *   - `GET /auth/v1/user`: the auth store verifies the stored session with it
- *     before publishing a user, and a page load sends 9 to 26 of them;
- *   - the root gate's `getMyAgeStatus`, then `getOnboardingStatus` (5s cap each),
- *     server functions that themselves call the sandbox.
+ *     before publishing a user (on 2026-11-12 a page load sent 9 to 26 of them;
+ *     since the game and pay pages read the user id from the stored session,
+ *     a game page load sends about one);
+ *   - the root gate's `getMyAgeStatus` and `getOnboardingStatus` (5s cap each),
+ *     server functions that themselves call the sandbox. They now start while
+ *     the session is being verified (src/lib/gate-prefetch.ts), but each still
+ *     waits on the auth server;
+ *   - `getMyChildStatus`, the account's age and consent policy. The pay page
+ *     shows no payment option until it has answered (it fails closed for
+ *     minors), so a slow answer would hold every pay spec's first screen.
  *
  * The sandbox slows down under the suite's own traffic. Measured locally on
  * 2026-11-12 (2 workers, these specs repeated): `/auth/v1/user` went from a
@@ -20,14 +27,13 @@
  * shape: a different pay test times out each run, while the test running beside
  * it on the other worker is also 2.7-5x slower than its median.
  *
- * So answer these three from the session the spec already holds. restoreSession
- * also answers the g1/g2 game lookups (see fixture-games.ts). The payment reads
- * each spec cares about still go where the spec sends them, and the database
- * still sees the real access token on every read that does reach it.
+ * So answer these from the session the spec already holds. The payment
+ * and game reads each spec cares about still go where the spec sends them, and
+ * the database still sees the real access token on every read that does reach it.
  */
 import type { Page } from "@playwright/test";
 import { onboardingStatusFor, stubServerFn } from "./server-fn";
-import { answerFixtureGameReads } from "./fixture-games";
+import { DEFAULT_AGE_POLICY } from "../../src/lib/child-policy";
 
 const SESSION_JSON = process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON;
 const STORAGE_KEY = process.env.LOVABLE_BROWSER_SUPABASE_STORAGE_KEY;
@@ -41,8 +47,33 @@ const ADULT_AGE_STATUS = {
   birthdaySet: true,
 };
 
-/** Answer the session checks above from the injected session. Call before the first navigation. */
+/**
+ * What `getMyChildStatus` answers for the same adult: no parental consent record, no guardian controls. A spec that
+ * walks a minor's flow stubs it again after this (the newest route handler answers first).
+ */
+export const ADULT_CHILD_STATUS = {
+  cohort: "adult",
+  ageReviewRequired: false,
+  jurisdiction: "US_FEDERAL",
+  consent: null,
+  controls: null,
+  policy: DEFAULT_AGE_POLICY,
+  hasBirthday: true,
+};
+
+const answered = new WeakSet<Page>();
+
+/**
+ * Answer the session checks above from the injected session. Call before the first navigation.
+ *
+ * Used by every spec that injects the fixture player's session to test a mocked screen (the pay,
+ * invite, join-request and leave specs). It registers its handlers once per page, so a spec that
+ * re-seeds the same page does not stack them. Specs about sign-in itself (oauth-*, onboarding-*,
+ * social-login-*, child-lifecycle-*, *-refresh-protected) keep the real checks.
+ */
 export async function answerSessionChecks(page: Page) {
+  if (answered.has(page)) return;
+  answered.add(page);
   const user = (JSON.parse(SESSION_JSON!) as { user?: unknown }).user;
   await page.route(/\/auth\/v1\/user(?:\?|$)/, async (route) => {
     if (route.request().method() !== "GET") return route.fallback();
@@ -54,12 +85,12 @@ export async function answerSessionChecks(page: Page) {
   });
   await stubServerFn(page, "getMyAgeStatus", ADULT_AGE_STATUS);
   await stubServerFn(page, "getOnboardingStatus", onboardingStatusFor("player", "email"));
+  await stubServerFn(page, "getMyChildStatus", ADULT_CHILD_STATUS);
 }
 
 /** Answer the session checks, then put the fixture session where the app reads it. */
 export async function restoreSession(page: Page) {
   await answerSessionChecks(page);
-  await answerFixtureGameReads(page);
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(
     ([key, value]) => window.localStorage.setItem(key!, value!),

@@ -17,6 +17,11 @@ import {
   listFamilyPostTeams,
   setFamilyPostTeam,
 } from "@/lib/family-clips.functions";
+import { teamShareErrorMessage } from "@/lib/family-clips";
+import { errorText, userErrorMessage } from "@/lib/user-error";
+
+/** setFamilyPostTeam's own refusal for anyone but the parent who added the clip; shown as it is (WP 4.0). */
+const ONLY_THE_PARENT = "Only the parent who added this clip can change this.";
 
 export function FamilyPostAudience({ reelId }: { reelId: string }) {
   const qc = useQueryClient();
@@ -43,7 +48,12 @@ export function FamilyPostAudience({ reelId }: { reelId: string }) {
       toast.success(teamId ? "Your team can now watch this clip" : "This clip is private again");
       await qc.invalidateQueries({ queryKey: ["family-post-teams", reelId] });
     } catch (e: any) {
-      toast.error(e?.message ?? "Could not update who can watch");
+      toast.error(
+        errorText(e) === ONLY_THE_PARENT
+          ? ONLY_THE_PARENT
+          : (teamShareErrorMessage(e) ??
+              userErrorMessage(e, "Couldn't update who can watch. Please try again.")),
+      );
     }
   }
 
@@ -54,9 +64,9 @@ export function FamilyPostAudience({ reelId }: { reelId: string }) {
         <Users className="h-3.5 w-3.5" /> Who can watch
       </p>
       <p className="mt-1 text-[11px] text-muted-foreground">
-        Private by default: you, and your child on their own account. You can also share with one
-        of your child&apos;s teams. Its coaches and verified teammates can watch, only while your
-        child is on the team. This clip is never public.
+        Private by default: you, and your child on their own account. You can also share with one of
+        your child&apos;s teams. Its coaches and verified teammates can watch, only while your child
+        is on the team. This clip is never public.
       </p>
       <label className="mt-2 block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
         Share with a team

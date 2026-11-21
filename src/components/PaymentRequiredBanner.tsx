@@ -20,12 +20,20 @@ export function PaymentRequiredBanner({
   gameId,
   settings,
   status,
+  takesPayment,
 }: {
   gameId: string;
   settings: GamePaymentSettings | null;
   status: PlayerFlowStatus;
+  /**
+   * The game can still take this viewer's payment: false on a cancelled game, or an ended one for a viewer without a
+   * place (gameTakesNoPayment in src/lib/pay-entry-gate.ts), where the pay page only shows its block card. Then the
+   * banner offers no payment ("Pay $X now", "Resubmit payment") at all.
+   */
+  takesPayment: boolean;
 }) {
   const navigate = useNavigate();
+  if (!takesPayment) return null;
   if (!settings || Number(settings.entry_fee ?? 0) <= 0) return null;
   if (status !== "payment_pending" && status !== "payment_rejected") return null;
 

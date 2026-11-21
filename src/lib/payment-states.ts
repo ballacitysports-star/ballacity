@@ -187,10 +187,7 @@ export function displayStatusFor(
   }
 }
 
-export function displayStatusLabel(
-  state: PaymentState,
-  opts?: { refunded?: boolean },
-): string {
+export function displayStatusLabel(state: PaymentState, opts?: { refunded?: boolean }): string {
   return PAYMENT_DISPLAY_STATUS_LABELS[displayStatusFor(state, opts)];
 }
 
@@ -209,6 +206,45 @@ export function canPlayerDispute(state: PaymentState): boolean {
 
 export function canHostConfirm(state: PaymentState): boolean {
   return state === "payment_sent" || state === "host_confirmation_pending";
+}
+
+/** What a host is told when they try to mark a cancelled claim paid (or reopen it): the player sends a new one. */
+export const CANCELLED_CLAIM_REVIEW_MESSAGE =
+  "This payment claim was cancelled, so it can't be marked paid. The player can send their payment again.";
+/** The same for a payment the host declined. */
+export const DECLINED_CLAIM_REVIEW_MESSAGE =
+  "This payment was declined, so it can't be marked paid. The player can send their payment again.";
+
+/**
+ * Why a host's review of the latest claim cannot go ahead, or null when it can. A cancelled or declined claim is final
+ * for the host (DECISION_FINAL, 20261125100000): only the player reopens it, by sending a new claim or disputing. So
+ * "Mark as paid" (or "Mark unpaid") on such a claim is refused here, in words, instead of by the database; declining
+ * it stays allowed.
+ */
+export function settledClaimReviewRefusal(
+  latest: PaymentSubmissionStatus | string,
+  next: "verified" | "rejected" | "pending",
+): string | null {
+  if (next === "rejected") return null;
+  if (latest === "cancelled") return CANCELLED_CLAIM_REVIEW_MESSAGE;
+  if (latest === "rejected") return DECLINED_CLAIM_REVIEW_MESSAGE;
+  return null;
+}
+
+/**
+ * The latest claim as a host's roster row shows it: verified, pending, declined or cancelled each get their own
+ * controls; anything else (disputed, or no claim) shows "Mark as paid". A cancelled claim is not "none": marking it
+ * paid would be refused (settledClaimReviewRefusal).
+ */
+export function rosterRowClaimStatus(
+  status: string | null | undefined,
+): "verified" | "pending" | "rejected" | "cancelled" | null {
+  return status === "verified" ||
+    status === "pending" ||
+    status === "rejected" ||
+    status === "cancelled"
+    ? status
+    : null;
 }
 
 /* ------------------------------------------------------------------ */

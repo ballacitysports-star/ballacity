@@ -1,4 +1,7 @@
+import { fulfillRows } from "./helpers/invite-postgrest";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { answerSessionChecks } from "./helpers/signed-in";
 
 /**
  * E2E: the first "Request to join" POST fails with a network error, the
@@ -22,6 +25,11 @@ const FUTURE_MS = Date.now() + 24 * 60 * 60 * 1000;
 const INVITE_URL = `/games/${GAME_ID}?invite=1&from=${FAKE_HOST_ID}&exp=${FUTURE_MS}`;
 
 async function restoreSession(page: Page) {
+  // Answer the session checks every load starts (GET /auth/v1/user and the root gate's
+  // age, onboarding and child-status server functions) from the injected session, as the
+  // pay specs do. They are not what this spec is about, and each signed-in load
+  // otherwise sends the shared sandbox 8-13 requests for them. See helpers/signed-in.ts.
+  await answerSessionChecks(page);
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(
     ([key, value]) => window.localStorage.setItem(key!, value!),
@@ -123,18 +131,14 @@ test("failed first join request can be retried and lands on pending UI with invi
           return;
         }
         retrySucceeded = true;
-        await route.fulfill({
-          status: 201,
-          contentType: "application/json",
-          headers: { "content-range": "0-0/1" },
-          body: JSON.stringify([pendingRow()]),
-        });
+        await fulfillRows(route, [pendingRow()], { status: 201 });
         return;
       }
       return route.fallback();
     },
   );
 
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
   await page.goto(INVITE_URL, { waitUntil: "domcontentloaded" });
 
@@ -155,9 +159,15 @@ test("failed first join request can be retried and lands on pending UI with invi
     .toBeGreaterThanOrEqual(1);
 
   // Error surfaces + CTA returns to "Request to join", still enabled.
-  await expect(page.getByText(/could not send request|failed|network/i).first()).toBeVisible({
+  await expect(
+    page
+      .getByText(/we couldn't connect\. check your internet connection|couldn't send your request/i)
+      .first(),
+  ).toBeVisible({
     timeout: 5_000,
   });
+  // WP 4.0: the member sees plain words, never the raw fetch error.
+  await expect(page.getByText(/failed to fetch|net::err|typeerror/i)).toHaveCount(0);
   await expect(page.getByText(/request pending · tap to cancel/i)).toHaveCount(0);
 
   const retryCta = page.getByRole("button", { name: /request spot/i }).first();
@@ -177,17 +187,33 @@ test("failed first join request can be retried and lands on pending UI with invi
     timeout: 5_000,
   });
 
-  // Exactly 2 POSTs: 1 failed + 1 successful retry.
+  // Exactly 2 POSTs: 1 failed + 1 successful retry. The pending UI above is
+  // optimistic, so the retry's POST may still be on its way (createJoinRequest
+  // asks the auth server who is signed in first): wait for it, then for strays.
+  await expect
+    .poll(() => joinPosts.length, { timeout: 10_000, message: "the retry's POST was never sent" })
+    .toBeGreaterThanOrEqual(2);
   await page.waitForTimeout(400);
   expect(joinPosts.length, `expected exactly 2 join_requests POSTs, saw ${joinPosts.length}`).toBe(
     2,
   );
 
-  // Both POSTs carried the right identifiers.
+  // Both POSTs carried the right identifiers, and no status: the server sets
+  // every new request to 'pending' whatever is sent (validate_join_request on
+  // INSERT), and createJoinRequest in src/lib/payments.ts sends none. Pinning
+  // that here catches the client starting to send one again.
+  //
+  // Both attempts use the per-game idempotency key `join:<game_id>`, which is
+  // what makes the retry safe: had the first insert reached the database, the
+  // retry would hit the (player_id, idempotency_key) unique index and get the
+  // existing row back instead of a second request. A key built per attempt
+  // (a random id, a timestamp) would break that and fail here.
   for (const p of joinPosts) {
     expect(p.body?.game_id).toBe(GAME_ID);
     expect(p.body?.host_id).toBe(FAKE_HOST_ID);
-    expect(p.body?.status).toBe("pending");
+    expect(p.body?.player_id).toBe(userId);
+    expect(p.body?.status, "the client must not send a join request status").toBeUndefined();
+    expect(p.body?.idempotency_key).toBe(`join:${GAME_ID}`);
   }
 
   // Invite params preserved on the final URL.

@@ -332,7 +332,7 @@ describe("removeApprovedCandidate", () => {
   it("puts the find back, with a plain reason, when the database refuses", async () => {
     for (const [code, expected] of [
       ["LISTING_IN_USE", /started using this listing.*Hide it from the Content tab/],
-      ["ALREADY_CLAIMED", /owner has claimed/],
+      ["ALREADY_CLAIMED", /already claimed this listing/],
       ["CLAIM_OPEN", /filed a claim/],
       ["NOT_UNCLAIMED_LISTING", /isn't an unclaimed listing/],
     ] as const) {
@@ -384,8 +384,10 @@ describe("removeApprovedCandidate", () => {
     expect(remove).toHaveBeenCalledTimes(1);
   });
 
-  it("passes an unknown error through unchanged", () => {
-    expect(removalMessage("connection reset")).toBe("connection reset");
+  it("never shows an unknown error's own text", () => {
+    expect(removalMessage("connection reset")).toBe(
+      "Couldn't remove this listing. Please try again.",
+    );
     expect(removalMessage("P0001: NOT_MODERATOR")).toBe("Only moderators can do that.");
   });
 });

@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { userErrorMessage } from "@/lib/user-error";
+
+/** What a failed save reads as when the caller has no better words (WP 4.0: never the raw error text). */
+export const AUTOSAVE_ERROR_FALLBACK = "Couldn't save your changes. Please try again.";
 
 export type AutosaveStatus = "idle" | "dirty" | "saving" | "saved" | "invalid" | "error";
 
@@ -6,7 +10,7 @@ export type AutosaveState = {
   status: AutosaveStatus;
   /** Reason the value can't be saved (when status === "invalid"). */
   reason: string | null;
-  /** Error message from the last failed save (when status === "error"). */
+  /** A sentence for the last failed save (when status === "error"); never the raw error text. */
   error: string | null;
   /** Timestamp (ms) of the last successful save, or null. */
   savedAt: number | null;
@@ -31,6 +35,11 @@ type Options<T> = {
   delay?: number;
   /** When false, nothing is tracked or saved (e.g. still loading). */
   enabled?: boolean;
+  /**
+   * Words for a failed save. Defaults to userErrorMessage with AUTOSAVE_ERROR_FALLBACK; pass one when `save` throws
+   * sentences of its own that should be shown as they are.
+   */
+  errorMessage?: (error: unknown) => string;
 };
 
 function fingerprint(value: unknown): string {
@@ -54,6 +63,7 @@ export function useAutosave<T>({
   validate,
   delay = 800,
   enabled = true,
+  errorMessage,
 }: Options<T>): AutosaveState {
   const [status, setStatus] = useState<AutosaveStatus>("idle");
   const [reason, setReason] = useState<string | null>(null);
@@ -64,6 +74,8 @@ export function useAutosave<T>({
   saveRef.current = save;
   const validateRef = useRef(validate);
   validateRef.current = validate;
+  const errorMessageRef = useRef(errorMessage);
+  errorMessageRef.current = errorMessage;
   const valueRef = useRef(value);
   valueRef.current = value;
 
@@ -109,7 +121,7 @@ export function useAutosave<T>({
       } catch (e) {
         if (seq !== seqRef.current) return;
         okRef.current = false;
-        setError(e instanceof Error ? e.message : "Couldn't save");
+        setError(errorMessageRef.current?.(e) ?? userErrorMessage(e, AUTOSAVE_ERROR_FALLBACK));
         setStatus("error");
       } finally {
         inFlightRef.current = null;

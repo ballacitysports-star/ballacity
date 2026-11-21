@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getCurrentUserId } from "@/lib/current-user-id";
 
 export type WaitlistStatus = "waiting" | "approved" | "declined";
 
@@ -128,8 +129,7 @@ export function useGameWaitlist(gameId: string | undefined): {
 }
 
 export async function joinWaitlist(gameId: string, position: string): Promise<void> {
-  const { data } = await supabase.auth.getUser();
-  const uid = data.user?.id;
+  const uid = await getCurrentUserId();
   if (!uid) throw new Error("Sign in to join the waitlist.");
   const { error } = await supabase.from("game_position_waitlist").insert({
     game_id: gameId,
@@ -141,8 +141,7 @@ export async function joinWaitlist(gameId: string, position: string): Promise<vo
 }
 
 export async function leaveWaitlist(gameId: string, position: string): Promise<void> {
-  const { data } = await supabase.auth.getUser();
-  const uid = data.user?.id;
+  const uid = await getCurrentUserId();
   if (!uid) return;
   await supabase
     .from("game_position_waitlist")
@@ -175,8 +174,7 @@ export function useMyWaitlist(): { entries: WaitlistEntry[]; loading: boolean } 
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      const { data: auth } = await supabase.auth.getUser();
-      const uid = auth.user?.id;
+      const uid = await getCurrentUserId();
       if (!uid) {
         if (!cancelled) {
           setEntries([]);

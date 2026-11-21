@@ -1,8 +1,10 @@
+import { repeatOf } from "@/lib/game-series-api";
 import { useSyncExternalStore } from "react";
 import type { Game, Sport } from "@/lib/sample-data";
 import { normalizeCutoff } from "@/lib/cancel-window";
 import { imageFor, ME, resolveSportAsset, toStoredCover } from "@/lib/sample-data";
 import { supabase } from "@/integrations/supabase/client";
+import { trackIdentity, type SeenIdentity } from "@/lib/auth-identity";
 import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 
 const STORAGE_KEY = "openrun.hostedGames.v1";
@@ -13,6 +15,9 @@ let dbHydrated = false;
 // True once a load from the database has finished. Unlike dbHydrated it stays true while a later re-load runs (after
 // an auth event), so live counts do not drop back to each card's own copy for the length of that re-load.
 let dbLoadedOnce = false;
+// Games this page has read from the database by id (fetchHostedGame) before the first full load finished: their
+// `joined` is the database's, not a copy restored from localStorage, so useHostedGameJoined can answer for them.
+const dbReadIds = new Set<string>();
 let dbHydratePromise: Promise<void> | null = null;
 
 /** Where the first load from the database stands, so a screen can say so. */
@@ -147,6 +152,7 @@ type DbRow = {
   org_id?: string | null;
   org_official?: boolean | null;
   series_id?: string | null;
+  rrule?: unknown;
   min_players?: number | null;
   allow_waitlist?: boolean | null;
   cancellation_policy?: string | null;
@@ -215,6 +221,7 @@ function rowToGame(r: DbRow): Game {
     orgId: r.org_id ?? undefined,
     orgOfficial: r.org_id ? !!r.org_official : undefined,
     seriesId: r.series_id ?? null,
+    repeat: repeatOf(r.rrule),
     endsAt: r.ends_at ?? null,
     allDay: !!r.all_day,
     timezone: r.timezone ?? null,
@@ -367,9 +374,14 @@ function ensureRealtime() {
 }
 
 // Re-hydrate when auth state changes so newly signed-in users pull DB rows.
+// A SIGNED_IN for the user already loaded (re-emitted whenever any tab opens
+// or becomes visible) changes nothing, so it does not reload.
 if (typeof window !== "undefined") {
-  supabase.auth.onAuthStateChange((event) => {
-    if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
+  let seenIdentity: SeenIdentity = undefined;
+  supabase.auth.onAuthStateChange((event, session) => {
+    const step = trackIdentity(seenIdentity, event, session);
+    seenIdentity = step.seen;
+    if (step.changed) {
       dbHydrated = false;
       dbHydratePromise = null;
       ensureDbHydrated();
@@ -563,6 +575,7 @@ export async function fetchHostedGame(id: string): Promise<Game | null> {
   const game = rowToGame(data as DbRow);
   const exists = cache.some((g) => g.id === game.id);
   cache = exists ? cache.map((g) => (g.id === game.id ? game : g)) : [game, ...cache];
+  dbReadIds.add(game.id);
   emit();
   return game;
 }
@@ -725,7 +738,8 @@ export function useHostedGamesStatus(): HostedGamesLoad {
  * game_participants_sync_count trigger sets to the game's participant rows on
  * every join and leave, and which reaches this store through its hosted_games
  * realtime channel. Undefined until the store has loaded from the database (a
- * copy restored from localStorage may be stale) and for a game it does not
+ * copy restored from localStorage may be stale), unless this game itself was
+ * read from the database by id (fetchHostedGame), and for a game it does not
  * hold, so callers keep the count on the game object they already have.
  *
  * Reading it never starts a load or a channel; pages that list games already
@@ -735,7 +749,7 @@ export function useHostedGameJoined(gameId: string | undefined): number | undefi
   const joined = useSyncExternalStore(
     subscribe,
     () => {
-      if (!gameId || !dbLoadedOnce) return -1;
+      if (!gameId || (!dbLoadedOnce && !dbReadIds.has(gameId))) return -1;
       const game = cache.find((g) => g.id === gameId);
       return typeof game?.joined === "number" ? game.joined : -1;
     },

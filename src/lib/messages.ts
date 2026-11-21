@@ -1,5 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
-import { ATTACHMENT_ACCEPT } from "@/lib/message-attachment-validation";
+import { getCurrentUserId } from "@/lib/current-user-id";
+import {
+  ATTACHMENT_ACCEPT,
+  ATTACHMENT_TOO_LARGE_MESSAGE,
+  ATTACHMENT_TYPE_MESSAGE,
+  MAX_ATTACHMENT_BYTES,
+} from "@/lib/message-attachment-validation";
 import { finalizeMessageAttachment } from "@/lib/message-attachments.functions";
 import { createNotification } from "@/lib/notifications";
 
@@ -346,21 +352,6 @@ export async function listMessages(convId: string): Promise<Message[]> {
 }
 
 /**
- * The signed-in user's id, read from the session the client already holds.
- *
- * `auth.getUser()` asks the auth server on every call, which put a network
- * round trip in front of both the upload and the send. The id only builds a
- * storage path and a sender_id, and the server checks both against the
- * verified token (the storage insert policy compares the folder with
- * auth.uid(); the messages policy requires sender_id = auth.uid()), so a stale
- * local value can make a request fail but never succeed as someone else.
- */
-async function currentUserId(): Promise<string | null> {
-  const { data } = await supabase.auth.getSession();
-  return data.session?.user?.id ?? null;
-}
-
-/**
  * Combine messages already on screen with a fresh copy from the server, by id.
  *
  * The thread hears about new messages two ways — a realtime event and a fetch
@@ -389,16 +380,12 @@ export async function uploadMessageAttachment(
   file: File,
   opts: UploadOptions = {},
 ): Promise<Attachment> {
-  const uid = await currentUserId();
+  const uid = await getCurrentUserId();
   if (!uid) throw new Error("Sign in to send attachments.");
-  const MAX = 20 * 1024 * 1024;
-  if (file.size > MAX) throw new Error("Attachment too large (max 20MB).");
-  // Early, friendly refusal. The server decides from the file's real bytes.
-  if (!ATTACHMENT_ACCEPT.split(",").includes(file.type)) {
-    throw new Error(
-      "That file type is not allowed. Send a photo (JPG, PNG, WEBP), a video (MP4, MOV, WEBM) or a PDF.",
-    );
-  }
+  // Early, friendly refusals with the shared sentences, which the send-error display passes on as they are
+  // (ATTACHMENT_REFUSAL_MESSAGES). The server decides from the file's real bytes.
+  if (file.size > MAX_ATTACHMENT_BYTES) throw new Error(ATTACHMENT_TOO_LARGE_MESSAGE);
+  if (!ATTACHMENT_ACCEPT.split(",").includes(file.type)) throw new Error(ATTACHMENT_TYPE_MESSAGE);
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
   const path = `${convId}/${uid}/${Date.now()}-${safeName}`;
   const contentType = file.type || "application/octet-stream";
@@ -471,7 +458,7 @@ export async function sendMessage(
   attachment?: Attachment | null,
   opts?: { replyToId?: string | null },
 ): Promise<Message | null> {
-  const me = await currentUserId();
+  const me = await getCurrentUserId();
   if (!me) throw new Error("Sign in to send messages.");
   const trimmed = (body ?? "").trim();
   if (!trimmed && !attachment) return null;

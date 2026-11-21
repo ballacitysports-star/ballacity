@@ -3,7 +3,12 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { assertModerator } from "@/lib/moderation.server";
 import { getAdmin, writeAudit } from "@/lib/superadmin.server";
-import { MAX_FEATURED_ORGS, canFeatureAnother } from "@/lib/featured-orgs";
+import {
+  FACILITY_NOT_FOUND_MESSAGE,
+  FEATURED_LIMIT_MESSAGE,
+  MAX_FEATURED_ORGS,
+  canFeatureAnother,
+} from "@/lib/featured-orgs";
 import {
   UNCLAIMED_LISTING_INPUT,
   createUnclaimedListingRecord,
@@ -330,7 +335,7 @@ export const setOrgFeatured = createServerFn({ method: "POST" })
       .eq("id", data.orgId)
       .maybeSingle();
     if (orgErr) throw new Error(orgErr.message);
-    if (!org) throw new Error("Facility not found.");
+    if (!org) throw new Error(FACILITY_NOT_FOUND_MESSAGE);
     if (!!org.featured_at === data.featured) return { ok: true, featuredAt: org.featured_at };
 
     if (data.featured) {
@@ -339,9 +344,7 @@ export const setOrgFeatured = createServerFn({ method: "POST" })
         .select("id", { count: "exact", head: true })
         .not("featured_at", "is", null);
       if (!canFeatureAnother(count ?? 0)) {
-        throw new Error(
-          `You can feature up to ${MAX_FEATURED_ORGS} facilities. Unfeature one first.`,
-        );
+        throw new Error(FEATURED_LIMIT_MESSAGE);
       }
     }
 

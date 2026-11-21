@@ -1,8 +1,15 @@
 import * as React from "react";
 import { toast } from "sonner";
+import { errorCode, userErrorMessage } from "@/lib/user-error";
 import { CalendarClock } from "lucide-react";
 import { useBirthdayCorrectionQueue, useReviewBirthdayCorrection } from "@/lib/birthday-lock";
 import { birthdayToDisplay } from "@/components/profile/ProfileFormPrimitives";
+
+/** Support screen: the readable sentence, with the code for support, never the raw database text (WP 4.0). */
+function withCode(message: string, err: unknown): string {
+  const code = errorCode(err);
+  return code ? `${message} (${code})` : message;
+}
 
 /**
  * Support review queue for locked-birthday corrections. Approving is the only
@@ -18,14 +25,12 @@ export function BirthdayCorrectionQueue() {
       await review.mutateAsync({ id, approve, notes: notes[id] ?? "" });
       toast.success(approve ? "Date of birth corrected." : "Request declined.");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not save that decision.");
+      toast.error(withCode(userErrorMessage(e, "Couldn't save that decision."), e));
     }
   };
 
   const errorMessage = error
-    ? error instanceof Error
-      ? error.message
-      : "Could not load birthday corrections."
+    ? withCode(userErrorMessage(error, "Couldn't load birthday corrections."), error)
     : null;
 
   return (

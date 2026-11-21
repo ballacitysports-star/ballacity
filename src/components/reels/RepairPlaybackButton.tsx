@@ -11,6 +11,10 @@ import {
 import { setReelPlaybackPath } from "@/lib/reels.functions";
 import { finalizeVideoUpload } from "@/lib/media-uploads.functions";
 import { buildMediaMeta, probeVideo } from "@/lib/video-metadata";
+import { userErrorMessage } from "@/lib/user-error";
+
+/** A failure this button words itself, so its sentence shows as it is; anything else never shows raw (WP 4.0). */
+class RepairPlaybackError extends Error {}
 
 /**
  * Owner-only repair for reels whose source clip can't be decoded everywhere
@@ -50,12 +54,14 @@ export function RepairPlaybackButton({
     const toastId = toast.loading("Preparing this clip for iPhone & Safari… 0%");
     try {
       const { data, error } = await supabase.storage.from("highlight-videos").download(videoPath);
-      if (error || !data) throw new Error("Could not read the original clip");
+      if (error || !data) throw new RepairPlaybackError("Could not read the original clip");
       const file = new File([data], videoPath.split("/").pop() || "clip.mp4", {
         type: data.type || "video/mp4",
       });
       if (file.size > MAX_TRANSCODE_BYTES) {
-        throw new Error("This clip is too large to convert in the browser (over 200 MB)");
+        throw new RepairPlaybackError(
+          "This clip is too large to convert in the browser (over 200 MB)",
+        );
       }
       // Separates "the converter is down" from "this clip beat this device".
       // Without it the fallback below sends people off to re-encode on a
@@ -69,7 +75,8 @@ export function RepairPlaybackButton({
           { id: toastId },
         ),
       );
-      if (!converted) throw new Error("This clip couldn't be converted on this device");
+      if (!converted)
+        throw new RepairPlaybackError("This clip couldn't be converted on this device");
       const path = `${videoPath}.h264.mp4`;
       const { error: upErr } = await supabase.storage
         .from("highlight-videos")
@@ -100,7 +107,9 @@ export function RepairPlaybackButton({
       const down = e instanceof ConverterUnavailableError;
       const message = down
         ? "Video conversion is temporarily unavailable"
-        : (e?.message ?? "Could not fix playback for this reel");
+        : e instanceof RepairPlaybackError
+          ? e.message
+          : userErrorMessage(e, "Couldn't fix playback for this reel. Please try again.");
       toast.error(message, { id: toastId });
       setOutage(down);
       setFailed(message);

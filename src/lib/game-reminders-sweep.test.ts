@@ -549,6 +549,35 @@ describe("sendDueGameReminders: an approved request on a free game is a place (P
     expect(pushes().map((p) => p.userId)).toEqual(["kid2", "kid3"]);
   });
 
+  it("a player who has turned 18 needs no guardian's approval, whatever their old link still says (20261125200000)", async () => {
+    const reminders = ["kid", "grown"].map((u) => rem(`r-${u}`, u, "g1", [120]));
+    const { admin, notifications } = fakeAdmin(reminders, [game("g1", 100)], {
+      roster: [],
+      requests: [approved("g1", "kid"), approved("g1", "grown")],
+      // Both links still say active; the database rule leaves out the one whose player is 18.
+      guardianLinks: [
+        { child_user_id: "kid", status: "active" },
+        { child_user_id: "grown", status: "active" },
+      ],
+    });
+    (admin as unknown as { rpc: unknown }).rpc = async (
+      fn: string,
+      args: { _children: string[] },
+    ) => ({
+      data:
+        fn === "guardian_links_in_force"
+          ? args._children
+              .filter((c) => c === "kid")
+              .map((c) => ({ parent_user_id: "mom", child_user_id: c, verified_at: null }))
+          : null,
+      error: null,
+    });
+    await sendDueGameReminders(admin, { now: NOW });
+    expect(notifications.map((n) => n.user_id)).toEqual(["kid", "grown"]);
+    // kid still waits on a guardian (in-app only); grown holds a place (pushed)
+    expect(pushes().map((p) => p.userId)).toEqual(["grown"]);
+  });
+
   it("takes the payee as the database does: every private_sec.game_payee returns the game's host", () => {
     // The sweep reads the payee from hosted_games.host_id with the games, not with one
     // game_payee_id call per game, so a migration that changes who the payee is (a minor host's
