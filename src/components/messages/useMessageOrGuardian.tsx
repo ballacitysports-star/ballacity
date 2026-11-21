@@ -7,7 +7,9 @@ import {
   describeMessagingError,
   isMinorMessagingBlock,
   parseMinorMessagingBlock,
+  type MessagingRecipient,
 } from "@/lib/minor-messaging";
+import { errorText } from "@/lib/user-error";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,13 +21,25 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+/** getOrCreateDirectConversation's own sentence when the session is gone; shown as it is (WP 4.0). */
+const SIGN_IN_TO_MESSAGE = "Sign in to send messages.";
+
+/** describeMessagingError (never raw text), keeping our own sign-in sentence. */
+function messagingErrorMessage(e: unknown, fallback?: string, to?: MessagingRecipient): string {
+  return errorText(e) === SIGN_IN_TO_MESSAGE
+    ? SIGN_IN_TO_MESSAGE
+    : describeMessagingError(e, fallback, to);
+}
+
 type Blocked = { childId: string; childName: string; guardianId: string | null; reason: string };
 
 /**
- * Opens a DM with a player; when the database refuses because the player is a
- * minor, offers to message their guardian instead. The guardian is only
- * resolvable when they have authorised contact (public_minor_guardian), so a
- * guardian's identity is never revealed without their opt-in.
+ * Opens a DM with a player; when the database refuses because of the player's
+ * account, offers to message their guardian instead. The refusal never says
+ * why (it is the same for a minor's rules and an adult's own settings), and
+ * the guardian is only resolvable when they have authorised contact
+ * (public_minor_guardian), so neither the player's age nor a guardian's
+ * identity is revealed without that opt-in.
  */
 export function useMessageOrGuardian() {
   const navigate = useNavigate();
@@ -41,7 +55,7 @@ export function useMessageOrGuardian() {
       // about *their* account. When it is the viewer's own restriction, say
       // so and stop.
       if (!isMinorMessagingBlock(e) || parseMinorMessagingBlock(e)?.side === "self") {
-        toast.error(describeMessagingError(e));
+        toast.error(messagingErrorMessage(e));
         return;
       }
       const { data } = await supabase.rpc("public_minor_guardian", { _child: userId });
@@ -67,7 +81,9 @@ export function useMessageOrGuardian() {
       setBlocked(null);
       navigate({ to: "/messages/$conversationId", params: { conversationId: convoId } });
     } catch (e) {
-      toast.error(describeMessagingError(e, "Couldn't contact the guardian.", "guardian"));
+      toast.error(
+        messagingErrorMessage(e, "Couldn't contact the guardian. Please try again.", "guardian"),
+      );
     } finally {
       setBusy(false);
     }
@@ -79,10 +95,10 @@ export function useMessageOrGuardian() {
         <AlertDialogHeader>
           <AlertDialogTitle>Direct messaging is restricted</AlertDialogTitle>
           <AlertDialogDescription>
-            {blocked?.reason}{" "}
+            {blocked?.reason}
             {blocked?.guardianId
-              ? `You can message ${blocked.childName}'s parent or guardian instead.`
-              : `${blocked?.childName}'s guardian hasn't enabled contact requests yet.`}
+              ? ` You can message ${blocked.childName}'s parent or guardian instead.`
+              : null}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

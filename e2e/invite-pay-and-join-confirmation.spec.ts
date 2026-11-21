@@ -1,4 +1,7 @@
+import { openAlertsAndTap } from "./helpers/invite-alerts";
 import { test, expect, type Page, type Route } from "@playwright/test";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
+import { answerSessionChecks } from "./helpers/signed-in";
 
 /**
  * E2E: end-to-end Pay & join flow starting from an invite notification.
@@ -7,8 +10,10 @@ import { test, expect, type Page, type Route } from "@playwright/test";
  *   1. Seed a `game_invite` notification for the signed-in user.
  *   2. Tap it in /notifications → lands on /games/$gameId with invite=1 & from preserved.
  *   3. Click the paid CTA → routes to /games/$gameId/pay with the same invite params.
- *   4. Pick a payment method and click "I have paid" (submit proof without a file).
- *   5. Assert the confirmation state renders ("Pending verification") AND the URL
+ *   4. The host's only payment method (Venmo) opens directly; accept the refund
+ *      terms and click "I have paid" (submit proof without a file).
+ *   5. Assert the confirmation state renders (payment status "Awaiting host
+ *      confirmation") AND the URL
  *      still carries invite=1 and from=<hostId>.
  *
  * game_payment_settings / host_payment_methods / payment_submissions are mocked
@@ -31,6 +36,11 @@ const METHOD_ID = "77777777-8888-9999-aaaa-bbbbbbbbbbbb";
 const ENTRY_FEE = 15;
 
 async function restoreSession(page: Page) {
+  // Answer the session checks every load starts (GET /auth/v1/user and the root gate's
+  // age, onboarding and child-status server functions) from the injected session, as the
+  // pay specs do. They are not what this spec is about, and each signed-in load
+  // otherwise sends the shared sandbox 8-13 requests for them. See helpers/signed-in.ts.
+  await answerSessionChecks(page);
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(
     ([key, value]) => window.localStorage.setItem(key!, value!),
@@ -164,6 +174,9 @@ test("invite → Pay & join → confirmation with invite params preserved", asyn
     },
   );
 
+  // Not a spec about "Before you join": the viewer has acknowledged it, so the pay page (which asks it
+  // before any payment option, docs/paid-path-gates.md section 7) goes straight to the options.
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
 
   // Seed the invite notification for the viewer.
@@ -184,10 +197,7 @@ test("invite → Pay & join → confirmation with invite params preserved", asyn
   expect(insertRes.ok, `seed insert failed: ${(insertRes as any).message ?? ""}`).toBe(true);
 
   // Open Alerts and tap the invite.
-  await page.goto("/notifications", { waitUntil: "domcontentloaded" });
-  const item = page.getByText(notifTitle, { exact: false }).first();
-  await expect(item).toBeVisible({ timeout: 10_000 });
-  await item.click();
+  await openAlertsAndTap(page, notifTitle);
 
   // Landing on game detail with both invite params preserved.
   await page.waitForURL(
@@ -199,7 +209,8 @@ test("invite → Pay & join → confirmation with invite params preserved", asyn
   );
 
   // Paid CTA → /pay with invite params preserved.
-  const payCta = page.getByRole("button", { name: /pay host/i }).first();
+  // On a paid, no-approval game the "Pay Host · $X" CTA is a link to the pay page.
+  const payCta = page.getByRole("link", { name: /pay host/i }).first();
   await expect(payCta).toBeVisible({ timeout: 10_000 });
   await payCta.click();
 
@@ -211,10 +222,13 @@ test("invite → Pay & join → confirmation with invite params preserved", asyn
     { timeout: 10_000 },
   );
 
-  // Pick the mocked payment method.
-  const methodBtn = page.getByRole("button", { name: /venmo/i }).first();
-  await expect(methodBtn).toBeVisible({ timeout: 10_000 });
-  await methodBtn.click();
+  // The host has a single payment method, so the pay page opens it straight
+  // away instead of showing a picker. (A /venmo/ button here is now "Open Venmo
+  // in a new tab to pay the host", which leaves for venmo.com.) Check the
+  // mocked Venmo method is the one shown, then use its proof form.
+  await expect(page.getByText("@fakehost", { exact: true }).first()).toBeVisible({
+    timeout: 10_000,
+  });
 
   // Submit proof without a file — no upload path, just an insert.
   const submitBtn = page.getByRole("button", { name: /i have paid/i });
@@ -237,9 +251,13 @@ test("invite → Pay & join → confirmation with invite params preserved", asyn
   expect(row.player_id).toBe(userId);
   expect(row.payment_method_id).toBe(METHOD_ID);
 
-  // Confirmation state renders (pending verification submission list item).
-  const pending = page.getByText(/pending verification/i).first();
-  await expect(pending).toBeVisible({ timeout: 10_000 });
+  // Confirmation state renders: the payment status timeline for the pending
+  // submission, waiting on the host ("Awaiting host confirmation", formerly
+  // "Pending verification").
+  const timeline = page.getByTestId("payment-status-timeline");
+  await expect(timeline).toBeVisible({ timeout: 10_000 });
+  await expect(timeline).toHaveAttribute("data-status", "pending");
+  await expect(timeline).toContainText(/awaiting host confirmation/i);
 
   // URL STILL preserves invite=1 and from=<hostId> at the confirmation step.
   const finalUrl = new URL(page.url());

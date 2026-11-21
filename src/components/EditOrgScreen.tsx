@@ -57,6 +57,7 @@ import { SaveStatus } from "@/components/SaveStatus";
 import { CANCEL_CUTOFF_PRESETS, normalizeCutoff } from "@/lib/cancel-window";
 import { RefundPolicyFields } from "@/components/RefundPolicyFields";
 import { normalizeRefundPolicy, type RefundPolicy } from "@/lib/refund-policy";
+import { userErrorMessage } from "@/lib/user-error";
 
 const ACCENTS = [
   { name: "Lime", hex: "#a3ff12" },
@@ -404,7 +405,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
         await queryClient.invalidateQueries({ queryKey: ["trainer-org-membership", org.id] });
       }
     } catch (e) {
-      toast.message(e instanceof Error ? e.message : "Couldn't update organization link.");
+      toast.error(userErrorMessage(e, "Couldn't update the organization link. Please try again."));
     }
   }
 
@@ -568,7 +569,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
         nav({ to: "/teams/$teamId", params: { teamId: org.id } });
       }
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to save changes.");
+      toast.error(userErrorMessage(e, "Couldn't save your changes. Please try again."));
     }
   }
 
@@ -629,7 +630,14 @@ export function EditOrgScreen({ org }: { org: Org }) {
       await deleteOrg(org.id);
       nav({ to: kind === "coach" ? "/trainers" : "/teams" });
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to delete team.");
+      toast.error(
+        userErrorMessage(
+          e,
+          kind === "coach"
+            ? "Couldn't delete this trainer profile. Please try again."
+            : "Couldn't delete this team. Please try again.",
+        ),
+      );
     }
   }
   function toggleSport(s: Sport) {
@@ -914,9 +922,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
                 ) : orgChoice.mode === "new" && orgChoice.name ? (
                   <div className="flex items-center justify-between rounded-2xl border border-coral/40 bg-coral/10 px-3 py-2.5">
                     <div className="min-w-0">
-                      <div className="micro-label text-coral">
-                        You'll own this new org
-                      </div>
+                      <div className="micro-label text-coral">You'll own this new org</div>
                       <div className="truncate text-sm font-bold">{orgChoice.name}</div>
                     </div>
                     <button
@@ -1039,9 +1045,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
-                      <div className="micro-label text-muted-foreground">
-                        Min
-                      </div>
+                      <div className="micro-label text-muted-foreground">Min</div>
                       <select
                         value={skillMin}
                         onChange={(e) => {
@@ -1059,9 +1063,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
                       </select>
                     </label>
                     <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
-                      <div className="micro-label text-muted-foreground">
-                        Max
-                      </div>
+                      <div className="micro-label text-muted-foreground">Max</div>
                       <select
                         value={skillMax}
                         onChange={(e) => {
@@ -1415,9 +1417,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
               <Section title="Record (optional)">
                 <div className="grid grid-cols-2 gap-2">
                   <label className="rounded-2xl border border-border bg-surface px-4 py-3">
-                    <div className="micro-label text-muted-foreground">
-                      Wins
-                    </div>
+                    <div className="micro-label text-muted-foreground">Wins</div>
                     <input
                       type="number"
                       min={0}
@@ -1427,9 +1427,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
                     />
                   </label>
                   <label className="rounded-2xl border border-border bg-surface px-4 py-3">
-                    <div className="micro-label text-muted-foreground">
-                      Losses
-                    </div>
+                    <div className="micro-label text-muted-foreground">Losses</div>
                     <input
                       type="number"
                       min={0}

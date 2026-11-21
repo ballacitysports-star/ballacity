@@ -44,6 +44,10 @@ import {
   type FollowPage,
   type FollowUser,
 } from "@/lib/follows";
+import { errorText, userErrorMessage } from "@/lib/user-error";
+
+/** followUser and unfollowUser's own sentence when the session is gone; shown as it is (WP 4.0). */
+const SIGN_IN_TO_FOLLOW = /^Sign in to (?:un)?follow$/;
 
 type Props = {
   open: boolean;
@@ -248,7 +252,13 @@ function FollowRow({
     },
     onError: (e: any) => {
       setOptimisticFollows(isFollowing);
-      toast.error(e?.message ?? "Something went wrong");
+      // followUser already throws followErrorMessage's sentence; unfollowUser throws the database error itself.
+      const text = errorText(e) ?? "";
+      toast.error(
+        SIGN_IN_TO_FOLLOW.test(text)
+          ? text
+          : userErrorMessage(e, "Couldn't update this follow. Please try again."),
+      );
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: listKey });
@@ -329,7 +339,7 @@ export function UserSafetyMenu({
       await block.toggle();
       toast.success(block.blocked ? `${displayName} unblocked` : `${displayName} blocked`);
     } catch (e: any) {
-      toast.error(e?.message ?? "Couldn't update block");
+      toast.error(userErrorMessage(e, "Couldn't update the block. Please try again."));
     } finally {
       setConfirmBlock(false);
     }
@@ -388,7 +398,7 @@ export function UserSafetyMenu({
                 e.preventDefault();
                 void handleBlockConfirmed();
               }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive-strong text-destructive-foreground hover:bg-destructive-strong/90"
             >
               Block
             </AlertDialogAction>

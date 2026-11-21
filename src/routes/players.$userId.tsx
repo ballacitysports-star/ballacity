@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate, Navigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Navigate } from "@tanstack/react-router";
 import { BackButton } from "@/components/layout/BackButton";
 import { useMessageOrGuardian } from "@/components/messages/useMessageOrGuardian";
 import { pageHead, ogImageUrl } from "@/lib/seo";
@@ -6,7 +6,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useReelRealtime } from "@/hooks/use-reel-realtime";
 
 import {
-  ArrowLeft,
   MessageCircle,
   Loader2,
   Calendar,
@@ -14,14 +13,13 @@ import {
   Trophy,
   UserPlus,
   UserCheck,
-  Building2,
-  ShieldCheck,
   Share2,
   Clapperboard,
 } from "lucide-react";
 import { usePublicPrivacyFlags } from "@/lib/privacy";
 import { useFollow } from "@/lib/follows";
 import { toast } from "sonner";
+import { userErrorMessage } from "@/lib/user-error";
 import { formatAvailabilityWindow } from "@/lib/availability-timeslots";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -34,6 +32,8 @@ import type { PlayerAvailability } from "@/lib/availability";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { SkillRatingCard } from "@/components/SkillRatingCard";
 import { PlayerPassportSection } from "@/components/players/PlayerPassportSection";
+import { PlayerOrgsSection } from "@/components/players/PlayerOrgsSection";
+import { ProfileUnavailable } from "@/components/players/ProfileUnavailable";
 import { FollowSheet, UserSafetyMenu } from "@/components/FollowSheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ReputationBadge } from "@/components/ReputationBadge";
@@ -59,6 +59,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { pluralize } from "@/lib/pluralize";
 
 export const Route = createFileRoute("/players/$userId")({
   head: ({ params }) => ({
@@ -246,7 +247,8 @@ function PlayerProfilePage() {
         .maybeSingle(),
     ]).then(([prof, avail]) => {
       if (cancelled) return;
-      if (prof.error) toast.error(prof.error.message);
+      if (prof.error)
+        toast.error(userErrorMessage(prof.error, "Couldn't load this profile. Please try again."));
       setProfile((prof.data as ProfileRow) ?? null);
       (supabase.rpc as any)("profile_ages", { _ids: [userId] }).then(
         ({ data }: { data: { age: number | null }[] | null }) => {
@@ -288,22 +290,10 @@ function PlayerProfilePage() {
     );
   }
 
-  if (!profile) {
-    return (
-      <div className="page-shell-content pt-6 pb-24">
-        <Link
-          to="/players"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground mb-4"
-        >
-          <ArrowLeft className="h-4 w-4" /> Back to players
-        </Link>
-        <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-8 text-center">
-          <p className="font-semibold">Player not found</p>
-          <p className="text-sm text-muted-foreground mt-1">This profile may have been removed.</p>
-        </div>
-      </div>
-    );
-  }
+  // A missing account and one hidden by its visibility setting (minors default to
+  // private) both come back as no row under RLS; both get the same screen, so it
+  // never says which.
+  if (!profile) return <ProfileUnavailable kind="profile" />;
 
   const initials =
     overrides.avatar || profile.avatar_initials || profile.display_name.slice(0, 2).toUpperCase();
@@ -356,7 +346,7 @@ function PlayerProfilePage() {
             onClick={() => setFollowList("followers")}
             className="underline-offset-2 hover:underline"
           >
-            {follow.followers} followers
+            {pluralize(follow.followers, "follower")}
           </button>,
           <button
             key="following"
@@ -704,84 +694,4 @@ function formatBirthday(iso: string): string {
   const d = new Date(iso + "T00:00:00");
   if (isNaN(d.getTime())) return iso;
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
-
-type PlayerOrgRow = {
-  id: string;
-  org_id: string;
-  role: string;
-  org: {
-    id: string;
-    name: string;
-    handle: string | null;
-    avatar: string | null;
-    city: string | null;
-    verified: boolean | null;
-  } | null;
-};
-
-function PlayerOrgsSection({ userId }: { userId: string }) {
-  const [rows, setRows] = useState<PlayerOrgRow[]>([]);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    const fetchRows = async () => {
-      const { data } = await supabase
-        .from("trainer_org_members")
-        .select("id, org_id, role, org:org_id(id,name,handle,avatar,city,verified)")
-        .eq("user_id", userId);
-      if (cancelled) return;
-      setRows(((data as unknown as PlayerOrgRow[]) ?? []).filter((r) => r.org));
-      setLoaded(true);
-    };
-    fetchRows();
-
-    const ch = supabase
-      .channel(`player-orgs:${userId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "trainer_org_members",
-          filter: `user_id=eq.${userId}`,
-        },
-        () => {
-          fetchRows();
-        },
-      )
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "trainer_orgs" }, () => {
-        fetchRows();
-      })
-      .subscribe();
-
-    return () => {
-      cancelled = true;
-      supabase.removeChannel(ch);
-    };
-  }, [userId]);
-
-  if (!loaded || rows.length === 0) return null;
-
-  return (
-    <div className="mt-3 flex flex-wrap gap-1.5">
-      {rows.map((r) => {
-        const o = r.org!;
-        return (
-          <Link
-            key={r.id}
-            to="/orgs/$orgId"
-            params={{ orgId: o.id }}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-surface px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:border-lime/60 hover:text-lime"
-          >
-            <Building2 className="h-3.5 w-3.5" />
-            <span className="truncate max-w-[160px]">{o.name}</span>
-            {o.verified && <ShieldCheck className="h-3 w-3 text-lime" />}
-            <span className="micro-label text-muted-foreground">{r.role}</span>
-          </Link>
-        );
-      })}
-    </div>
-  );
 }

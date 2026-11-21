@@ -37,3 +37,10 @@ export function spotsOpenLabel(spotsLeft: number, opts: { short?: boolean } = {}
   if (opts.short) return `${spotsLeft} open`;
   return `${spotsLeft} ${spotsLeft === 1 ? "spot" : "spots"} open`;
 }
+
+/** Whether any of the viewer's payments for a game is in (pending, verified or disputed). */
+export function hasPaymentIn(subs: readonly { status: string }[]): boolean {
+  return subs.some(
+    (s) => s.status === "pending" || s.status === "verified" || s.status === "disputed",
+  );
+}

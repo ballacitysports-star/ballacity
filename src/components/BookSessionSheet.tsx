@@ -50,11 +50,32 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useAuthSearchHere } from "@/lib/auth-return";
+import { errorText, userErrorMessage } from "@/lib/user-error";
+
+const TRAINER_UNAVAILABLE = "Trainer profile not available. Try again shortly.";
+
+/**
+ * The sentences this sheet and trainer-requests.ts throw themselves (before or instead of a database error). They
+ * say what to do, so they show as they are; anything else goes through userErrorMessage (WP 4.0).
+ */
+const OWN_REQUEST_ERRORS: ReadonlySet<string> = new Set([
+  TRAINER_UNAVAILABLE,
+  "Please sign in to request a session.",
+  "You can't request a session from yourself.",
+  "This time just got booked — please pick another slot.",
+  "You already have a pending request with this trainer.",
+  "This session can't be cancelled anymore.",
+]);
+
+function requestErrorMessage(e: unknown, fallback: string): string {
+  const text = errorText(e);
+  return text && OWN_REQUEST_ERRORS.has(text) ? text : userErrorMessage(e, fallback);
+}
 
 export type BookPrefill = {
   date?: string;
   startTime?: string;
-  venue?: string | null;
   duration?: "30" | "60" | "90";
 };
 
@@ -91,6 +112,7 @@ export function BookSessionSheet({
 }) {
   const nav = useNavigate();
   const { user } = useAuth();
+  const authSearch = useAuthSearchHere();
   const sessionTypes = useMemo(
     () => org.sessionTypes ?? ["1:1 Coaching", "Group Session", "Assessment"],
     [org.sessionTypes],
@@ -257,7 +279,7 @@ export function BookSessionSheet({
   const submit = async () => {
     if (!user) {
       toast("Sign in to request a session");
-      nav({ to: "/auth" });
+      nav({ to: "/auth", search: authSearch });
       return;
     }
     if (startTime && !date) {
@@ -268,7 +290,7 @@ export function BookSessionSheet({
     setSubmitting(true);
     try {
       const ownerId = await ensureOrgOwnerId(org.id);
-      if (!ownerId) throw new Error("Trainer profile not available. Try again shortly.");
+      if (!ownerId) throw new Error(TRAINER_UNAVAILABLE);
       const row = await createTrainerSessionRequest({
         trainerId: org.id,
         toUserId: ownerId,
@@ -282,8 +304,8 @@ export function BookSessionSheet({
       setMode("sent");
       toast.success(`Request sent to ${org.name}`);
       onStatusChange?.();
-    } catch (e: any) {
-      toast.error(e?.message ?? "Could not send request");
+    } catch (e: unknown) {
+      toast.error(requestErrorMessage(e, "Couldn't send your request. Please try again."));
     } finally {
       setSubmitting(false);
     }
@@ -300,8 +322,8 @@ export function BookSessionSheet({
       onStatusChange?.();
       onOpenChange(false);
       setTimeout(reset, 250);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Could not cancel request");
+    } catch (e: unknown) {
+      toast.error(requestErrorMessage(e, "Couldn't cancel your request. Please try again."));
     } finally {
       setSubmitting(false);
     }

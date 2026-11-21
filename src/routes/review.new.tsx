@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { Sparkles } from "lucide-react";
 import { suggestReviewText } from "@/lib/reviews.functions";
 import { submitSkillVote } from "@/lib/skill.functions";
+import { errorText, userErrorMessage } from "@/lib/user-error";
 
 type Search = {
   revieweeId?: string;
@@ -28,6 +29,28 @@ type Search = {
 
 const isKind = (v: unknown): v is ReviewerKind =>
   v === "player" || v === "trainer" || v === "team" || v === "host";
+
+/**
+ * The sentences submitReview (reviews.functions.ts, review-age.server.ts) and useSubmitReview throw themselves: they
+ * tell the reviewer what happened, so they show as they are. Anything else goes through userErrorMessage, never raw
+ * database text (WP 4.0).
+ */
+const OWN_REVIEW_ERRORS: ReadonlySet<string> = new Set([
+  "Sign in to write a review.",
+  "Pick a star rating",
+  "Write at least a sentence.",
+  "Reviews are available to adults only for now.",
+  "Reviews are not available for this person.",
+  "That review can't be posted because it may break our community guidelines. Please keep feedback respectful and about the game.",
+  "Your review was saved but could not be published yet.",
+]);
+
+function reviewErrorMessage(e: unknown): string {
+  const text = errorText(e);
+  return text && OWN_REVIEW_ERRORS.has(text)
+    ? text
+    : userErrorMessage(e, "Couldn't post your review. Please try again.");
+}
 
 export const Route = createFileRoute("/review/new")({
   head: () =>
@@ -94,7 +117,8 @@ function ReviewNew() {
       });
       setBody(res.draft);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't draft that right now");
+      // The AI errors are catalog sentences and pass through; "Tap a few things" can't happen (the button waits for one).
+      toast.error(userErrorMessage(e, "Couldn't draft that right now. Please try again."));
     } finally {
       setDrafting(false);
     }
@@ -129,7 +153,7 @@ function ReviewNew() {
           toast.success(isPrivate ? "Private feedback sent" : "Review posted");
           goBack();
         },
-        onError: (e) => toast.error(e instanceof Error ? e.message : "Couldn't post review"),
+        onError: (e) => toast.error(reviewErrorMessage(e)),
       },
     );
   };

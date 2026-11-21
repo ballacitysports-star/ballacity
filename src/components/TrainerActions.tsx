@@ -10,6 +10,7 @@ import {
   subscribeToMyTrainerRequests,
   type TrainerSessionRequest,
 } from "@/lib/trainer-requests";
+import { useAuthSearchHere } from "@/lib/auth-return";
 
 function useMyTrainerRequest(trainerId: string) {
   const { user } = useAuth();
@@ -36,28 +37,17 @@ function useMyTrainerRequest(trainerId: string) {
   return { row, refresh };
 }
 
-export function TrainerActions({
-  org,
-  defaultVenue = null,
-}: {
-  org: Org;
-  defaultVenue?: string | null;
-}) {
+export function TrainerActions({ org }: { org: Org }) {
   const nav = useNavigate();
   const { user } = useAuth();
+  const authSearch = useAuthSearchHere();
   const [bookOpen, setBookOpen] = useState(false);
   const { row, refresh } = useMyTrainerRequest(org.id);
-  const venueOffered =
-    !!defaultVenue &&
-    (org.venueAddresses ?? []).some(
-      (a) => a.trim().toLowerCase() === defaultVenue.trim().toLowerCase(),
-    );
-  const prefill = venueOffered ? { venue: defaultVenue } : null;
 
   const requireAuth = () => {
     if (!user) {
       toast("Sign in to continue");
-      nav({ to: "/auth" });
+      nav({ to: "/auth", search: authSearch });
       return false;
     }
     return true;
@@ -131,7 +121,6 @@ export function TrainerActions({
         open={bookOpen}
         onOpenChange={setBookOpen}
         onStatusChange={refresh}
-        prefill={prefill}
       />
     </>
   );

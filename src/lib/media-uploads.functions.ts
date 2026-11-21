@@ -1,7 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { MAX_VIDEO_BYTES, sniffVideoContainer } from "@/lib/video-validation";
+import {
+  MAX_VIDEO_BYTES,
+  VIDEO_EMPTY_MESSAGE,
+  VIDEO_NOT_PLAYABLE_MESSAGE,
+  VIDEO_TOO_LARGE_MESSAGE,
+  VIDEO_UPLOAD_MISSING_MESSAGE,
+  sniffVideoContainer,
+} from "@/lib/video-validation";
 import {
   clipLengthProblem,
   mp4DurationSeconds,
@@ -139,7 +146,7 @@ export const finalizeVideoUpload = createServerFn({ method: "POST" })
       .from(VIDEO_BUCKET)
       .list(folder, { search: name, limit: 100 });
     const object = (listed ?? []).find((o: any) => o.name === name);
-    if (!object) throw new Error("Uploaded file could not be found");
+    if (!object) throw new Error(VIDEO_UPLOAD_MISSING_MESSAGE);
 
     const bytes = Number((object as any).metadata?.size ?? 0);
     const reject = async (reason: string) => {
@@ -147,9 +154,9 @@ export const finalizeVideoUpload = createServerFn({ method: "POST" })
       throw new Error(reason);
     };
 
-    if (bytes <= 0) await reject("The file is empty");
+    if (bytes <= 0) await reject(VIDEO_EMPTY_MESSAGE);
     if ((kind === "video" || kind === "source") && bytes > MAX_VIDEO_BYTES) {
-      await reject("Video is too large (max 200 MB)");
+      await reject(VIDEO_TOO_LARGE_MESSAGE);
     }
 
     const isClip = kind === "video" || kind === "source";
@@ -206,7 +213,7 @@ export const finalizeVideoUpload = createServerFn({ method: "POST" })
         );
       }
       const { container, seconds, size } = facts;
-      if (!container) await reject("That file could not be prepared for playback");
+      if (!container) await reject(VIDEO_NOT_PLAYABLE_MESSAGE);
       if (clipLimits) {
         const problem =
           clipLengthProblem(seconds, clipLimits) ?? resolutionProblem(size, clipLimits);

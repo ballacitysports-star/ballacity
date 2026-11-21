@@ -12,6 +12,8 @@ let myClaim: Record<string, unknown> | null = null;
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: { id: "u1" } }) }));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children }: { children: unknown }) => children,
+  useLocation: ({ select }: { select: (l: { href: string }) => unknown }) =>
+    select({ href: "/orgs/o1" }),
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/integrations/supabase/client", () => {

@@ -93,7 +93,7 @@ export function BottomNav() {
         {it.to === "/messages" && inboxUnread > 0 ? (
           <span
             aria-hidden
-            className="absolute right-[22%] top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-coral px-1 text-[10px] font-bold text-white"
+            className="absolute right-[22%] top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-coral-strong px-1 text-[10px] font-bold text-white"
           >
             {inboxUnread > 9 ? "9+" : inboxUnread}
           </span>
@@ -133,7 +133,7 @@ function FamilyBadge() {
       <span className="sr-only">{`, ${pending.total} waiting on you`}</span>
       <span
         aria-hidden
-        className="absolute right-[22%] top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-coral px-1 text-[10px] font-bold text-white"
+        className="absolute right-[22%] top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-coral-strong px-1 text-[10px] font-bold text-white"
       >
         {pending.total > 9 ? "9+" : pending.total}
       </span>

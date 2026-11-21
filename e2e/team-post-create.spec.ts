@@ -44,8 +44,11 @@ async function restoreSession(page: Page) {
     ([k, v]) => window.localStorage.setItem(k!, v!),
     [STORAGE_KEY!, SESSION_JSON!],
   );
-  // Give the app a moment to pick up the injected session before we navigate away.
-  await page.waitForLoadState("networkidle").catch(() => {});
+  // No wait here. The next navigation reads the session from storage; letting "/"
+  // finish loading first only booted the whole app once more against the shared
+  // sandbox (about 28 backend requests plus realtime joins, measured on a local
+  // stub), which none of the assertions below look at. The other seeded specs
+  // already navigate straight on.
 }
 
 test("team-post composer publishes a post end-to-end", async ({ page }) => {

@@ -26,7 +26,7 @@ export function DiscoverCategoryPills({
     <div
       role="group"
       aria-label="Discover category"
-      className="-mx-4 mb-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 scrollbar-hide"
+      className="bleed-x-gutter mb-4 flex snap-x gap-2 overflow-x-auto pb-1 scrollbar-hide"
     >
       {DISCOVER_CATEGORIES.map((c) => {
         const on = value === c.id;
@@ -229,7 +229,7 @@ export function DiscoverResults({
               <button
                 type="button"
                 onClick={() => onSeeAll(s.id)}
-                className="text-xs font-semibold text-lime"
+                className="-mr-2 inline-flex min-h-11 items-center px-2 text-xs font-semibold text-lime"
               >
                 See all
               </button>

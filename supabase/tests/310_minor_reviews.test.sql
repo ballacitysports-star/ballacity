@@ -100,7 +100,9 @@ INSERT INTO public.reviews (id, reviewer_id, kind, reviewee_kind, reviewee_id, r
   (t.id('r-adult-pub'),   t.id('adultrev'), 'player', 'player', t.id('adultsubj')::text,  'Adult',   5, 'Great teammate, always on time.',  false, true, false),
   (t.id('r-team-pub'),    t.id('adultrev'), 'player', 'team',   'tm',                     'Team',    5, 'A well run team with good vibes.', false, true, false),
   (t.id('r-by-teen'),     t.id('teen17'),   'player', 'player', t.id('adultsubj')::text,  'Adult',   4, 'Played well and was friendly.',    false, true, false),
-  (t.id('r-gym-by-teen'), t.id('teen17'),   'player', 'gym',    'some-gym',               'Gym',     4, 'Clean courts and friendly staff.', false, true, false);
+  (t.id('r-gym-by-teen'), t.id('teen17'),   'player', 'gym',    'some-gym',               'Gym',     4, 'Clean courts and friendly staff.', false, true, false),
+  -- backs the adult host summary below: a summary is readable only while a public review of its subject is (20261120100000)
+  (t.id('r-adult-host'),  t.id('adultrev'), 'player', 'host',   t.id('adultsubj')::text,  'Adult',   5, 'Well organised and started on time.', false, true, false);
 INSERT INTO public.review_ai_analysis (review_id, traits, sentiment, mismatch, model) VALUES
   (t.id('r-teen14-pub'), ARRAY['positive'], 0.2, false, 'fixture'),
   (t.id('r-adult-pub'),  ARRAY['positive','onTime'], 0.9, false, 'fixture'),
@@ -196,10 +198,17 @@ SELECT t.eq((SELECT respectful + communicative + fair_play + positive + on_time 
 SELECT t.eq((SELECT games_joined + review_count FROM public.player_activity_stats(t.id('child8'))), 0, 'under-13: zero for a member');
 SELECT t.eq((SELECT games_joined + review_count FROM public.player_activity_stats(t.id('teen17'))), 0, '16-17: zero for a member');
 SELECT t.eq((SELECT games_joined + review_count FROM public.player_activity_stats(t.id('nullcohort'))), 0, 'unknown age: zero for a member');
-SELECT t.eq((SELECT games_joined FROM public.player_activity_stats(t.id('adultsubj'))), 1, 'an adult subject: attendance unchanged for a member');
+-- Since 20261113120000 (SEC-2b) the statistics depend only on who asks: a member gets zeros about an adult too, so zeros say nothing about age.
+SELECT t.eq((SELECT games_joined + review_count FROM public.player_activity_stats(t.id('adultsubj'))), 0, 'an adult subject: zero for a member as well (no age signal)');
+SELECT t.as_user(t.id('adultsubj'));
+SELECT t.eq((SELECT games_joined FROM public.player_activity_stats(t.id('adultsubj'))), 1, 'an adult subject: their own attendance');
 -- Two adult-authored reviews (the historical one and the one written in section 1); the minor-authored one is not counted.
 SELECT t.eq((SELECT review_count FROM public.player_activity_stats(t.id('adultsubj'))), 2, 'an adult subject: counts the adult-authored reviews, not the hidden minor-authored one');
-SELECT t.eq((SELECT positive FROM public.player_trait_counts(t.id('adultsubj'))), 1, 'an adult subject: trait counts still work (adult-authored review only)');
+SELECT t.eq((SELECT positive FROM public.player_trait_counts(t.id('adultsubj'))), 1, 'an adult subject: their own trait counts still work (adult-authored review only)');
+SELECT t.as_user(t.id('stranger'));
+-- Since 20261113120000 (SEC-2b) the trait counts, like the statistics, depend only on who asks.
+SELECT t.eq((SELECT respectful + communicative + fair_play + positive + on_time FROM public.player_trait_counts(t.id('adultsubj'))), 0,
+  'an adult subject: zero trait counts for a member as well (no age signal)');
 SELECT t.as_user(t.id('guardian8'));
 SELECT t.eq((SELECT games_joined + review_count FROM public.player_activity_stats(t.id('teen14'))), 0, 'a guardian of a different child: zero');
 SELECT t.as_user(t.id('teen14'));
@@ -358,7 +367,10 @@ INSERT INTO public.game_participants (game_id, user_id, attended) VALUES ('g-tee
 SET LOCAL session_replication_role = origin;
 SELECT t.as_user(t.id('stranger'));
 SELECT t.eq((SELECT marked + attended + completed_games FROM public.host_attendance_stats(t.id('teen17'))), 0, 'host stats about a 16-17 host, asked by a member: zeros');
-SELECT t.eq((SELECT completed_games FROM public.host_attendance_stats(t.id('adultrev'))), 1, 'an adult host''s stats are unchanged for a member (control)');
+-- adultrev keeps the sign-up default ('private' profile); since 20261113120000 (SEC-2b) a member's numbers come from the host's public,
+-- unhidden games only, and g-rv is one of those.
+SELECT t.eq(private_sec.profile_visibility_of(t.id('adultrev')), 'private', 'fixture: the adult host has the sign-up default, a private profile');
+SELECT t.eq((SELECT completed_games FROM public.host_attendance_stats(t.id('adultrev'))), 1, 'an adult host''s public game still counts for a member (control)');
 SELECT t.as_user(t.id('teen17'));
 SELECT t.eq((SELECT completed_games FROM public.host_attendance_stats(t.id('teen17'))), 1, 'the 16-17 host sees their own');
 SELECT t.as_anon();
@@ -429,7 +441,11 @@ SELECT t.reset();
 -- merely editing other columns cannot clear a flag
 UPDATE public.reputation_insights SET minor_protected = false, summary = 'edited' WHERE reviewee_id = t.id('grad')::text;
 SELECT t.ok((SELECT minor_protected FROM public.reputation_insights WHERE reviewee_id = t.id('grad')::text), 'editing other columns cannot clear the summary flag');
--- a summary regenerated after 18 (the server builds it from unprotected reviews only) is judged at its own time
+-- a summary regenerated after 18 (the server builds it from unprotected reviews only) is judged at its own time; it is backed
+-- by a review written about them as an adult (a summary is readable only while a public review of its subject is)
+INSERT INTO public.reviews (id, reviewer_id, kind, reviewee_kind, reviewee_id, reviewee_name, rating, body)
+  VALUES (t.id('h-about-grad-adult'), t.id('peer31'), 'player', 'player', t.id('grad')::text, 'Grad', 5, 'Written about them after they turned 18.');
+SELECT t.ok(NOT (SELECT minor_protected FROM public.reviews WHERE id = t.id('h-about-grad-adult')), 'fixture: a review about grad as an adult is not flagged');
 UPDATE public.reputation_insights SET summary = 'Regenerated from adult-era reviews.', generated_at = now() WHERE reviewee_id = t.id('grad')::text;
 SELECT t.ok(NOT (SELECT minor_protected FROM public.reputation_insights WHERE reviewee_id = t.id('grad')::text), 'a regenerated summary is not flagged');
 SELECT t.as_user(t.id('stranger'));

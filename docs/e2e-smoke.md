@@ -48,11 +48,11 @@ were added on 2026-11-07, after #298 and #341 fixed them and they passed in thre
 the sandbox (the invite and join specs wait on the payment-settings guard decision).
 
 The managed-child end-to-end test (`managed child, end to end › add, switch in, switch back,
-delete`) was added on 2026-11-10, with the cap raised from 30 to 31 for it (owner decision). #381
-fixed its cleanup: it used to skip the delete silently and leave children behind in the sandbox.
-It now gives each run's child a unique name and deletes every leftover before and after the flow.
-It joins after passing on the sandbox in #381, which merges only once three of its
-sandbox runs have passed it.
+delete`) was added on 2026-11-21, with the cap raised from 30 to 31 for it (owner decision of
+2026-11-10). It had been leaving children behind in the sandbox, which broke later runs. The spec now
+deletes every leftover test child before and after the flow, and switching back no longer lands on the
+child's page. It passed on the sandbox in three consecutive `main` runs on 2026-11-21 (44846750099,
+44853626573 and 44915902392), each in about 22 s with no other failures in the suite.
 
 ## Changing the set
 
@@ -89,4 +89,9 @@ Moderate and minor findings are only printed.
   same change. Putting the old target back fails the spec on every page.
 - The 11 tests join `e2e/smoke-set.json` once they have passed on the sandbox in CI, like every
   other smoke test.
-- Signed-in pages are not covered yet. They need the fixture accounts, so they come next.
+- Signed-in pages: `e2e/a11y-signed-in-pages.spec.ts` signs in once as the adult `host` fixture and
+  runs the same check on `/feed`, `/discover`, `/teams`, `/players`, `/messages`, `/notifications`,
+  `/profile`, `/settings` and `/create`. Its baseline (2026-11-10) found one serious problem on every
+  one of them: white text on the brand coral in the unread badges (4.1:1, under AA's 4.5:1). Those
+  now use `bg-coral-strong` (4.9:1, and 5.3:1 in the light theme), and `src/lib/coral-contrast.test.ts`
+  keeps plain `bg-coral` out from behind white text.

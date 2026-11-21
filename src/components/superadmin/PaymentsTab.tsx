@@ -1,6 +1,7 @@
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { errorCode, userErrorMessage } from "@/lib/user-error";
 import {
   superadminListPayments,
   superadminSetSubmissionStatus,
@@ -29,7 +30,12 @@ export function PaymentsTab() {
       qc.invalidateQueries({ queryKey: ["superadmin-payments"] });
       qc.invalidateQueries({ queryKey: ["superadmin-audit"] });
     },
-    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+    onError: (e) => {
+      const code = errorCode(e);
+      toast.error(
+        `${userErrorMessage(e, "Couldn't update this payment.")}${code ? ` (${code})` : ""}`,
+      );
+    },
   });
 
   if (isLoading || !data) return <div className="p-4 text-sm text-muted-foreground">Loading…</div>;

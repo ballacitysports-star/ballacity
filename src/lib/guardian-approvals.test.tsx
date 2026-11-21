@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { userErrorMessage } from "@/lib/user-error";
 
 /**
  * A minor's game request needs the host's answer and the guardian's, in either
@@ -30,6 +31,26 @@ const rows = {
       created_at: "2026-10-26T11:00:00Z",
       status: "approved",
     },
+    // Task #71: asked on an open game, to the guardian alone.
+    {
+      id: "r-open",
+      game_id: "g-open",
+      player_id: "kid",
+      message: null,
+      created_at: "2026-10-26T12:00:00Z",
+      status: "pending",
+      idempotency_key: "guardian-only:g-open",
+    },
+    // Asked the same way, but the host has since turned approval on: the host answers too.
+    {
+      id: "r-now-queue",
+      game_id: "g-now-queue",
+      player_id: "kid",
+      message: null,
+      created_at: "2026-10-26T13:00:00Z",
+      status: "pending",
+      idempotency_key: "guardian-only:g-now-queue",
+    },
   ],
   team_invites: [],
   teams: [],
@@ -53,8 +74,18 @@ function builder(table: string) {
   return chain;
 }
 
+const policyCalls: unknown[] = [];
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { from: (t: string) => builder(t) },
+  supabase: {
+    from: (t: string) => builder(t),
+    rpc: (name: string, args: { _game_id: string }) => {
+      policyCalls.push([name, args]);
+      return Promise.resolve({
+        data: [{ requires_approval: args._game_id !== "g-open" }],
+        error: null,
+      });
+    },
+  },
 }));
 vi.mock("@/lib/child-safety", () => ({
   useMyChildren: () => ({
@@ -73,13 +104,29 @@ function wrapper({ children }: { children: ReactNode }) {
 describe("useGuardianApprovals", () => {
   it("lists requests the host already approved, and says so", async () => {
     const { result } = renderHook(() => useGuardianApprovals(), { wrapper });
-    await waitFor(() => expect(result.current.requests).toHaveLength(2));
+    await waitFor(() => expect(result.current.requests).toHaveLength(4));
     const statuses = requestFilters.find((f) => f.column === "status");
     expect(statuses?.values).toEqual(["pending", "approved"]);
     expect(result.current.requests.map((r) => [r.id, r.hostApproved])).toEqual([
       ["r-waiting", false],
       ["r-host-yes", true],
+      ["r-open", false],
+      ["r-now-queue", false],
     ]);
+  });
+
+  it("says when the guardian's answer is the only one needed (an open game, task #71)", async () => {
+    const { result } = renderHook(() => useGuardianApprovals(), { wrapper });
+    await waitFor(() => expect(result.current.requests).toHaveLength(4));
+    expect(result.current.requests.map((r) => [r.id, r.guardianOnly])).toEqual([
+      ["r-waiting", false],
+      ["r-host-yes", false],
+      ["r-open", true],
+      ["r-now-queue", false],
+    ]);
+    // The public join policy is read only for the requests sent to the guardian alone.
+    expect(policyCalls).toContainEqual(["get_game_join_policy", { _game_id: "g-open" }]);
+    expect(policyCalls).not.toContainEqual(["get_game_join_policy", { _game_id: "g1" }]);
   });
 });
 
@@ -88,5 +135,66 @@ describe("guardianApprovalError", () => {
     expect(guardianApprovalError(new Error("ALREADY_ON_ROSTER: this child is already in"))).toMatch(
       /already in this game/i,
     );
+  });
+
+  it("explains a guardian whose account cannot approve (audit F03)", () => {
+    expect(guardianApprovalError(new Error("GUARDIAN_NOT_ELIGIBLE"))).toMatch(
+      /can't approve for a child right now/i,
+    );
+  });
+
+  it("explains a child whose account has no date of birth yet (20261111120000)", () => {
+    const msg = guardianApprovalError(
+      new Error(
+        "AGE_VERIFICATION_REQUIRED: your player must add their date of birth before joining a team.",
+      ),
+    );
+    expect(msg).toMatch(/needs a date of birth before they can join a team/i);
+    expect(msg).not.toMatch(/AGE_VERIFICATION_REQUIRED|Something went wrong/);
+  });
+
+  it("asks the parent to sign the team's waiver for their child, not for themselves (20261111120000)", () => {
+    // guardian_approve_team_invite raises the child's own wording.
+    const raw = "WAIVER_REQUIRED: this team requires a signed waiver before you can join.";
+    expect(guardianApprovalError(new Error(raw))).toBe(
+      "Sign the team's waiver for your child first.",
+    );
+    expect(guardianApprovalError({ message: raw, code: "P0001" })).toBe(
+      "Sign the team's waiver for your child first.",
+    );
+  });
+
+  it("asks the parent for their own consent, not someone else's (CHILD_ACTIVITY_LOCKED)", () => {
+    // guardian_approve_team_invite raises the bare code when child_features_locked (20261111120000).
+    const parentSentence =
+      "Your child's account is waiting on your parental consent before they can join a team. Approve it from the consent email we sent you (your child can send a new one from their account), then approve this invite again.";
+    expect(guardianApprovalError(new Error("CHILD_ACTIVITY_LOCKED"))).toBe(parentSentence);
+    expect(guardianApprovalError({ message: "CHILD_ACTIVITY_LOCKED", code: "P0001" })).toBe(
+      parentSentence,
+    );
+    expect(guardianApprovalError(new Error("CHILD_ACTIVITY_LOCKED"))).not.toMatch(
+      /A parent or guardian needs/,
+    );
+    // The guardian reads it inside the Parent Center, which has no consent control: point at the email.
+    expect(guardianApprovalError(new Error("CHILD_ACTIVITY_LOCKED"))).not.toMatch(/Parent Center/);
+    expect(guardianApprovalError(new Error("CHILD_ACTIVITY_LOCKED"))).toMatch(/consent email/);
+    // The child's own screens keep the catalog sentence.
+    expect(userErrorMessage(new Error("CHILD_ACTIVITY_LOCKED"), "x")).toBe(
+      "A parent or guardian needs to approve this account before it can join a team.",
+    );
+    // The waiver wording and the fallback are unchanged.
+    expect(guardianApprovalError(new Error("WAIVER_REQUIRED"))).toBe(
+      "Sign the team's waiver for your child first.",
+    );
+    expect(guardianApprovalError(new Error("something odd"))).toBe(
+      "Something went wrong. Please try again.",
+    );
+  });
+
+  it("never shows the database's own text", () => {
+    expect(guardianApprovalError(new Error("relation public.team_invites does not exist"))).toBe(
+      "Something went wrong. Please try again.",
+    );
+    expect(guardianApprovalError(new TypeError("Failed to fetch"))).toMatch(/couldn't connect/i);
   });
 });

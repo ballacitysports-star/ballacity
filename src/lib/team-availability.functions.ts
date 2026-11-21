@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { guardianLinksInForce } from "@/lib/guardian-links-in-force.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   AVAILABILITY_STATUSES,
@@ -11,7 +12,13 @@ import {
 export type MyTeamAvailability = {
   /** The caller and/or their verified-guardian children who are on this team's roster. */
   people: { userId: string; name: string; isSelf: boolean }[];
-  events: { id: string; title: string; kind: "tryout" | "clinic"; eventDate: string; location: string | null }[];
+  events: {
+    id: string;
+    title: string;
+    kind: "tryout" | "clinic";
+    eventDate: string;
+    location: string | null;
+  }[];
   /** Keyed by event id. */
   answers: Record<string, AvailabilityAnswer[]>;
 };
@@ -27,7 +34,8 @@ export const getMyTeamAvailability = createServerFn({ method: "GET" })
   .inputValidator((i: unknown) => z.object({ teamId: z.string().min(1).max(100) }).parse(i))
   .handler(async ({ data, context }): Promise<MyTeamAvailability> => {
     const empty: MyTeamAvailability = { people: [], events: [], answers: {} };
-    // RLS lets a guardian read only their own links; mirror is_guardian_of.
+    // RLS lets a guardian read only their own links; mirror is_guardian_of: active, verified, and in force (a link
+    // to someone who has turned 18 is not, 20261125200000).
     const { data: links, error: linksError } = await context.supabase
       .from("guardian_links")
       .select("child_user_id")
@@ -35,16 +43,34 @@ export const getMyTeamAvailability = createServerFn({ method: "GET" })
       .eq("status", "active")
       .not("verified_at", "is", null);
     if (linksError) throw new Error("Could not verify your linked children.");
-    const candidates = [context.userId, ...(links ?? []).map((l) => l.child_user_id)];
-
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: inForce, error: forceError } = await guardianLinksInForce(
+      supabaseAdmin,
+      (links ?? []).map((l) => l.child_user_id),
+    );
+    if (forceError) throw new Error("Could not verify your linked children.");
+    const current = new Set(
+      (inForce ?? [])
+        .filter((l) => l.parent_user_id === context.userId && l.verified_at)
+        .map((l) => l.child_user_id),
+    );
+    const candidates = [
+      context.userId,
+      ...(links ?? []).map((l) => l.child_user_id).filter((id) => current.has(id)),
+    ];
+
     const [members, owner] = await Promise.all([
-      supabaseAdmin.from("team_members").select("user_id").eq("team_id", data.teamId).in("user_id", candidates),
+      supabaseAdmin
+        .from("team_members")
+        .select("user_id")
+        .eq("team_id", data.teamId)
+        .in("user_id", candidates),
       supabaseAdmin.from("teams").select("owner_id").eq("id", data.teamId).maybeSingle(),
     ]);
     if (members.error || owner.error) throw new Error("Could not verify this team.");
     const onTeam = new Set((members.data ?? []).map((m) => m.user_id));
-    if (owner.data?.owner_id && candidates.includes(owner.data.owner_id)) onTeam.add(owner.data.owner_id);
+    if (owner.data?.owner_id && candidates.includes(owner.data.owner_id))
+      onTeam.add(owner.data.owner_id);
     if (onTeam.size === 0) return empty;
     const peopleIds = candidates.filter((id) => onTeam.has(id));
 
@@ -73,12 +99,17 @@ export const getMyTeamAvailability = createServerFn({ method: "GET" })
         ? context.supabase
             .from("team_event_availability")
             .select("post_id,user_id,status,note,set_by")
-            .in("post_id", events.map((e) => e.id))
+            .in(
+              "post_id",
+              events.map((e) => e.id),
+            )
             .in("user_id", peopleIds)
         : Promise.resolve({ data: [], error: null }),
     ]);
     if (rows.error) throw new Error("Could not load your availability.");
-    const names = new Map((profiles.data ?? []).map((p) => [p.id, p.display_name ?? p.username ?? "Player"]));
+    const names = new Map(
+      (profiles.data ?? []).map((p) => [p.id, p.display_name ?? p.username ?? "Player"]),
+    );
     const answers: Record<string, AvailabilityAnswer[]> = {};
     for (const r of rows.data ?? []) {
       (answers[r.post_id] ??= []).push({
@@ -89,7 +120,11 @@ export const getMyTeamAvailability = createServerFn({ method: "GET" })
       });
     }
     return {
-      people: peopleIds.map((id) => ({ userId: id, name: id === context.userId ? "You" : names.get(id) ?? "Your child", isSelf: id === context.userId })),
+      people: peopleIds.map((id) => ({
+        userId: id,
+        name: id === context.userId ? "You" : (names.get(id) ?? "Your child"),
+        isSelf: id === context.userId,
+      })),
       events,
       answers,
     };

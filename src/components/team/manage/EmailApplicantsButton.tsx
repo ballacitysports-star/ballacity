@@ -3,19 +3,47 @@ import { useServerFn } from "@tanstack/react-start";
 import { Loader2, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { emailTryoutApplicants } from "@/lib/tryouts.functions";
+import { errorText, userErrorMessage } from "@/lib/user-error";
 
-export function EmailApplicantsButton({ teamId, postId, count }: { teamId: string; postId: string; count: number }) {
+/** The sentences emailTryoutApplicants (tryouts.functions.ts) throws itself. */
+const OWN_EMAIL_ERRORS: ReadonlySet<string> = new Set([
+  "Only owners, managers and coaches can email applicants.",
+  "Tryout not found.",
+]);
+
+export function EmailApplicantsButton({
+  teamId,
+  postId,
+  count,
+}: {
+  teamId: string;
+  postId: string;
+  count: number;
+}) {
   const send = useServerFn(emailTryoutApplicants);
   const [busy, setBusy] = useState(false);
   if (count === 0) return null;
   const onClick = async () => {
-    if (!confirm(`Email a tryout invite to ${count} applicant${count === 1 ? "" : "s"}? Parents get it when they applied for their child.`)) return;
+    if (
+      !confirm(
+        `Email a tryout invite to ${count} applicant${count === 1 ? "" : "s"}? Parents get it when they applied for their child.`,
+      )
+    )
+      return;
     setBusy(true);
     try {
       const r = await send({ data: { teamId, postId } });
-      toast.success(`Sent ${r.sent} invite${r.sent === 1 ? "" : "s"}${r.skipped ? ` · ${r.skipped} skipped` : ""}${r.failed ? ` · ${r.failed} failed` : ""}`);
+      toast.success(
+        `Sent ${r.sent} invite${r.sent === 1 ? "" : "s"}${r.skipped ? ` · ${r.skipped} skipped` : ""}${r.failed ? ` · ${r.failed} failed` : ""}`,
+      );
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't send invites.");
+      const text = errorText(e);
+      // emailTryoutApplicants' own refusals say what to do; anything else is never shown raw (WP 4.0).
+      toast.error(
+        text && OWN_EMAIL_ERRORS.has(text)
+          ? text
+          : userErrorMessage(e, "Couldn't send invites. Please try again."),
+      );
     } finally {
       setBusy(false);
     }

@@ -14,6 +14,7 @@ import {
   listAnalyticsShares,
   setAnalyticsShare,
 } from "@/lib/coach-analytics.functions";
+import { userErrorMessage } from "@/lib/user-error";
 
 export function AnalyticsCoachShare({
   childUserId,
@@ -46,13 +47,16 @@ export function AnalyticsCoachShare({
   if (on?.enabled !== true || !data || data.mode === "unavailable" || data.teams.length === 0) {
     return null;
   }
-  const canChange = (data.mode === "self" && !childUserId) || (data.mode === "guardian" && !!childUserId);
+  const canChange =
+    (data.mode === "self" && !childUserId) || (data.mode === "guardian" && !!childUserId);
   const who = childName ?? "you";
 
   return (
     <div className={`rounded-xl border border-border p-3 ${className}`}>
       <div className="text-sm font-semibold">
-        {childUserId ? `Share ${childName}'s analytics with coaches` : "Share my analytics with my coaches"}
+        {childUserId
+          ? `Share ${childName}'s analytics with coaches`
+          : "Share my analytics with my coaches"}
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
         Coaches of a team you choose can see {childUserId ? "their" : "your"} Pro Analytics ratings
@@ -76,7 +80,7 @@ export function AnalyticsCoachShare({
                   await qc.invalidateQueries({ queryKey: key });
                   toast.success(v ? `Shared with ${t.name} coaches` : "Sharing turned off");
                 } catch (e: any) {
-                  toast.error(e?.message ?? "Could not save this setting");
+                  toast.error(userErrorMessage(e, "Couldn't save this setting. Please try again."));
                 }
               }}
               aria-label={`Share analytics with ${t.name} coaches`}

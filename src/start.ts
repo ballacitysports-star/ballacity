@@ -1,6 +1,7 @@
 import { createStart, createMiddleware } from "@tanstack/react-start";
 
 import { renderErrorPage } from "./lib/error-page";
+import { errorReportMiddleware } from "./lib/error-report-middleware";
 import { isRequestAbort } from "./lib/request-abort";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 
@@ -8,7 +9,7 @@ import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 // must never pass through app-level guards or error wrapping.
 const isPlatformPath = (request: Request) => new URL(request.url).pathname.startsWith("/lovable/");
 
-const errorMiddleware = createMiddleware().server(async ({ request, next }) => {
+export const errorMiddleware = createMiddleware().server(async ({ request, next }) => {
   if (isPlatformPath(request)) return await next();
   try {
     return await next();
@@ -20,6 +21,14 @@ const errorMiddleware = createMiddleware().server(async ({ request, next }) => {
       throw error;
     }
     console.error(error);
+    // P0-8: record the failure behind this 500 page. Imported here, inside .server(), so the
+    // browser bundle never carries the reporter; a reporter that fails never changes the page.
+    try {
+      const { reportServerError } = await import("./lib/error-report.server");
+      await reportServerError(error, request, "ssr");
+    } catch {
+      // best effort
+    }
     return new Response(renderErrorPage(), {
       status: 500,
       headers: { "content-type": "text/html; charset=utf-8" },
@@ -44,6 +53,7 @@ const serverFnDirectAccessMiddleware = createMiddleware().server(async ({ reques
 });
 
 export const startInstance = createStart(() => ({
-  functionMiddleware: [attachSupabaseAuth],
+  // errorReportMiddleware (P0-8) wraps every server function and reports unexpected failures.
+  functionMiddleware: [attachSupabaseAuth, errorReportMiddleware],
   requestMiddleware: [serverFnDirectAccessMiddleware, errorMiddleware],
 }));

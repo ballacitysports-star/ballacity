@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { emitSignedIn, expectAccountTypePickerInPlace } from "./helpers/oauth-signin";
 import { onboardingStatusFor, stubServerFn } from "./helpers/server-fn";
 
 /**
@@ -8,6 +9,11 @@ import { onboardingStatusFor, stubServerFn } from "./helpers/server-fn";
  * a stashed `pending` account type for social providers — the picker screen is
  * the source of truth. Any saved post-auth `next` path stays in sessionStorage
  * so onboarding can consume it after the user picks a type.
+ *
+ * Two layers enforce it. The root gate renders the picker in place of any
+ * protected page (so a hydrated session on `/` that the landing page forwards to
+ * the feed sees the picker, not the feed), and the SIGNED_IN listener sends an
+ * OAuth return to `/onboarding/account-type` itself.
  */
 
 const SESSION_JSON = process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON;
@@ -25,10 +31,15 @@ const NEXT_KEY = "openrun:oauth-next";
 const PROVIDER_KEY = "openrun:oauth-provider";
 const NEXT_PATH = "/feed?src=oauth-e2e";
 
-async function stubNullAccountType(page: Page) {
+async function stubNullAccountType(
+  page: Page,
+  serverProvider: "google" | "apple" | "email" = "google",
+) {
   // The root gate asks the server first (getOnboardingStatus reads the profile
   // server-side), so the table stub below only covers its client fallback.
-  await stubServerFn(page, "getOnboardingStatus", onboardingStatusFor(null));
+  // `serverProvider` is what the server's identity check reports ("email" means
+  // it does not see a social sign-in, so `isSocial` is false).
+  await stubServerFn(page, "getOnboardingStatus", onboardingStatusFor(null, serverProvider));
   await page.route(/\/rest\/v1\/profiles\?.*select=account_type/, async (route) => {
     await route.fulfill({
       status: 200,
@@ -92,40 +103,25 @@ test.describe("OAuth new-user onboarding gate", () => {
 
         // The landing page itself is public, so this verifies the real
         // regression path: a hydrated OAuth session on `/` with no account
-        // type must be sent to onboarding instead of staying on marketing or
-        // restoring `/feed` from last-visited state.
-        await expect(page).toHaveURL(/\/onboarding\/account-type(?:[?#/].*)?$/, {
-          timeout: 15_000,
-        });
+        // type must be held at the account-type picker instead of staying on
+        // marketing or restoring `/feed` from last-visited state. The landing
+        // page forwards a signed-in member on, and the root gate renders the
+        // picker in place of the page they were forwarded to.
+        await expectAccountTypePickerInPlace(page);
+        await expect(page).not.toHaveURL(/^https?:\/\/[^/]+\/?$/);
+        // The feed itself (its header links to the member's profile) is not shown.
+        await expect(page.getByRole("link", { name: "Your profile" })).toHaveCount(0);
 
         await page.goto("/", { waitUntil: "domcontentloaded" });
+        await expectAccountTypePickerInPlace(page);
+        // Held in place, not yet sent to the picker's own page: that redirect
+        // must come from the listener below.
+        await expect(page).not.toHaveURL(/\/onboarding\/account-type/);
 
         // Force the SIGNED_IN reconcile with the correct app_metadata.provider
-        // so the "new OAuth user" branch runs. We patch getSession() so the
+        // so the "new OAuth user" branch runs. getSession() is patched so the
         // reconcile sees provider=<google|apple> without touching real auth.
-        await page.evaluate(async (providerId) => {
-          const mod = await import("/src/integrations/supabase/client.ts");
-          const supabase = (mod as { supabase: import("@supabase/supabase-js").SupabaseClient })
-            .supabase;
-          const { data } = await supabase.auth.getSession();
-          const session = data.session;
-          if (!session) throw new Error("no session in test context");
-          const patched = {
-            ...session,
-            user: {
-              ...session.user,
-              app_metadata: { ...(session.user.app_metadata ?? {}), provider: providerId },
-            },
-          };
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const authAny = supabase.auth as any;
-          authAny.getSession = async () => ({ data: { session: patched }, error: null });
-          const emit = authAny._notifyAllSubscribers ?? authAny.notifyAllSubscribers;
-          if (typeof emit !== "function") {
-            throw new Error("Supabase auth emit hook missing");
-          }
-          await emit.call(supabase.auth, "SIGNED_IN", patched, false);
-        }, provider);
+        await emitSignedIn(page, { provider });
 
         await expect(page).toHaveURL(/\/onboarding\/account-type(?:[?#/].*)?$/, {
           timeout: 15_000,
@@ -154,33 +150,17 @@ test.describe("OAuth new-user onboarding gate", () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     try {
-      await stubNullAccountType(page);
+      // The server's identity check does not say "social" either, so only the
+      // saved marker can make the listener treat this as an OAuth return
+      // (otherwise it would apply the stashed pending type with a PATCH).
+      await stubNullAccountType(page, "email");
       await primeStorage(page, "google");
       await page.goto("/", { waitUntil: "domcontentloaded" });
+      await expectAccountTypePickerInPlace(page);
+      await expect(page).not.toHaveURL(/\/onboarding\/account-type/);
 
-      await page.evaluate(async () => {
-        const mod = await import("/src/integrations/supabase/client.ts");
-        const supabase = (mod as { supabase: import("@supabase/supabase-js").SupabaseClient })
-          .supabase;
-        const { data } = await supabase.auth.getSession();
-        const session = data.session;
-        if (!session) throw new Error("no session in test context");
-        const patched = {
-          ...session,
-          user: {
-            ...session.user,
-            app_metadata: { ...(session.user.app_metadata ?? {}), provider: undefined },
-          },
-        };
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const authAny = supabase.auth as any;
-        authAny.getSession = async () => ({ data: { session: patched }, error: null });
-        const emit = authAny._notifyAllSubscribers ?? authAny.notifyAllSubscribers;
-        if (typeof emit !== "function") {
-          throw new Error("Supabase auth emit hook missing");
-        }
-        await emit.call(supabase.auth, "SIGNED_IN", patched, false);
-      });
+      // The session carries no provider; only the saved marker says Google.
+      await emitSignedIn(page, { provider: null });
 
       await expect(page).toHaveURL(/\/onboarding\/account-type(?:[?#/].*)?$/, {
         timeout: 15_000,

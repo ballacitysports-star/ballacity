@@ -7,6 +7,7 @@ import {
   useRevokeMinorInvite,
 } from "@/lib/family-invites";
 import { Button } from "@/components/ui/button";
+import { userErrorMessage } from "@/lib/user-error";
 
 const RELATIONSHIPS = ["parent", "guardian", "grandparent", "other adult"];
 
@@ -32,7 +33,7 @@ export function AddMinorPanel() {
       setName("");
       toast.success("Invitation created. Share the link with your minor.");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not create that invitation.");
+      toast.error(userErrorMessage(e, "Couldn't create that invitation. Please try again."));
     }
   };
 
@@ -129,7 +130,9 @@ export function AddMinorPanel() {
                     .mutateAsync({ id: i.id })
                     .then(() => toast.success("Invitation cancelled."))
                     .catch((e) =>
-                      toast.error(e instanceof Error ? e.message : "Could not cancel that."),
+                      toast.error(
+                        userErrorMessage(e, "Couldn't cancel that invitation. Please try again."),
+                      ),
                     );
                 }}
                 className="shrink-0 rounded-full border border-border px-3 py-1.5 text-xs font-bold disabled:opacity-60"

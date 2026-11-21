@@ -1,0 +1,161 @@
+# Local Supabase backend for the Playwright E2E suite. Start and stop it with
+# `node e2e/local-stack/stack.mjs up|down`, never with `docker compose` directly: the
+# script generates the per-run secrets this file reads from .state/compose.env, applies
+# the repository's migrations between the services, and runs the API gateway.
+#
+# Every port is published on 127.0.0.1 only. Nothing here talks to a hosted project.
+name: ballacity-e2e-local
+
+services:
+  db:
+    image: supabase/postgres:17.6.1.003
+    command:
+      [
+        "postgres",
+        "-c",
+        "config_file=/etc/postgresql/postgresql.conf",
+        "-c",
+        "log_min_messages=fatal",
+      ]
+    environment:
+      POSTGRES_HOST: /var/run/postgresql
+      POSTGRES_PORT: "5432"
+      PGPORT: "5432"
+      POSTGRES_DB: postgres
+      PGDATABASE: postgres
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD:?run e2e/local-stack/stack.mjs up}
+      PGPASSWORD: ${LOCAL_DB_PASSWORD}
+      JWT_SECRET: ${LOCAL_JWT_SECRET:?run e2e/local-stack/stack.mjs up}
+      JWT_EXP: "3600"
+    volumes:
+      # Runs after the image's own init scripts: gives the service roles the generated password.
+      - ./roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql:ro
+      # Runs after the image's migrations: the schema Realtime keeps its own tables in.
+      - ./realtime.sql:/docker-entrypoint-initdb.d/migrations/99-realtime.sql:ro
+    ports:
+      - "127.0.0.1:${LOCAL_DB_PORT:-54322}:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+
+  auth:
+    image: supabase/gotrue:v2.180.0
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: "9999"
+      API_EXTERNAL_URL: ${LOCAL_API_URL}/auth/v1
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${LOCAL_DB_PASSWORD}@db:5432/postgres
+      GOTRUE_SITE_URL: ${LOCAL_SITE_URL}
+      GOTRUE_URI_ALLOW_LIST: "${LOCAL_SITE_URL}/**,http://127.0.0.1:8080/**"
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: "3600"
+      GOTRUE_JWT_SECRET: ${LOCAL_JWT_SECRET}
+      GOTRUE_JWT_ISSUER: ${LOCAL_API_URL}/auth/v1
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: "false"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_EXTERNAL_PHONE_ENABLED: "false"
+      GOTRUE_SMS_AUTOCONFIRM: "false"
+      # No mail server: autoconfirm covers sign-up; nothing is ever delivered.
+      GOTRUE_SMTP_ADMIN_EMAIL: e2e@localhost
+      GOTRUE_SMTP_HOST: localhost
+      GOTRUE_SMTP_PORT: "2500"
+      GOTRUE_SMTP_SENDER_NAME: ballacity-e2e-local
+      # One machine, one suite: the hosted defaults would throttle the fixture sign-ins.
+      GOTRUE_RATE_LIMIT_EMAIL_SENT: "1000"
+      GOTRUE_RATE_LIMIT_TOKEN_REFRESH: "100000"
+      GOTRUE_RATE_LIMIT_VERIFY: "100000"
+      GOTRUE_RATE_LIMIT_OTP: "100000"
+      GOTRUE_RATE_LIMIT_SSO: "100000"
+      GOTRUE_RATE_LIMIT_ANONYMOUS_USERS: "100000"
+      GOTRUE_SECURITY_REFRESH_TOKEN_ROTATION_ENABLED: "true"
+      GOTRUE_SECURITY_REFRESH_TOKEN_REUSE_INTERVAL: "10"
+    ports:
+      - "127.0.0.1:${LOCAL_AUTH_PORT:-54331}:9999"
+
+  rest:
+    image: postgrest/postgrest:v13.0.7
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${LOCAL_DB_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public,graphql_public
+      PGRST_DB_EXTRA_SEARCH_PATH: public,extensions
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${LOCAL_JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_APP_SETTINGS_JWT_SECRET: ${LOCAL_JWT_SECRET}
+      PGRST_APP_SETTINGS_JWT_EXP: "3600"
+      PGRST_DB_MAX_ROWS: "1000"
+    ports:
+      - "127.0.0.1:${LOCAL_REST_PORT:-54332}:3000"
+
+  # Optional: started only when the image is present (stack.mjs checks). Without it the
+  # suite's realtime specs cannot pass; everything else still runs.
+  realtime:
+    image: supabase/realtime:v2.51.11
+    profiles: ["realtime"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: "4000"
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USER: supabase_admin
+      DB_PASSWORD: ${LOCAL_DB_PASSWORD}
+      DB_NAME: postgres
+      DB_IP_VERSION: ipv4
+      DB_AFTER_CONNECT_QUERY: "SET search_path TO _realtime"
+      DB_ENC_KEY: ${LOCAL_REALTIME_ENC_KEY}
+      API_JWT_SECRET: ${LOCAL_JWT_SECRET}
+      SECRET_KEY_BASE: ${LOCAL_REALTIME_SECRET_KEY_BASE}
+      METRICS_JWT_SECRET: ${LOCAL_JWT_SECRET}
+      ERL_AFLAGS: -proto_dist inet_tcp
+      DNS_NODES: "''"
+      RLIMIT_NOFILE: "10000"
+      APP_NAME: realtime
+      SEED_SELF_HOST: "true"
+      RUN_JANITOR: "true"
+    volumes:
+      # The image's runtime config with the HTTP listener on IPv4 instead of its hard-coded
+      # IPv6 (stack.mjs writes it). Hosts whose kernel has no IPv6 cannot start it otherwise.
+      - ./.state/realtime-runtime.exs:/app/releases/2.51.11/runtime.exs:ro
+    ports:
+      - "127.0.0.1:${LOCAL_REALTIME_PORT:-54333}:4000"
+
+  # Optional, like realtime: started only when the image is present. It migrates the storage
+  # schema to what the hosted platform has (the postgres image's own copy is older), which the
+  # repository's storage migrations need. Files live inside the container and vanish with it.
+  storage:
+    image: supabase/storage-api:v1.28.0
+    profiles: ["storage"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ANON_KEY: ${LOCAL_ANON_KEY}
+      SERVICE_KEY: ${LOCAL_SERVICE_ROLE_KEY}
+      POSTGREST_URL: http://rest:3000
+      PGRST_JWT_SECRET: ${LOCAL_JWT_SECRET}
+      AUTH_JWT_SECRET: ${LOCAL_JWT_SECRET}
+      DATABASE_URL: postgres://supabase_storage_admin:${LOCAL_DB_PASSWORD}@db:5432/postgres
+      FILE_SIZE_LIMIT: "52428800"
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: stub
+      REGION: stub
+      GLOBAL_S3_BUCKET: stub
+      ENABLE_IMAGE_TRANSFORMATION: "false"
+    ports:
+      - "127.0.0.1:${LOCAL_STORAGE_PORT:-54334}:5000"

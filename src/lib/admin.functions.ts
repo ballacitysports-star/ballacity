@@ -64,18 +64,40 @@ export const adminSetRole = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    if (data.grant) {
-      await supabaseAdmin
-        .from("user_roles")
-        .insert({ user_id: data.userId, role: data.role })
-        .select();
-    } else {
-      await supabaseAdmin
-        .from("user_roles")
-        .delete()
-        .eq("user_id", data.userId)
-        .eq("role", data.role);
+    const { writeAudit } = await import("@/lib/superadmin.server");
+    const { data: rows, error } = data.grant
+      ? await supabaseAdmin
+          .from("user_roles")
+          .insert({ user_id: data.userId, role: data.role })
+          .select()
+      : await supabaseAdmin
+          .from("user_roles")
+          .delete()
+          .eq("user_id", data.userId)
+          .eq("role", data.role)
+          // Return the removed rows, so a revoke that matched none can be told apart.
+          .select("id");
+    // A failed grant or revoke is an error for the admin to see, never a success, and is not
+    // audited as a change.
+    if (error) {
+      throw new Error(
+        `Could not ${data.grant ? "grant" : "revoke"} the ${data.role} role: ${error.message}`,
+      );
     }
+    // Deleting a role the user does not have (or one another admin already revoked) is no
+    // error to the database, but it changed nothing: say so, and audit nothing.
+    if (!data.grant && !rows?.length) {
+      throw new Error(`This user does not have the ${data.role} role.`);
+    }
+    // Same entry as superadminSetRole writes, so the audit log shows both paths alike; the
+    // source says the change came from the admin panel.
+    await writeAudit(supabaseAdmin, context.userId, {
+      action: data.grant ? "role.grant" : "role.revoke",
+      targetType: "user",
+      targetId: data.userId,
+      after: { role: data.role },
+      metadata: { source: "admin_panel" },
+    });
     return { ok: true };
   });
 

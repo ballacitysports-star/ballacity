@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { heldNotice } from "@/lib/post-moderation";
+import { errorText, userErrorMessage } from "@/lib/user-error";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +23,9 @@ import type { Sport, TeamPostKind } from "@/lib/sample-data";
 import { POST_KIND_META, toStoredCover } from "@/lib/sample-data";
 
 const KINDS: TeamPostKind[] = ["announcement", "tryout", "clinic", "recap"];
+
+/** createTeamPost's own refusal of an image it won't attach (parsePostImage in post-image.ts): shown as it is. */
+const POST_IMAGE_REFUSED = "That image can't be used on a post. Upload it again.";
 
 export function CreatePostSheet({
   teamId,
@@ -72,8 +76,12 @@ export function CreatePostSheet({
       setErr(null);
       onOpenChange(false);
     },
-    onError: (e: any) => {
-      const msg = e?.message ?? "Failed to post.";
+    onError: (e: unknown) => {
+      // POST_BLOCKED_MESSAGE is a catalog sentence and passes through userErrorMessage (WP 4.0).
+      const msg =
+        errorText(e) === POST_IMAGE_REFUSED
+          ? POST_IMAGE_REFUSED
+          : userErrorMessage(e, "Couldn't publish your post. Please try again.");
       setErr(msg);
       toast.error(msg);
     },

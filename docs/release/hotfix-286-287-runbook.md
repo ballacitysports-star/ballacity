@@ -5,12 +5,12 @@ Prepared 2026-11-05, revised the same day for the owner's channel: production SQ
 approval at the time it is taken, and is recorded (who, when, output). Every database step is either a read-only check or
 one reviewed file applied whole, and each was rehearsed on replays of `main` (section 8).
 
-| Step | What                                                                         | Touches                                         | Approval |
-| ---- | ---------------------------------------------------------------------------- | ----------------------------------------------- | -------- |
-| A    | #286 dependency patch: merged (`9a400a9c`); check the preview, publish        | the app build                                   | yes      |
-| B    | #287 database: pre-check, apply the migration through Lovable, verify         | production database: one migration              | yes      |
-| C    | #287 app: merge, publish, right after B                                       | the app build                                   | yes      |
-| D    | Afterwards: read-only checks, held reviews decided                            | nothing (reads); superadmin moderation          | no       |
+| Step | What                                                                   | Touches                                | Approval |
+| ---- | ---------------------------------------------------------------------- | -------------------------------------- | -------- |
+| A    | #286 dependency patch: merged (`9a400a9c`); check the preview, publish | the app build                          | yes      |
+| B    | #287 database: pre-check, apply the migration through Lovable, verify  | production database: one migration     | yes      |
+| C    | #287 app: merge, publish, right after B                                | the app build                          | yes      |
+| D    | Afterwards: read-only checks, held reviews decided                     | nothing (reads); superadmin moderation | no       |
 
 ## 1. Order, and why
 
@@ -66,6 +66,7 @@ one reviewed file applied whole, and each was rehearsed on replays of `main` (se
    Then sign in on the preview and open pages that load through server functions: the games list, a game, your
    profile, a team page. No error screen and no errors in the browser console. Do not submit forms: the preview may
    write to the production database.
+
 4. **Publish** _approval_. Record the commit and time. Repeat step 3 against the published site, and watch the error
    logs for 30 minutes.
 
@@ -81,7 +82,8 @@ Lovable's migration tool runs the SQL it is given and stores the SHA-256 of that
 `drizzle.__drizzle_migrations`. It writes no `supabase_migrations` row (`docs/supabase-cli.md`; checked against
 production on 2026-10-20). So the text must reach production **unchanged**:
 
-- The verification below recognizes the hotfix by that hash. So does the release preflight (#294, commit `c6a8ae50`):
+- The verification below recognizes the hotfix by that hash. (The release preflight in #294, commit `c6a8ae50`, does
+  too, but it is not on `main`; corrected 2026-11-11.)
   - `843e356b69c732ba0f335447e920b5f954029bada2d6c7c85d0a97f0fe13a6c1`, the file;
   - `ef17f8dd6b530f1a04a5dc700299e9759d50da930abdbe9609afcd1e5f971089`, the file without its final newline.
 - Any other text fails both, by design. Lovable has applied comment-stripped function bodies before
@@ -125,6 +127,7 @@ If any row is false, stop. The rows hold catalog data only, so they can be share
 Pick a quiet time. Applying takes seconds; queries on the four tables can wait briefly for its locks. Two ways:
 
 **Option 1 (recommended): Claude sends it, you approve.**
+
 1. With your go-ahead to apply, Claude sends the file's exact bytes to Lovable's agent through the connector, with the
    message below. Copying by hand can lose or change characters; this cannot.
 2. Lovable normally pauses for approval before changing the database. Claude then compares the SQL it proposes with the
@@ -211,32 +214,33 @@ notices.
      Lovable to reload the API schema cache (`NOTIFY pgrst, 'reload schema';`).
 
    This fails closed (reviews stay hidden), so fix it forward. Do not roll back for it.
+
 3. **Re-run the verification the next day** (B5, all `ok`). That catches a later tool or agent overwriting a
    definition.
-4. When the privacy release is prepared, its preflight recognizes this hotfix by its drizzle hash (#294) and reports
-   that in a warning.
+4. When the privacy release is prepared, recognize this hotfix by its drizzle hash. The preflight that does this is
+   only in the unmerged #294 (corrected 2026-11-11); on `main` it is B5's record row.
 
 ## 7. Rollback
 
 Prefer a forward fix: a new reviewed migration that keeps the protection. A rollback re-opens a live hole, so it needs
 the owner's approval at the time, and only the part that misbehaves is undone. The four parts are independent.
 
-| Symptom                                                                   | Part | First response                                                                                                                                                          |
-| ------------------------------------------------------------------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A roster change fails with `MEMBER_IDENTITY_FIXED`                        | 1    | Only moving a row to another person or team is refused. The app edits role, number and position, and those still work. Send the screen and error: likely a forward fix. |
-| A payment action fails with a `refund_*` error                            | 2    | The app never writes `refund_*` from the browser. The refund engine and the service role are unaffected. Send the error.                                                |
-| New reviews stay hidden (D2)                                              | 3    | Fix forward (D2). If the #287 build itself must go, publish the previous build. It is safe on the new database: reviews stay hidden until a superadmin unhides them.     |
-| A moderator's report change fails with `REPORT_FIELDS_FIXED`              | 4    | The app's moderation tools use the server path and are unaffected; only a direct API edit of a report is. Send the error.                                                |
+| Symptom                                                      | Part | First response                                                                                                                                                          |
+| ------------------------------------------------------------ | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A roster change fails with `MEMBER_IDENTITY_FIXED`           | 1    | Only moving a row to another person or team is refused. The app edits role, number and position, and those still work. Send the screen and error: likely a forward fix. |
+| A payment action fails with a `refund_*` error               | 2    | The app never writes `refund_*` from the browser. The refund engine and the service role are unaffected. Send the error.                                                |
+| New reviews stay hidden (D2)                                 | 3    | Fix forward (D2). If the #287 build itself must go, publish the previous build. It is safe on the new database: reviews stay hidden until a superadmin unhides them.    |
+| A moderator's report change fails with `REPORT_FIELDS_FIXED` | 4    | The app's moderation tools use the server path and are unaffected; only a direct API edit of a report is. Send the error.                                               |
 
 **Through Lovable.** Each part is one file in `docs/rollbacks/20261031120000_lovable/` that holds a single statement,
 so it applies whole or not at all however Lovable runs it:
 
-| Part | File                                  |
-| ---- | ------------------------------------- |
-| 1    | `part1_roster_identity_lock.sql`      |
-| 2    | `part2_refund_field_lock.sql`         |
-| 3    | `part3_review_screening_hold.sql`     |
-| 4    | `part4_report_guard.sql`              |
+| Part | File                              |
+| ---- | --------------------------------- |
+| 1    | `part1_roster_identity_lock.sql`  |
+| 2    | `part2_refund_field_lock.sql`     |
+| 3    | `part3_review_screening_hold.sql` |
+| 4    | `part4_report_guard.sql`          |
 
 - Send the file for that part to Lovable's agent unchanged, the same way as B4: the same message, Option 1 or 2.
 - To undo several parts, send their files one after another.
@@ -249,8 +253,8 @@ Then:
   moment stay hidden: a notice gives their number, and superadmins decide them in Moderation.
 - Afterwards, run the verification (B5). The rolled-back part's rows read `missing`, or show `main`'s policy hashes for
   part 3; the other parts' rows stay `ok`.
-- The drizzle rows stay. The release preflight then refuses the target until a reviewed forward fix restores a
-  recognized state. The rollback's own drizzle row is unknown to it, which is intended.
+- The drizzle rows stay. (Corrected 2026-11-11: `main` has no release preflight to refuse that state; #294's is
+  unmerged. B5 shows the rolled-back part as no longer matching.)
 - App rollback for #287 alone (publish the previous build) never requires a database rollback.
 
 **With psql**, if a direct connection exists: `docs/rollbacks/20261031120000_close_live_write_holes.down.sql`, with
@@ -269,28 +273,28 @@ Lovable's tool was emulated by running the file in one transaction and recording
 `/tmp/claude-0/-home-user-ballacity/6077ac3f-6266-5ad6-b242-855a0f5d2664/scratchpad/tools/hf287_lovable_rehearse.sh`
 and `/tmp/claude-0/-home-user-ballacity/6077ac3f-6266-5ad6-b242-855a0f5d2664/scratchpad/tools/hf287_rehearse.sh`.
 
-| Check (Lovable path)                                                          | PG17                                                                                                      | PG16                                          |
-| ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| Pre-check on `main`, run as the bare `SELECT` (as through the connector)       | 26/26 ok                                                                                                  | 25/26 (server major: by design, production is 17) |
-| Apply as Lovable does (drizzle hash `843e356b…`), then verify (bare `SELECT`)  | 21/21 ok; the record row reads "(drizzle ledger, Lovable)"                                                | 20/21 (server major); same record row          |
-| Verify when the drizzle hash is of the text without its final newline          | 21/21 ok                                                                                                  | 20/21 (server major)                           |
-| Held-reviews count (bare `SELECT`)                                            | runs; 0, 0, 0 on a replay                                                                                 | same                                          |
-| Pre-check after the apply                                                     | its 20 "not yet" and "as on main" rows fail, as they must                                                 | the same 20, plus the server major             |
-| Each Lovable rollback file alone, run without a transaction wrapper           | only that part removed; the file applied again gives `main` + #287 exactly                                | same                                          |
-| All four Lovable rollback files                                               | catalog identical to `main`                                                                               | same                                          |
-| A comment-stripped text applied instead                                       | caught: 3 function hashes differ; the record row reads "no ledger row and no drizzle row with the file hash" | same                                          |
+| Check (Lovable path)                                                          | PG17                                                                                                         | PG16                                              |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------- |
+| Pre-check on `main`, run as the bare `SELECT` (as through the connector)      | 26/26 ok                                                                                                     | 25/26 (server major: by design, production is 17) |
+| Apply as Lovable does (drizzle hash `843e356b…`), then verify (bare `SELECT`) | 21/21 ok; the record row reads "(drizzle ledger, Lovable)"                                                   | 20/21 (server major); same record row             |
+| Verify when the drizzle hash is of the text without its final newline         | 21/21 ok                                                                                                     | 20/21 (server major)                              |
+| Held-reviews count (bare `SELECT`)                                            | runs; 0, 0, 0 on a replay                                                                                    | same                                              |
+| Pre-check after the apply                                                     | its 20 "not yet" and "as on main" rows fail, as they must                                                    | the same 20, plus the server major                |
+| Each Lovable rollback file alone, run without a transaction wrapper           | only that part removed; the file applied again gives `main` + #287 exactly                                   | same                                              |
+| All four Lovable rollback files                                               | catalog identical to `main`                                                                                  | same                                              |
+| A comment-stripped text applied instead                                       | caught: 3 function hashes differ; the record row reads "no ledger row and no drizzle row with the file hash" | same                                              |
 
 The direct-connection path, from the first version of this runbook, gave these results:
 
-| Check                                                                       | PG17                                       | PG16                                                    |
-| --------------------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------- |
-| Pre-check on `main`                                                         | 26/26 ok                                   | 25/26 (server major is 16: by design, production is 17) |
-| Apply with a one-byte-altered migration file                                | refused, exit 3, nothing applied           | same                                                    |
-| Apply, then verify                                                          | `COMMIT`; 21/21 ok                         | `COMMIT`; 20/21 (server major)                          |
-| Apply again                                                                 | refused (duplicate ledger key), unchanged  | same                                                    |
-| Rollback without confirmation; without `parts`; `5`; `all,3`; `1;DROP`      | each refused, exit 3, unchanged            | same                                                    |
-| Rollback of each part alone; the file re-run after each                     | only that part removed; then `main` + #287 | same                                                    |
-| Rollbacks `1`, then `2`, then `3,4`; rollback `all`                         | catalog identical to `main`                | same                                                    |
+| Check                                                                  | PG17                                       | PG16                                                    |
+| ---------------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------- |
+| Pre-check on `main`                                                    | 26/26 ok                                   | 25/26 (server major is 16: by design, production is 17) |
+| Apply with a one-byte-altered migration file                           | refused, exit 3, nothing applied           | same                                                    |
+| Apply, then verify                                                     | `COMMIT`; 21/21 ok                         | `COMMIT`; 20/21 (server major)                          |
+| Apply again                                                            | refused (duplicate ledger key), unchanged  | same                                                    |
+| Rollback without confirmation; without `parts`; `5`; `all,3`; `1;DROP` | each refused, exit 3, unchanged            | same                                                    |
+| Rollback of each part alone; the file re-run after each                | only that part removed; then `main` + #287 | same                                                    |
+| Rollbacks `1`, then `2`, then `3,4`; rollback `all`                    | catalog identical to `main`                | same                                                    |
 
 "Catalog identical" compares every function (definition hash, owner, ACL), relation (kind, RLS, ACL), column (type),
 policy (roles, expressions), trigger (function, events, enabled state) and schema, row by row.
@@ -314,13 +318,13 @@ The app's other writes to these tables were checked in the code:
 **Required checks, run locally**, the way `.github/workflows/unit-lint.yml` and `db-tests.yml` run them, on each head
 that GitHub Actions could not check:
 
-| Head                       | Typecheck & build                 | Unit tests      | Lint (hooks, format) | SQL (PG17)  | Preflight (offline, self-tests) |
-| -------------------------- | --------------------------------- | --------------- | -------------------- | ----------- | ------------------------------- |
-| #287 `44525e1a`            | clean; built, no production ref   | 2920 passed     | pass                 | 951/0       | (not on this branch)            |
-| #292 `d41b2fb6`            | clean; built, no production ref   | 3461 passed     | pass                 | 3454/0      | pass; 60/60                     |
-| #293 `80e45b02`            | clean; built, no production ref   | 3575 passed     | pass                 | 3364/0      | pass; pass                      |
-| #294 `3c076f63`            | clean; built, no production ref   | 3461 passed     | pass                 | 3467/0      | pass; pass                      |
-| snapshot `a7b60601`        | clean; built, no production ref   | 3619 passed     | hooks pass           | 3467/0      | pass; pass                      |
+| Head                | Typecheck & build               | Unit tests  | Lint (hooks, format) | SQL (PG17) | Preflight (offline, self-tests) |
+| ------------------- | ------------------------------- | ----------- | -------------------- | ---------- | ------------------------------- |
+| #287 `44525e1a`     | clean; built, no production ref | 2920 passed | pass                 | 951/0      | (not on this branch)            |
+| #292 `d41b2fb6`     | clean; built, no production ref | 3461 passed | pass                 | 3454/0     | pass; 60/60                     |
+| #293 `80e45b02`     | clean; built, no production ref | 3575 passed | pass                 | 3364/0     | pass; pass                      |
+| #294 `3c076f63`     | clean; built, no production ref | 3461 passed | pass                 | 3467/0     | pass; pass                      |
+| snapshot `a7b60601` | clean; built, no production ref | 3619 passed | hooks pass           | 3467/0     | pass; pass                      |
 
 #294's next commit (`c6a8ae50`) changes only the release preflight, its tests and the manifest's `pinned_history`. Its
 self-tests pass 70/70 on PG16 and PG17, and its offline check passes. This #287 update merges `main` (with #286) and
@@ -331,12 +335,12 @@ Test 440 (`supabase/tests/440_live_write_holes.test.sql`) has 55 assertions. The
 
 ## 9. Files
 
-| File                                                                 | Use                                                     |
-| -------------------------------------------------------------------- | ------------------------------------------------------- |
-| `supabase/migrations/20261031120000_close_live_write_holes.sql`       | the migration (sha256 `843e356b…a6c1`)                  |
-| `docs/release/hotfix-287-precheck.sql`                               | B3, read-only                                           |
-| `docs/release/hotfix-287-verify.sql`                                 | B5 and D3, read-only                                    |
-| `docs/release/hotfix-287-held-reviews.sql`                           | C3 and D2, read-only counts                             |
-| `docs/rollbacks/20261031120000_lovable/part*.sql`                    | section 7, one part each, through Lovable               |
-| `docs/release/hotfix-287-apply.psql`                                 | B4 with a direct connection only                        |
-| `docs/rollbacks/20261031120000_close_live_write_holes.down.sql`      | section 7 with a direct connection only                 |
+| File                                                            | Use                                       |
+| --------------------------------------------------------------- | ----------------------------------------- |
+| `supabase/migrations/20261031120000_close_live_write_holes.sql` | the migration (sha256 `843e356b…a6c1`)    |
+| `docs/release/hotfix-287-precheck.sql`                          | B3, read-only                             |
+| `docs/release/hotfix-287-verify.sql`                            | B5 and D3, read-only                      |
+| `docs/release/hotfix-287-held-reviews.sql`                      | C3 and D2, read-only counts               |
+| `docs/rollbacks/20261031120000_lovable/part*.sql`               | section 7, one part each, through Lovable |
+| `docs/release/hotfix-287-apply.psql`                            | B4 with a direct connection only          |
+| `docs/rollbacks/20261031120000_close_live_write_holes.down.sql` | section 7 with a direct connection only   |

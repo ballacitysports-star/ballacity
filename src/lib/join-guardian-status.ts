@@ -1,3 +1,5 @@
+import { guardedOpenCopy } from "@/lib/guarded-open-join";
+
 /**
  * Who a minor's request to join a game is waiting on. The database needs both
  * the host and a guardian to say yes, in either order, and until both have the
@@ -8,22 +10,27 @@ export type JoinWait = {
   onParent: boolean;
   /** The host still has to approve. */
   onHost: boolean;
+  /** An open game: the guardian is the only one to answer (see guarded-open-join). */
+  guardianOnly?: true;
 };
 
 export function joinWait(input: {
   hostStatus: "pending" | "approved" | "rejected";
   needsGuardian: boolean;
   guardianApproved: boolean;
+  /** False on an open game, where the host never answers the request. Defaults to true. */
+  hostAnswers?: boolean;
 }): JoinWait | null {
   if (input.hostStatus === "rejected") return null;
   const onParent = input.needsGuardian && !input.guardianApproved;
-  const onHost = input.hostStatus === "pending";
   if (!onParent) return null; // nothing special: the usual host-only wording applies
-  return { onParent, onHost };
+  if (input.hostAnswers === false) return { onParent, onHost: false, guardianOnly: true };
+  return { onParent, onHost: input.hostStatus === "pending" };
 }
 
 /** The minor's own banner. */
 export function playerWaitCopy(w: JoinWait): { title: string; body: string } {
+  if (w.guardianOnly) return guardedOpenCopy("waiting_parent", { isPaid: false });
   if (w.onHost) {
     return {
       title: "Waiting for your parent and the host",

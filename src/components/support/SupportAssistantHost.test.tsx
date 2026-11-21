@@ -11,6 +11,8 @@ const state = vi.hoisted(() => ({
 vi.mock("@tanstack/react-start", () => ({ useServerFn: (fn: unknown) => fn }));
 vi.mock("@tanstack/react-router", () => ({
   useRouterState: ({ select }: any) => select({ location: { pathname: state.pathname } }),
+  useLocation: ({ select }: { select: (l: { href: string }) => unknown }) =>
+    select({ href: state.pathname }),
   Link: ({ to, children, onClick, className }: any) => (
     <a href={to} onClick={onClick} className={className}>
       {children}
@@ -55,7 +57,8 @@ describe("floating Help button", () => {
     render(<SupportAssistantHost />);
     const btn = screen.getByRole("button", { name: "Help and support" });
     expect(btn.className).toMatch(/h-11 w-11/);
-    expect(btn.className).toMatch(/safe-area-inset-bottom/);
+    // Its bottom offset (safe area, and lift over fixed bottom bars) lives in the .help-launcher rule.
+    expect(btn.className).toMatch(/(^| )help-launcher( |$)/);
   });
 
   it("stays out of the way on /contact, which has its own Help card", () => {
@@ -63,6 +66,41 @@ describe("floating Help button", () => {
     state.pathname = "/contact";
     render(<SupportAssistantHost />);
     expect(screen.queryByRole("button", { name: "Help and support" })).toBeNull();
+  });
+
+  it.each([
+    "/create",
+    "/create/",
+    "/games/g1/pay",
+    "/games/g1/pay/",
+    "/orgs/create",
+    "/teams/create",
+    "/trainers/create",
+    "/orgs/o1/edit",
+    "/teams/t1/edit/",
+    "/trainers/tr1/edit",
+  ])(
+    "stays off %s, where it would sit on form labels and the publish, Next or pay button",
+    (path) => {
+      signedIn();
+      state.pathname = path;
+      render(<SupportAssistantHost />);
+      expect(screen.queryByRole("button", { name: "Help and support" })).toBeNull();
+    },
+  );
+
+  it.each([
+    "/games/g1",
+    "/games/g1/payment-setup",
+    "/feed",
+    "/players",
+    "/trainers/tr1",
+    "/teams/t1",
+  ])("is still shown on %s (fixed bottom bars lift it instead)", (path) => {
+    signedIn();
+    state.pathname = path;
+    render(<SupportAssistantHost />);
+    expect(screen.getByRole("button", { name: "Help and support" })).toBeTruthy();
   });
 });
 

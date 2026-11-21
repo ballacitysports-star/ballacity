@@ -1,4 +1,5 @@
 import type { AgeCohort } from "@/lib/child-policy";
+import { userErrorMessage } from "@/lib/user-error";
 
 /**
  * Pure rules for network posts (P1-2), shared by client code and server functions. The
@@ -38,16 +39,12 @@ export function audiencesForEntity(postedAs: Exclude<PostedAs, "person">): PostA
   return postedAs === "team" ? ["public", "followers", "team"] : ["public", "followers"];
 }
 
-/** Turns a database refusal into words for the member. Unknown errors pass through. */
+/**
+ * Turns a database refusal into words for the member; any other failure reads as a generic sentence, never as raw
+ * text. A post the moderation screen blocked keeps its own sentence (it is one of user-error.ts's vetted ones).
+ */
 export function postErrorMessage(message: string): string {
-  if (/POST_LOCKED/.test(message))
-    return "A parent or guardian needs to approve your account first.";
-  if (/POST_AGE_NOT_ALLOWED/.test(message)) return "Posting isn't available for your account.";
-  if (/POST_AUDIENCE_NOT_ALLOWED/.test(message))
-    return "You can't share a post with that audience.";
-  if (/POST_TARGET_INVALID/.test(message)) return "You can't post for that team or facility.";
-  if (/POST_DELETED/.test(message)) return "That post was deleted.";
-  return message;
+  return userErrorMessage(message, "Something went wrong with this post. Please try again.");
 }
 
 export const NETWORK_POSTS_SETTING_KEY = "network_posts";

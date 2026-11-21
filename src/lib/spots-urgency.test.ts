@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getSpotsUrgency, spotsOpenLabel } from "./spots-urgency";
+import { getSpotsUrgency, hasPaymentIn, spotsOpenLabel } from "./spots-urgency";
 
 describe("getSpotsUrgency", () => {
   it("returns full when no spots remain", () => {
@@ -44,5 +44,18 @@ describe("spotsOpenLabel", () => {
 
   it("has a short form for tight rows", () => {
     expect(spotsOpenLabel(7, { short: true })).toBe("7 open");
+  });
+});
+
+describe("hasPaymentIn", () => {
+  it("counts a payment waiting for the host, verified or disputed", () => {
+    expect(hasPaymentIn([{ status: "pending" }])).toBe(true);
+    expect(hasPaymentIn([{ status: "verified" }])).toBe(true);
+    expect(hasPaymentIn([{ status: "disputed" }])).toBe(true);
+  });
+
+  it("does not count a rejected or cancelled one: that player is about to pay again", () => {
+    expect(hasPaymentIn([{ status: "rejected" }, { status: "cancelled" }])).toBe(false);
+    expect(hasPaymentIn([])).toBe(false);
   });
 });

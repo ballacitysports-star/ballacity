@@ -11,8 +11,14 @@ export function OrgCard({
   index = 0,
   search,
   facility,
+  followers,
 }: {
   org: Org;
+  /**
+   * The real follower count (entity follows, P1-1), when the list has it. Without one the
+   * card shows no number: teams.followers is not maintained and would read 0.
+   */
+  followers?: number;
   index?: number;
   search?: Record<string, unknown>;
   /** The facility this trainer works at, when known. */
@@ -103,10 +109,13 @@ export function OrgCard({
           )}
 
           <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1">
-              <Users className="h-3.5 w-3.5 text-lime" />
-              {org.followers.toLocaleString()}
-            </span>
+            {typeof followers === "number" ? (
+              <span className="inline-flex items-center gap-1" data-testid="org-followers">
+                <Users className="h-3.5 w-3.5 text-lime" aria-hidden />
+                {followers.toLocaleString()}
+                <span className="sr-only">{followers === 1 ? " follower" : " followers"}</span>
+              </span>
+            ) : null}
             {org.kind === "coach" && org.ratePerHour ? (
               <span className="font-semibold text-foreground">${org.ratePerHour}/hr</span>
             ) : null}

@@ -23,8 +23,17 @@ import {
 } from "@/components/ui/select";
 import { ConfirmAction } from "./ConfirmAction";
 import { LandingListingsPanel } from "./LandingListingsPanel";
+import { HomeAvailabilityPanel } from "./HomeAvailabilityPanel";
 import { MaintenancePanel } from "./MaintenancePanel";
 import { sendTestPushToSelf } from "@/lib/push.functions";
+import { PushOptInButton } from "./PushOptInButton";
+import { errorCode, userErrorMessage } from "@/lib/user-error";
+
+/** Staff screen: the readable sentence, with the error code (when there is one) for support. */
+function staffErrorMessage(e: unknown, fallback: string): string {
+  const code = errorCode(e);
+  return `${userErrorMessage(e, fallback)}${code ? ` (${code})` : ""}`;
+}
 
 /**
  * Settings that have a dedicated editor elsewhere.
@@ -80,7 +89,7 @@ export function OpsTab() {
       qc.invalidateQueries({ queryKey: ["superadmin-settings"] });
       qc.invalidateQueries({ queryKey: ["superadmin-audit"] });
     },
-    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+    onError: (e: unknown) => toast.error(staffErrorMessage(e, "Couldn't save that change.")),
   });
 
   const send = useMutation({
@@ -102,13 +111,14 @@ export function OpsTab() {
       setLink("");
       qc.invalidateQueries({ queryKey: ["superadmin-audit"] });
     },
-    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+    onError: (e: unknown) => toast.error(staffErrorMessage(e, "Couldn't send the announcement.")),
   });
 
   return (
     <div className="grid gap-3 lg:grid-cols-2">
       <MaintenancePanel />
       <LandingListingsPanel />
+      <HomeAvailabilityPanel />
 
       <Card>
         <CardHeader className="pb-2">
@@ -373,9 +383,11 @@ function PushTester() {
       if (r.reason === "not_configured") toast.error("Push provider key isn't configured");
       else if (r.ok) toast.success(`Push delivered to ${r.recipients} device(s)`);
       else if (!r.linked) toast.error("Your account isn't linked to push yet");
-      else toast.error(r.error ? `Send failed: ${r.error}` : "No subscribed devices");
+      // The provider's own answer stays in the diagnostic panel below, not in the toast.
+      else
+        toast.error(r.error ? "Push send failed. See the details below." : "No subscribed devices");
     },
-    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+    onError: (e: unknown) => toast.error(staffErrorMessage(e, "Couldn't send the test push.")),
   });
 
   const Row = ({ label, ok, value }: { label: string; ok: boolean; value: string }) => (
@@ -438,9 +450,13 @@ function PushTester() {
               <p className="text-xs text-destructive">Push provider key is not configured.</p>
             )}
             {!result.linked && (
-              <p className="text-xs text-muted-foreground">
-                Open Notifications and tap “Turn on push” on this device, then retest.
-              </p>
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Turn on push for this device here, or in Notifications under “Turn on push
+                  notifications”, then retest.
+                </p>
+                <PushOptInButton />
+              </div>
             )}
             {result.subscriptions?.length > 0 && (
               <ul className="pt-1 text-[11px] text-muted-foreground">

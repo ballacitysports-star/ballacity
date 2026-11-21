@@ -1,5 +1,12 @@
-import { useState, useCallback } from "react";
-import { StripeEmbeddedCheckout } from "@/components/StripeEmbeddedCheckout";
+import { lazy, Suspense, useState, useCallback } from "react";
+
+// Stripe's checkout (and through it Stripe.js) loads only when checkout opens, not for every viewer of a page that
+// can offer it.
+const StripeEmbeddedCheckout = lazy(() =>
+  import("@/components/StripeEmbeddedCheckout").then((m) => ({
+    default: m.StripeEmbeddedCheckout,
+  })),
+);
 
 interface CheckoutOptions {
   priceId: string;
@@ -22,7 +29,18 @@ export function useStripeCheckout() {
     setOptions(null);
   }, []);
 
-  const checkoutElement = isOpen && options ? <StripeEmbeddedCheckout {...options} /> : null;
+  const checkoutElement =
+    isOpen && options ? (
+      <Suspense
+        fallback={
+          <div role="status" className="py-8 text-center text-sm text-muted-foreground">
+            Loading checkout…
+          </div>
+        }
+      >
+        <StripeEmbeddedCheckout {...options} />
+      </Suspense>
+    ) : null;
 
   return { openCheckout, closeCheckout, isOpen, checkoutElement };
 }

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { userErrorMessage } from "@/lib/user-error";
 
 /**
  * Following a team, a trainer (both `teams` rows) or a facility (`trainer_orgs`). Person
@@ -23,14 +24,12 @@ function rpc(fn: string, args: Record<string, unknown>): Promise<RpcResult> {
   ).rpc(fn, args);
 }
 
-/** Turns a database refusal into words for the member. Unknown errors pass through. */
+/**
+ * Turns a database refusal into words for the member; any other failure reads as a generic sentence, never as the
+ * database's text. FOLLOW_BLOCKED and INVALID_FOLLOW_TARGET read the same, so a refusal does not reveal a block.
+ */
 export function entityFollowErrorMessage(message: string): string {
-  if (/FOLLOW_LOCKED/.test(message))
-    return "A parent or guardian needs to approve your account first.";
-  if (/NOT_SIGNED_IN/.test(message)) return "Sign in to follow";
-  // Blocked and unavailable read the same, so a refusal does not reveal a block.
-  if (/FOLLOW_BLOCKED|INVALID_FOLLOW_TARGET/.test(message)) return "This page can't be followed.";
-  return message;
+  return userErrorMessage(message, "Couldn't update this follow. Please try again.");
 }
 
 export async function getEntityFollowState(
@@ -41,6 +40,57 @@ export async function getEntityFollowState(
   if (error) throw new Error(entityFollowErrorMessage(error.message));
   const row = (Array.isArray(data) ? data[0] : data) as EntityFollowState | undefined;
   return { following: !!row?.following, followers: Number(row?.followers ?? 0) };
+}
+
+export type EntityFollowCount = { followers: number; following: boolean };
+
+/** entity_follow_counts reads at most this many ids per call. */
+const FOLLOW_COUNTS_BATCH = 200;
+
+/**
+ * Follower counts for a list of entities (entity_follow_counts, one call per 200 ids):
+ * counts only, and nothing for an entity the caller cannot see.
+ */
+export async function getEntityFollowCounts(
+  kind: EntityKind,
+  ids: string[],
+): Promise<Map<string, EntityFollowCount>> {
+  const out = new Map<string, EntityFollowCount>();
+  const batches: string[][] = [];
+  for (let i = 0; i < ids.length; i += FOLLOW_COUNTS_BATCH) {
+    batches.push(ids.slice(i, i + FOLLOW_COUNTS_BATCH));
+  }
+  const results = await Promise.all(
+    batches.map((batch) => rpc("entity_follow_counts", { _kind: kind, _ids: batch })),
+  );
+  for (const { data, error } of results) {
+    if (error) throw new Error(entityFollowErrorMessage(error.message));
+    for (const row of (Array.isArray(data) ? data : []) as {
+      id: string;
+      followers: number;
+      following: boolean;
+    }[]) {
+      out.set(row.id, { followers: Number(row.followers ?? 0), following: !!row.following });
+    }
+  }
+  return out;
+}
+
+/**
+ * Real follower counts for a list of cards (P1-1). Signed-out viewers get none (the
+ * database answers signed-in callers only), and a failed call gives none too: cards then
+ * show no number rather than a wrong one.
+ */
+export function useEntityFollowCounts(kind: EntityKind, ids: string[]) {
+  const { user } = useAuth();
+  const key = [...new Set(ids)].sort();
+  const query = useQuery({
+    queryKey: ["entity-follow-counts", kind, key, user?.id ?? null],
+    queryFn: () => getEntityFollowCounts(kind, key),
+    enabled: !!user && key.length > 0,
+    staleTime: 30_000,
+  });
+  return query.data ?? null;
 }
 
 export async function followEntity(kind: EntityKind, id: string): Promise<void> {
@@ -85,7 +135,11 @@ export function useEntityFollow(kind: EntityKind, id: string) {
       });
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Something went wrong"),
-    onSettled: () => qc.invalidateQueries({ queryKey: ["entity-follow", kind, id] }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["entity-follow", kind, id] });
+      // The count on list cards (Discover, /teams, /trainers) changes with this follow too.
+      qc.invalidateQueries({ queryKey: ["entity-follow-counts", kind] });
+    },
   });
 
   return {

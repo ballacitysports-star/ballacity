@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Loader2, UserCheck, UserPlus } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useEntityFollow, type EntityKind } from "@/lib/entity-follows";
+import { useAuthSearchHere } from "@/lib/auth-return";
 
 type Props = {
   kind: EntityKind;
@@ -20,6 +21,7 @@ type Props = {
  */
 export function FollowEntityButton({ kind, id, name, className = "", size = "md" }: Props) {
   const { user } = useAuth();
+  const authSearch = useAuthSearchHere();
   const follow = useEntityFollow(kind, id);
   const base =
     size === "sm"
@@ -30,6 +32,7 @@ export function FollowEntityButton({ kind, id, name, className = "", size = "md"
     return (
       <Link
         to="/auth"
+        search={authSearch}
         aria-label={`Sign in to follow ${name}`}
         className={`${base} bg-lime-gradient text-primary-foreground ${className}`}
       >

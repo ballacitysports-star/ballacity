@@ -1,4 +1,6 @@
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { serveHostedGame } from "./helpers/realtime-game-row";
+import { answerSessionChecks } from "./helpers/signed-in";
 
 /**
  * E2E: viewing the game as the host, when a player leaves (their
@@ -35,10 +37,14 @@ const GAME_ID = "g2";
 const OTHER_PLAYER_ID = "11111111-2222-3333-4444-555555555555";
 const JOIN_REQ_ID = "mock-pending-req-id";
 
-const isTable = (url: string | URL, table: string) =>
-  String(url).includes(`/rest/v1/${table}`);
+const isTable = (url: string | URL, table: string) => String(url).includes(`/rest/v1/${table}`);
 
 async function restoreSession(page: Page) {
+  // Answer the session checks every load starts (GET /auth/v1/user and the root gate's
+  // age, onboarding and child-status server functions) from the injected session, as the
+  // pay specs do. They are not what this spec is about, and each signed-in load
+  // otherwise sends the shared sandbox 8-13 requests for them. See helpers/signed-in.ts.
+  await answerSessionChecks(page);
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(
     ([key, value]) => window.localStorage.setItem(key!, value!),
@@ -61,14 +67,9 @@ test("host's pending list clears in realtime when the player's join_request is d
   let requestDeleted = false;
   let joinGets = 0;
 
-  // hosted_games: rely on sample fallback for g2.
-  await page.route(
-    (u) => isTable(u, "hosted_games"),
-    async (route) => {
-      if (route.request().method() !== "GET") return route.fallback();
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-    },
-  );
+  // hosted_games: serve g2 as a game the viewer hosts (the page no longer
+  // falls back to bundled sample games, so an empty answer is "Game not found").
+  await serveHostedGame(page, { id: GAME_ID, host_id: userId!, title: "E2E host pending game" });
 
   // game_payment_settings: viewer is the host.
   await page.route(
@@ -208,7 +209,8 @@ test("host's pending list clears in realtime when the player's join_request is d
       for (const ch of chans as Array<{ topic?: string; bindings?: Record<string, unknown> }>) {
         if (typeof ch.topic !== "string" || !ch.topic.includes("join_requests:host:")) continue;
         const bindings =
-          (ch.bindings && ((ch.bindings as Record<string, unknown>).postgres_changes as unknown[])) ||
+          (ch.bindings &&
+            ((ch.bindings as Record<string, unknown>).postgres_changes as unknown[])) ||
           [];
         for (const b of bindings as Array<{ callback: (p: unknown) => void }>) {
           try {
@@ -234,7 +236,7 @@ test("host's pending list clears in realtime when the player's join_request is d
     timeout: 10_000,
   });
   await expect(
-    page.getByText(/No pickup requests yet\. You'll see them here as players ask to join/i),
+    page.getByText(/No pickup requests yet\. You'll see them here as players request a spot/i),
   ).toBeVisible({ timeout: 10_000 });
 
   // 5. Handler actually refetched (proves realtime → refresh wiring, not

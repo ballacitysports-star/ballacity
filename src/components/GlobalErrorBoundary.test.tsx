@@ -3,6 +3,9 @@ import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { GlobalErrorBoundary } from "./GlobalErrorBoundary";
+import { reportBrowserError } from "@/lib/error-report-client";
+
+vi.mock("@/lib/error-report-client", () => ({ reportBrowserError: vi.fn(() => true) }));
 
 /** Throws `error` while `fail.current` is true. */
 function Boom({ fail, error }: { fail: { current: boolean }; error: Error }) {
@@ -14,6 +17,7 @@ let reload: ReturnType<typeof vi.fn>;
 const realLocation = window.location;
 
 beforeEach(() => {
+  vi.mocked(reportBrowserError).mockClear();
   reload = vi.fn();
   Object.defineProperty(window, "location", {
     configurable: true,
@@ -57,6 +61,27 @@ describe("GlobalErrorBoundary", () => {
     expect(screen.getByRole("link", { name: "Go home" }).getAttribute("href")).toBe("/");
     // Outside development the raw error message is not shown to members.
     expect(screen.queryByText("kaboom")).toBeNull();
+  });
+
+  it("reports what it caught once, as a boundary error (P0-8)", () => {
+    const error = new Error("kaboom");
+    render(
+      <GlobalErrorBoundary scope="section">
+        <Boom fail={{ current: true }} error={error} />
+      </GlobalErrorBoundary>,
+    );
+    expect(reportBrowserError).toHaveBeenCalledTimes(1);
+    expect(reportBrowserError).toHaveBeenCalledWith(error, "boundary");
+  });
+
+  it("reports nothing while nothing throws", () => {
+    render(
+      <GlobalErrorBoundary>
+        <Boom fail={{ current: false }} error={new Error("never thrown")} />
+      </GlobalErrorBoundary>,
+    );
+    expect(screen.getByText("All good")).toBeTruthy();
+    expect(reportBrowserError).not.toHaveBeenCalled();
   });
 
   it("Try again renders the subtree again", () => {

@@ -13,6 +13,7 @@ import { AI_RESULTS_CAVEAT, AI_TRAINING_NOTE } from "@/lib/ai-video-privacy";
 import { useMyPrivacy, type PrivacyPreferences } from "@/lib/privacy";
 import { deleteMyAiAnalysis, listMyAiAnalyses } from "@/lib/ai-video-privacy.functions";
 import { deleteReel } from "@/lib/reels.functions";
+import { userErrorMessage } from "@/lib/user-error";
 
 export const Route = createFileRoute("/account/ai-privacy")({
   head: () =>
@@ -118,7 +119,7 @@ function AnalysisCard({
               type="button"
               disabled={busy !== null}
               onClick={() => void run("video", () => onDeleteVideo(item.reelId))}
-              className="inline-flex items-center gap-1.5 rounded-full bg-destructive px-3 py-1.5 text-xs font-semibold text-destructive-foreground disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-full bg-destructive-strong px-3 py-1.5 text-xs font-semibold text-destructive-foreground disabled:opacity-50"
             >
               {busy === "video" ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -173,7 +174,7 @@ function AiVideoPrivacyPage() {
       void refresh();
     },
     onError: (e: unknown) =>
-      toast.error(e instanceof Error ? e.message : "Couldn't delete these AI results"),
+      toast.error(userErrorMessage(e, "Couldn't delete these AI results. Please try again.")),
   });
 
   const deleteVideo = useMutation({
@@ -183,7 +184,7 @@ function AiVideoPrivacyPage() {
       void refresh();
     },
     onError: (e: unknown) =>
-      toast.error(e instanceof Error ? e.message : "Couldn't delete this video"),
+      toast.error(userErrorMessage(e, "Couldn't delete this video. Please try again.")),
   });
 
   const save = async (patch: Partial<PrivacyPreferences>) => {
@@ -191,7 +192,7 @@ function AiVideoPrivacyPage() {
       await update(patch);
       toast.success("AI preferences saved");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't save AI preferences");
+      toast.error(userErrorMessage(e, "Couldn't save your AI preferences. Please try again."));
     }
   };
 

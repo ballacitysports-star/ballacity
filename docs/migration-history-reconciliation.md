@@ -264,3 +264,30 @@ Guardrails that apply to every disposition:
 insert into supabase_migrations.schema_migrations (version, name, statements)
 values ('<version_if_inserted>', '<source_file without .sql>', array[]::text[]);
 ```
+
+## 9. Shared migration versions (audit F15, 2026-11-05)
+
+Four versions are each used by two files. Production applied all eight files. Read-only catalog check, 2026-11-05: every file's key
+object exists, and there are no ledger rows for these versions.
+
+| Version          | Files                                               | Key objects checked in production                                      |
+| ---------------- | --------------------------------------------------- | ---------------------------------------------------------------------- |
+| `20261008140000` | `refund_policies`, `teen_reel_sharing`              | `refund_pct_for(...)`, `guard_members_media_visibility()`              |
+| `20261008160000` | `family_post_links`, `guardian_cancel_child_game`   | table `family_post_links`, `guardian_cancel_child_game(uuid,text)`     |
+| `20261008170000` | `family_post_team_tier`, `guardian_refund_notices`  | `guard_family_post_team()`, `mark_refund_sent(uuid)`                   |
+| `20261020120000` | `accept_message_request`, `hide_posts_and_comments` | `guard_message_recipient_update()`, policy `team_posts_moderated_read` |
+
+Within each pair the two files touch disjoint objects, so their relative order does not matter.
+
+Disposition:
+
+- **Do not rename these files.** They are applied history. Renaming would change the reviewed paths and sha256 values in
+  `ledger-evidence.csv` (and in the release branches' manifest), and would add nothing to production.
+- `schema_migrations.version` is a primary key, so only one row per version can ever exist. **Decided and done:** the owner chose one
+  row per version, named after the first file of each pair (`refund_policies`, `family_post_links`, `family_post_team_tier`,
+  `accept_message_request`). The four rows were inserted in production on 2026-11-07 as ledger group E
+  (`docs/release/records/2026-11-07-batch-3.md`, row 10 and the group E note). Each row covers both files of its pair.
+- **New collisions are blocked.** `scripts/migration-versions.test.mjs` (vitest) fails if any version other than these four is shared,
+  or if a file name does not start with a 14-digit version. A new migration must also sort after every existing file in
+  `supabase/migrations`; P0-4's replay (`scripts/migration-twins.mjs`) only catches identical copies, not two different files that
+  share a version.

@@ -46,6 +46,7 @@ import { LEGAL_DOCUMENT_LIST, effectiveVersion } from "@/lib/legal-documents";
 import { usePublishedLegalDocuments } from "@/lib/legal-consent";
 
 import { supabase } from "@/integrations/supabase/client";
+import { errorCode, userErrorMessage } from "@/lib/user-error";
 
 export const Route = createFileRoute("/admin/")({
   head: () =>
@@ -166,6 +167,15 @@ function AdminPage() {
   );
 }
 
+/** adminSetRole's own sentence for revoking a role the user does not have; shown as it is. */
+const NO_SUCH_ROLE = /^This user does not have the (?:admin|moderator) role\.$/;
+
+/** Staff-facing error text: the plain sentence, plus the error's code (when it has one) for support. Never raw SQL. */
+function staffErrorMessage(err: unknown, fallback: string): string {
+  const code = errorCode(err);
+  return `${userErrorMessage(err, fallback)}${code ? ` (${code})` : ""}`;
+}
+
 /** Acceptance counts per legal document version (admins/superadmins only). */
 function LegalConsentPanel() {
   const load = useServerFn(getLegalConsentStats);
@@ -190,7 +200,7 @@ function LegalConsentPanel() {
         {isLoading ? <p className="text-muted-foreground">Loading…</p> : null}
         {error ? (
           <p className="text-destructive">
-            {error instanceof Error ? error.message : "Failed to load"}
+            {staffErrorMessage(error, "Couldn't load acceptance counts.")}
           </p>
         ) : null}
         {data && data.length > 0 ? (
@@ -236,16 +246,19 @@ function ReelsPanel() {
       qc.invalidateQueries({ queryKey: ["admin-reels"] });
       toast.success(res?.resumed ? "Resumed from last step" : "Reel restarted from scratch");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(staffErrorMessage(e, "Couldn't restart this reel.")),
   });
   const runMut = useMutation({
     mutationFn: () => run({}),
     onSuccess: (res: any) => {
       qc.invalidateQueries({ queryKey: ["admin-reels"] });
       if (res?.ok) toast.success(`Worker ran — processed ${res.processed ?? 0}`);
-      else toast.error(res?.error ?? `Worker failed (${res?.status ?? "?"})`);
+      else
+        toast.error(
+          `${staffErrorMessage(res?.error, "The reels worker didn't finish.")}${res?.status ? ` (HTTP ${res.status})` : ""}`,
+        );
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(staffErrorMessage(e, "Couldn't run the reels worker.")),
   });
   if (isLoading) return <p className="text-sm text-muted-foreground p-4">Loading…</p>;
 
@@ -313,14 +326,17 @@ function ReelsPanel() {
                     </div>
                   )}
                   {r.error_message && (
-                    <pre className="mt-1 text-xs text-destructive bg-destructive/10 rounded p-2 whitespace-pre-wrap break-all">
-                      {r.error_message}
-                      {r.failed_at && (
-                        <span className="block text-muted-foreground mt-1">
-                          at {new Date(r.failed_at).toLocaleString()}
-                        </span>
-                      )}
-                    </pre>
+                    // The worker's raw failure text is a diagnostic for staff: kept behind a toggle, not shown inline.
+                    <details className="mt-1 text-xs">
+                      <summary className="cursor-pointer text-destructive">
+                        Generation failed
+                        {r.failed_at ? ` at ${new Date(r.failed_at).toLocaleString()}` : ""} ·
+                        technical details
+                      </summary>
+                      <pre className="mt-1 text-destructive bg-destructive/10 rounded p-2 whitespace-pre-wrap break-all">
+                        {r.error_message}
+                      </pre>
+                    </details>
                   )}
                 </div>
                 {(isFailed || isStuck) && (
@@ -355,11 +371,17 @@ function UsersPanel() {
   const mut = useMutation({
     mutationFn: (vars: { userId: string; role: "admin" | "moderator"; grant: boolean }) =>
       setRole({ data: vars }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["admin-users"] });
-      toast.success("Updated");
-    },
-    onError: (e: Error) => toast.error(e.message),
+    onSuccess: () => toast.success("Updated"),
+    // A failed grant or revoke shows the server's reason in plain words (catalog sentence), with its code for support.
+    onError: (e: Error) =>
+      toast.error(
+        NO_SUCH_ROLE.test(e.message)
+          ? // eslint-disable-next-line local/no-raw-toast-error -- set_user_role's own "no such role" sentence (NO_SUCH_ROLE), superadmin-only.
+            e.message
+          : staffErrorMessage(e, "Couldn't change the role."),
+      ),
+    // Reload after a failure too, so the badges and buttons show the roles the user really has.
+    onSettled: () => qc.invalidateQueries({ queryKey: ["admin-users"] }),
   });
 
   if (isLoading) return <p className="text-sm text-muted-foreground p-4">Loading…</p>;
@@ -393,6 +415,8 @@ function UsersPanel() {
                     key={role}
                     size="sm"
                     variant={has ? "destructive" : "outline"}
+                    // One change at a time: a second click would repeat the grant and fail.
+                    disabled={mut.isPending}
                     onClick={() => mut.mutate({ userId: u.id, role, grant: !has })}
                   >
                     {has ? `Revoke ${role}` : `Make ${role}`}
@@ -524,7 +548,7 @@ function GamesPanel() {
       setPreview(res);
       setPreviewOpen(true);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(staffErrorMessage(e, "Couldn't preview the backfill.")),
   });
   const backfill = useMutation({
     mutationFn: () => runMigration(false),
@@ -533,7 +557,7 @@ function GamesPanel() {
       setPreviewOpen(false);
       toast.success(`Backfill complete — claimed ${res.claimed}/${res.scanned} local games`);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(staffErrorMessage(e, "Couldn't run the backfill.")),
   });
 
   if (isLoading) return <p className="text-sm text-muted-foreground p-4">Loading…</p>;

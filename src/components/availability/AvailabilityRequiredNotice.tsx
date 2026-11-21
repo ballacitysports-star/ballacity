@@ -3,23 +3,31 @@ import { UserCog, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
 import { useMyProfiles, useSwitchProfile, type AccountProfile } from "@/lib/account-profiles";
 import { availabilityGateMessage, type AvailabilityGateReason } from "@/lib/availability-gate";
+import { useAuthSearchHere } from "@/lib/auth-return";
+import { userErrorMessage } from "@/lib/user-error";
+import { AVAILABILITY_POST_RETURN } from "@/lib/profile-return";
 
 /**
  * Inline explanation of why the viewer can't post availability yet, with the
  * one-tap fix (switch to the player profile, finish the profile, or sign in).
+ * "Complete my profile" brings the member back to posting afterwards (`returnTo`, checked by /profile/edit).
  */
 export function AvailabilityRequiredNotice({
   reason,
   onSwitched,
+  returnTo = AVAILABILITY_POST_RETURN,
   className = "",
 }: {
   reason: AvailabilityGateReason;
   /** Called after switching into the player profile succeeds. */
   onSwitched?: () => void;
+  /** Where "Complete my profile" returns to once the profile is saved (an internal path). */
+  returnTo?: string;
   className?: string;
 }) {
   const { profiles } = useMyProfiles();
   const switcher = useSwitchProfile();
+  const authSearch = useAuthSearchHere();
   if (!reason) return null;
 
   const playerProfile: AccountProfile | undefined = profiles.find((p) => p.kind === "player");
@@ -49,7 +57,8 @@ export function AvailabilityRequiredNotice({
             {reason === "signed_out" && (
               <Link
                 to="/auth"
-                className="rounded-full bg-lime-gradient px-4 py-2 text-xs font-bold text-primary-foreground"
+                search={authSearch}
+                className="inline-flex min-h-11 items-center rounded-full bg-lime-gradient px-4 py-2 text-sm font-bold text-primary-foreground"
               >
                 Sign in
               </Link>
@@ -65,10 +74,12 @@ export function AvailabilityRequiredNotice({
                       onSwitched?.();
                     },
                     onError: (e) =>
-                      toast.error(e instanceof Error ? e.message : "Could not switch profile"),
+                      toast.error(
+                        userErrorMessage(e, "Couldn't switch profiles. Please try again."),
+                      ),
                   })
                 }
-                className="inline-flex items-center gap-1.5 rounded-full bg-lime-gradient px-4 py-2 text-xs font-bold text-primary-foreground disabled:opacity-50"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-lime-gradient px-4 py-2 text-sm font-bold text-primary-foreground disabled:opacity-50"
               >
                 <UserCog className="h-3.5 w-3.5" aria-hidden />
                 Switch to my player profile
@@ -77,7 +88,8 @@ export function AvailabilityRequiredNotice({
             {reason === "incomplete_profile" && (
               <Link
                 to="/profile/edit"
-                className="rounded-full bg-lime-gradient px-4 py-2 text-xs font-bold text-primary-foreground"
+                search={{ returnTo }}
+                className="inline-flex min-h-11 items-center rounded-full bg-lime-gradient px-4 py-2 text-sm font-bold text-primary-foreground"
               >
                 Complete my profile
               </Link>

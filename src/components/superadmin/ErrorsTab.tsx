@@ -4,41 +4,71 @@ import { useServerFn } from "@tanstack/react-start";
 import { superadminListErrors } from "@/lib/error-report-admin.functions";
 import { Button } from "@/components/ui/button";
 
+/** The windows offered, in hours. "Last hour" is the one to read right after a publish. */
+const WINDOWS = [
+  { hours: 1, label: "Last hour" },
+  { hours: 24, label: "Last day" },
+  { hours: 7 * 24, label: "Last 7 days" },
+  { hours: 30 * 24, label: "Last 30 days" },
+] as const;
+
 /**
  * P0-8: errors reported by the app (browser and server), grouped by fingerprint. Reports hold
- * no personal data; they are kept 30 days.
+ * no personal data; they are kept 30 days. "Last hour" with "Server only" answers "did the
+ * publish break anything on the server": pages that failed to render (ssr) and server functions
+ * that failed (server_fn).
  */
 export function ErrorsTab() {
   const list = useServerFn(superadminListErrors);
-  const [days, setDays] = useState(7);
+  const [hours, setHours] = useState<number>(7 * 24);
+  const [serverOnly, setServerOnly] = useState(false);
   const q = useQuery({
-    queryKey: ["superadmin-errors", days],
-    queryFn: () => list({ data: { days } }),
+    queryKey: ["superadmin-errors", hours, serverOnly],
+    queryFn: () => list({ data: { hours, serverOnly } }),
   });
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        {[1, 7, 30].map((d) => (
+        {WINDOWS.map((w) => (
           <Button
-            key={d}
+            key={w.hours}
             size="sm"
-            variant={days === d ? "default" : "outline"}
-            onClick={() => setDays(d)}
+            variant={hours === w.hours ? "default" : "outline"}
+            aria-pressed={hours === w.hours}
+            onClick={() => setHours(w.hours)}
           >
-            Last {d === 1 ? "day" : `${d} days`}
+            {w.label}
           </Button>
         ))}
+        <Button
+          size="sm"
+          variant={serverOnly ? "default" : "outline"}
+          aria-pressed={serverOnly}
+          onClick={() => setServerOnly((on) => !on)}
+        >
+          Server only
+        </Button>
         <Button size="sm" variant="ghost" onClick={() => q.refetch()}>
           Refresh
         </Button>
       </div>
+      {serverOnly ? (
+        <p className="text-xs text-muted-foreground">
+          Server only: pages that failed to render (ssr) and server functions that failed
+          (server_fn).
+        </p>
+      ) : null}
       {q.isLoading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : q.isError ? (
         <p className="text-sm text-destructive">Couldn&apos;t load errors.</p>
       ) : (q.data?.groups.length ?? 0) === 0 ? (
-        <p className="text-sm text-muted-foreground">No errors reported in this period.</p>
+        <p className="text-sm text-muted-foreground">
+          {serverOnly
+            ? "No server errors reported in this period."
+            : "No errors reported in this period."}
+        </p>
       ) : (
         <>
           <p className="text-xs text-muted-foreground">

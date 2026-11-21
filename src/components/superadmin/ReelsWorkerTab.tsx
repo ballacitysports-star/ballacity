@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { errorCode, userErrorMessage } from "@/lib/user-error";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,7 +63,11 @@ export function ReelsWorkerTab() {
       setAction(null);
       void qc.invalidateQueries({ queryKey: QUERY_KEY });
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Action failed"),
+    onError: (e) => {
+      // Superadmin screen: a readable sentence with the code for support, never raw database text (WP 4.0).
+      const code = errorCode(e);
+      toast.error(`${userErrorMessage(e, "That action failed.")}${code ? ` (${code})` : ""}`);
+    },
   });
 
   const data = status.data;

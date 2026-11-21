@@ -105,6 +105,7 @@ const h = vi.hoisted(() => {
       from: () => ({
         remove: vi.fn(async () => ({ error: state.removeError })),
         createSignedUploadUrl: vi.fn(async () => {
+          state.log.push("storage:sign-upload");
           await state.signedUrlDelay;
           return { data: { signedUrl: "https://storage.test/upload" }, error: null };
         }),
@@ -126,6 +127,12 @@ vi.mock("@/lib/notifications", () => ({ createNotification: h.createNotification
 vi.mock("@/lib/message-attachments.functions", () => ({ finalizeMessageAttachment: h.finalize }));
 
 import { discardMessageAttachment, sendMessage, uploadMessageAttachment } from "./messages";
+import {
+  ATTACHMENT_REFUSAL_MESSAGES,
+  ATTACHMENT_TOO_LARGE_MESSAGE,
+  ATTACHMENT_TYPE_MESSAGE,
+  MAX_ATTACHMENT_BYTES,
+} from "./message-attachment-validation";
 
 beforeEach(() => {
   Object.assign(h.state, {
@@ -316,6 +323,33 @@ describe("uploadMessageAttachment", () => {
     const big = new File([new Uint8Array(1)], "big.bin");
     Object.defineProperty(big, "size", { value: 21 * 1024 * 1024 });
     await expect(uploadMessageAttachment("c1", big)).rejects.toThrow("too large");
+  });
+
+  it("refuses with the shared sentences, so the send-error display passes them on, before any storage call", async () => {
+    const big = new File([new Uint8Array(1)], "big.jpg", { type: "image/jpeg" });
+    Object.defineProperty(big, "size", { value: MAX_ATTACHMENT_BYTES + 1 });
+    await expect(uploadMessageAttachment("c1", big)).rejects.toThrow(
+      new Error(ATTACHMENT_TOO_LARGE_MESSAGE),
+    );
+    const zip = new File([new Uint8Array(10)], "a.zip", { type: "application/zip" });
+    await expect(uploadMessageAttachment("c1", zip)).rejects.toThrow(
+      new Error(ATTACHMENT_TYPE_MESSAGE),
+    );
+    expect(ATTACHMENT_REFUSAL_MESSAGES).toContain(ATTACHMENT_TOO_LARGE_MESSAGE);
+    expect(ATTACHMENT_REFUSAL_MESSAGES).toContain(ATTACHMENT_TYPE_MESSAGE);
+    expect(h.state.log).not.toContain("storage:sign-upload");
+  });
+
+  it("allows a file of exactly the limit through to storage", async () => {
+    const edge = new File([new Uint8Array(1)], "edge.jpg", { type: "image/jpeg" });
+    Object.defineProperty(edge, "size", { value: MAX_ATTACHMENT_BYTES });
+    const ctrl = new AbortController();
+    ctrl.abort();
+    // Cancelled once the upload URL is made: it got past both refusals.
+    await expect(
+      uploadMessageAttachment("c1", edge, { signal: ctrl.signal }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(h.state.log).toContain("storage:sign-upload");
   });
 });
 

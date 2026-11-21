@@ -1,4 +1,5 @@
 import type { User } from "@supabase/supabase-js";
+import { errorCode, isUserErrorCode, knownErrorMessage } from "@/lib/user-error";
 
 /**
  * Managed children: minors whose account a guardian created and who have no
@@ -127,49 +128,15 @@ export function initialsForDisplayName(displayName: string): string {
 
 /**
  * Database and server error codes → something a parent can act on. §23: never
- * show a raw Postgres or PostgREST error.
+ * show a raw Postgres or PostgREST error. The sentences live in user-error.ts.
  */
-const MESSAGES: Record<string, string> = {
-  AUTH_REQUIRED: "Sign in to add your child.",
-  ADULT_REQUIRED:
-    "Only an adult account with a confirmed email and verified age can add a child. Finish your own setup first.",
-  NOT_YOUR_MANAGED_CHILD: "That profile isn't one you created.",
-  ALREADY_PROVISIONED: "That profile is already set up.",
-  MANAGED_LIMIT:
-    "You've reached the limit for child profiles right now. Contact support if you need more.",
-  MINOR_HANDLE_UNSAFE: "Remove personal details (numbers, email, address) from the name.",
-  CHILD_IS_ADULT: "That birthday makes them an adult — they can sign up with their own account.",
-  DOB_REQUIRED: "Enter your child's birthday.",
-  DOB_INVALID: "Enter a real birthday.",
-  DOB_IN_FUTURE: "The birthday can't be in the future.",
-  NAME_REQUIRED: "Enter your child's first name.",
-  NAME_INVALID: "Use letters only in your child's name.",
-  LEGAL_VERSION_STALE:
-    "Our Terms or Privacy Policy were just updated. Reload the page and try again.",
-  LEGAL_VERSION_INVALID:
-    "Our Terms or Privacy Policy couldn't be loaded. Reload the page and try again.",
-  ATTESTATION_REQUIRED: "Confirm that you're this child's parent or legal guardian.",
-  NOT_AUTHORIZED: "You can only manage children linked to your account.",
-  NOT_MANAGED: "That child has their own login, so you can't switch into their profile.",
-  MANAGED_CHILD_DELETE_INSTEAD:
-    "This child only exists under your account. Delete their profile instead of ending the link.",
-  MANAGED_SESSION_NOT_ALLOWED: "Switch back to your own account to do that.",
-  MANAGES_CHILDREN: "Your account can't be deleted while it manages child profiles.",
-  MANAGED_UNAVAILABLE: "Adding a child isn't available yet. Please try again later.",
-  MANAGES_CHECK_FAILED:
-    "We couldn't check whether your account manages any children, so nothing was deleted. Please try again.",
-};
 
-/** The code a database or server error starts with, when it is one we know. */
+/** The code a database or server error carries, when it is one we have words for. */
 export function managedChildErrorCode(error: unknown): string | null {
-  const raw = error instanceof Error ? error.message : typeof error === "string" ? error : "";
-  for (const code of Object.keys(MESSAGES)) {
-    if (new RegExp(`\\b${code}\\b`).test(raw)) return code;
-  }
-  return null;
+  const code = errorCode(error);
+  return isUserErrorCode(code) ? code : null;
 }
 
 export function managedChildErrorMessage(error: unknown): string {
-  const code = managedChildErrorCode(error);
-  return code ? MESSAGES[code] : "Something went wrong. Please try again.";
+  return knownErrorMessage(error) ?? "Something went wrong. Please try again.";
 }

@@ -19,7 +19,12 @@
  */
 import { readFileSync } from "node:fs";
 import type { FullConfig } from "@playwright/test";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type User } from "@supabase/supabase-js";
+import {
+  LEGAL_DOCUMENT_LIST,
+  effectiveVersion,
+  type PublishedLegalDocument,
+} from "../src/lib/legal-documents";
 import { TEST_ACCOUNTS } from "../src/lib/test-fixtures";
 import { assertLaunchedDevServer } from "./safety/dev-server";
 import {
@@ -130,6 +135,49 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
     // child-safety policies the fixture flows exercise.
     const ADULT_BIRTHDAY = "1990-05-04";
 
+    // The current Terms and Privacy versions, as the app computes them (a published
+    // legal_documents row, else the bundled version). An account that has not accepted a
+    // material version gets the full-screen LegalReacceptGate on every signed-in page, which
+    // covers whatever a spec is trying to click. The shared sandbox's fixtures accepted long
+    // ago; a fresh database (e2e/local-stack) has no consent rows at all. So record the
+    // acceptance a user would give by ticking the gate. ignoreDuplicates leaves existing rows
+    // untouched.
+    let published: PublishedLegalDocument[] = [];
+    {
+      const { data, error } = await admin
+        .from("legal_documents")
+        .select(
+          "id, document_type, title, version, content, summary, requires_reacceptance, effective_date, published, published_at, archived_at",
+        )
+        .not("published_at", "is", null)
+        .order("effective_date", { ascending: false });
+      if (error) {
+        console.warn(
+          `[e2e global-setup] Could not read published legal documents (${error.message}); using the bundled versions.`,
+        );
+      } else published = (data ?? []) as PublishedLegalDocument[];
+    }
+    const currentLegal = LEGAL_DOCUMENT_LIST.map((doc) => ({
+      document_type: doc.type,
+      document_version: effectiveVersion(doc.type, published).version,
+    }));
+
+    // One listing of the users for every fixture account. Each upsert used to page through
+    // all of the sandbox's users again (five calls a run, perPage 1000). A failed listing is
+    // forgotten, so the next account asks again, as before.
+    let userListing: Promise<User[]> | null = null;
+    const listAllUsers = (): Promise<User[]> =>
+      (userListing ??= admin.auth.admin
+        .listUsers({ page: 1, perPage: 1000 })
+        .then(({ data, error }) => {
+          if (error) throw new Error(error.message);
+          return data.users;
+        })
+        .catch((err: unknown) => {
+          userListing = null;
+          throw err;
+        }));
+
     async function upsertAccount(acct: {
       email: string;
       password: string;
@@ -153,14 +201,8 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
         is_guardian: false,
       };
       try {
-        const { data: list, error: listErr } = await admin.auth.admin.listUsers({
-          page: 1,
-          perPage: 1000,
-        });
-        if (listErr) throw new Error(listErr.message);
-        const existing = list.users.find(
-          (u) => u.email?.toLowerCase() === acct.email.toLowerCase(),
-        );
+        const users = await listAllUsers();
+        const existing = users.find((u) => u.email?.toLowerCase() === acct.email.toLowerCase());
 
         let id: string | null = existing?.id ?? null;
         if (!existing) {
@@ -189,6 +231,16 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
               `[e2e global-setup] Could not set birthday for ${acct.email}: ${bErr.message}`,
             );
           }
+          const { error: cErr } = await admin.from("legal_consents").upsert(
+            currentLegal.map((c) => ({ ...c, user_id: id })),
+            { onConflict: "user_id,document_type,document_version", ignoreDuplicates: true },
+          );
+          if (cErr) {
+            console.warn(
+              `[e2e global-setup] Could not record legal acceptance for ${acct.email}: ${cErr.message}. ` +
+                "Signed-in specs may be blocked by the legal re-accept dialog.",
+            );
+          }
         }
         return id;
       } catch (err) {
@@ -201,7 +253,26 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
       }
     }
 
-    for (const acct of TEST_ACCOUNTS) await upsertAccount(acct);
+    const accountIds = new Map<string, string | null>();
+    for (const acct of TEST_ACCOUNTS) accountIds.set(acct.key, await upsertAccount(acct));
+
+    // player-orgs-realtime opens player2's profile to members for the length of
+    // the test and puts it back in a finally. A run killed in between would
+    // leave it open on the shared fixture for good, so put it back every run:
+    // 'private' is what the account was created with (handle_new_user stores
+    // default_profile_visibility_for, and the cohort is unknown until the
+    // birthday above exists).
+    const player2Id = accountIds.get("player2");
+    if (player2Id) {
+      const { error: visErr } = await admin
+        .from("privacy_preferences")
+        .upsert({ user_id: player2Id, profile_visibility: "private" }, { onConflict: "user_id" });
+      if (visErr) {
+        console.warn(
+          `[e2e global-setup] Could not reset player2's profile visibility: ${visErr.message}`,
+        );
+      }
+    }
 
     // (2b) Seed the fixed "g1"/"g2" hosted_games rows a large chunk of the suite
     // hardcodes as a lightweight fixture game.
@@ -228,18 +299,40 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
     } else {
       try {
         const now = Date.now();
+        // hosted_games.joined is the game's participant count: the
+        // game_participants_sync_count trigger recounts it on every join and
+        // leave, and every card, the map and the pay page read it. g1 is the
+        // game the realtime specs really join and leave, so seed what its roster
+        // holds. A fixed 8 over an empty roster made the first join recount to
+        // 1 and the "N spots" pill jump from 2 to 9 instead of dropping by one.
+        //
+        // g1 starts a day out. Leaving inside a game's cancel cutoff (2 hours
+        // by default) records a late cancellation against the player, and the
+        // realtime specs leave g1 on every run: at 3 hours out, any spec that
+        // ran more than an hour after this seed recorded one against the shared
+        // fixture player. leaveFreeRun (e2e/helpers/realtime-join.ts) fails if
+        // it is ever offered only "Leave anyway". No spec reads g1's start time.
+        const { count: g1Roster, error: g1CountErr } = await admin
+          .from("game_participants")
+          .select("id", { count: "exact", head: true })
+          .eq("game_id", "g1");
+        if (g1CountErr) {
+          console.warn(
+            `[e2e global-setup] Could not count g1's roster (${g1CountErr.message}); seeding joined = 0.`,
+          );
+        }
         const rows = [
           {
             id: "g1",
             host_id: gamesHostId,
             sport: "Basketball",
             title: "Friday Night Run · 5v5 Full Court",
-            date: new Date(now + 3 * 3600_000).toISOString(),
+            date: new Date(now + 24 * 3600_000).toISOString(),
             duration: "120 min",
             location: "Tompkins Square Courts",
             neighborhood: "East Village",
             max_players: 10,
-            joined: 8,
+            joined: g1Roster ?? 0,
             skill: "Intermediate",
             price: 0,
             indoor: false,
@@ -295,7 +388,7 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
         // The game page derives "requires approval" from game_payment_settings,
         // and FAILS CLOSED: with no settings row, `requiresApproval` defaults to
         // true (src/routes/games.$gameId.index.tsx), so the join CTA reads
-        // "Request Spot" instead of "Join Run". The join-free specs on g1
+        // "Request Spot" instead of "Join Game". The join-free specs on g1
         // (join-cross-device-*, join-realtime-*, roster-*) expect a free,
         // no-approval game, so seed a settings row that says so. g2 keeps the
         // default (approval-gated), which the invite/request specs rely on, and

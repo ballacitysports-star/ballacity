@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { knownErrorMessage } from "@/lib/user-error";
 
 /**
  * Date of birth is a locked identity attribute.
@@ -124,15 +125,5 @@ export const reviewBirthdayCorrection = createServerFn({ method: "POST" })
   });
 
 function friendly(message: string): string {
-  const m = message ?? "";
-  if (m.includes("BIRTHDAY_LOCKED"))
-    return "Your date of birth is locked. Request a correction and support will review it.";
-  if (m.includes("DOB_UNCHANGED")) return "That is already the date of birth we have on file.";
-  if (m.includes("REQUEST_PENDING")) return "You already have a correction under review.";
-  if (m.includes("REASON_REQUIRED")) return "Tell us why the date needs correcting.";
-  if (m.includes("DOB_INVALID")) return "That date of birth isn't valid.";
-  if (m.includes("ALREADY_REVIEWED")) return "That request was already decided.";
-  if (m.includes("FORBIDDEN")) return "You don't have access to birthday corrections.";
-  if (m.includes("NOT_FOUND")) return "That correction request no longer exists.";
-  return "Something went wrong. Please try again.";
+  return knownErrorMessage(message) ?? "Something went wrong. Please try again.";
 }

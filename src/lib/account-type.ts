@@ -113,7 +113,7 @@ export const ROLES: readonly RoleMeta[] = [
     id: "player",
     emoji: "🏃",
     label: "Player",
-    blurb: "Athletes looking for games and runs",
+    blurb: "Athletes looking for pickup games",
     setups: ["player"],
   },
   {

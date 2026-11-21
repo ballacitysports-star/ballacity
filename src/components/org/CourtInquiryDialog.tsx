@@ -23,6 +23,14 @@ import {
   type CourtType,
   type TimeSlot,
 } from "@/lib/court-inquiries";
+import { useAuthSearchHere } from "@/lib/auth-return";
+import { errorText, userErrorMessage } from "@/lib/user-error";
+
+/** Sentences submitCourtInquiry words itself; shown as they are. */
+const INQUIRY_SENTENCES: readonly string[] = [
+  "That facility no longer exists.",
+  "Couldn't send your court inquiry. Please try again.",
+];
 
 const fieldCls =
   "w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime/60";
@@ -49,6 +57,7 @@ export function CourtInquiryDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const auth = useAuth();
+  const authSearch = useAuthSearchHere();
   const qc = useQueryClient();
   const submit = useServerFn(submitCourtInquiry);
   const [sport, setSport] = useState<string>("Basketball");
@@ -91,7 +100,12 @@ export function CourtInquiryDialog({
       setNotes("");
       onOpenChange(false);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't send your inquiry");
+      const text = errorText(e) ?? "";
+      toast.error(
+        INQUIRY_SENTENCES.includes(text)
+          ? text
+          : userErrorMessage(e, "Couldn't send your inquiry. Please try again."),
+      );
     } finally {
       setBusy(false);
     }
@@ -112,7 +126,7 @@ export function CourtInquiryDialog({
             <p className="text-muted-foreground">Sign in to send a court inquiry.</p>
             <Link
               to="/auth"
-              search={{ next: "/orgs" }}
+              search={authSearch}
               className="inline-flex rounded-full bg-lime px-4 py-2 text-xs font-bold text-primary-foreground"
             >
               Sign in

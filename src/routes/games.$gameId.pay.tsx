@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { pageHead } from "@/lib/seo";
@@ -6,6 +7,7 @@ import {
   ArrowLeft,
   ExternalLink,
   Upload,
+  ShieldAlert,
   ShieldCheck,
   Clock,
   X,
@@ -20,6 +22,7 @@ import {
 import { toast } from "sonner";
 import { GAMES } from "@/lib/sample-data";
 import { useAuth } from "@/hooks/use-auth";
+import { isManagedUser } from "@/lib/managed-children";
 import { useParentMode } from "@/hooks/use-parent-mode";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -30,6 +33,7 @@ import {
   paymentTypeMeta,
   resolvePaymentDeepLink,
   getGamePaymentSettings,
+  getGameJoinPolicy,
   listPaymentMethodsForHost,
   uploadProofScreenshot,
   createPaymentSubmission,
@@ -38,6 +42,8 @@ import {
   cancelMyPaymentSubmission,
   disputeMyPaymentSubmission,
 } from "@/lib/payments";
+import { validateImageMeta } from "@/lib/image-validation";
+import { paymentSubmissionErrorMessage, userErrorMessage } from "@/lib/user-error";
 import {
   PAYMENT_DISCLAIMER,
   PAYMENT_STATE_META,
@@ -49,7 +55,8 @@ import {
 } from "@/lib/payment-states";
 import { PaymentSafetyNotice } from "@/components/PaymentSafetyNotice";
 import { PayPalCheckoutButton } from "@/components/payments/PayPalCheckoutButton";
-import { getPayPalCheckoutConfig } from "@/lib/paypal.functions";
+import { payOptionsView, usePayPalCheckoutConfig } from "@/hooks/use-paypal-checkout-config";
+import { openExternalPaymentTab } from "@/lib/external-payment-tab";
 import { ReportDialog } from "@/components/ReportDialog";
 import { LegalNotice } from "@/components/LegalNotice";
 
@@ -62,9 +69,39 @@ import { useGameRefundTerms } from "@/hooks/use-game-refund-terms";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 
 // joinGame no longer called here — player is added to roster only after host verifies payment.
-import { fetchHostedGame, useHostedGames } from "@/lib/hosted-games-store";
+import { retryHostedGames, useHostedGames, useHostedGamesStatus } from "@/lib/hosted-games-store";
+import { useGameLookup } from "@/hooks/use-game-lookup";
+import { reloadRoster, retryRosterLoad, useIsJoined, useRosterLoadState } from "@/lib/games-store";
+import { hasPaymentIn } from "@/lib/spots-urgency";
 import { useMyFlowStatus, FLOW_STEPS, FLOW_META } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
+import { useJoinGate } from "@/lib/live-status";
+import { useMyChildStatus } from "@/lib/child-safety";
+import { useMyAge } from "@/lib/use-my-age";
+import {
+  blockOutranksApproval,
+  checkStateOf,
+  payEntryView,
+  payAwaitsApproval,
+  payManualMethodsStep,
+  payPalOffered,
+  payRiskAckStep,
+  payRiskAckView,
+  payEntryFlow,
+  payMethodsHeldForApproval,
+  paySetupFrom,
+  type CheckState,
+  type PayEntryView,
+  type PaySetup,
+} from "@/lib/pay-entry-gate";
+import { RiskAcknowledgmentDialog } from "@/components/safety/RiskAcknowledgmentDialog";
+import { RISK_ACKNOWLEDGMENT, SAFETY_ACK_VERSION } from "@/lib/safety";
+import { recordSafetyAck, safetyAckQueryKey, useSafetyAck } from "@/lib/safety-acks";
+import { riskAckReadFrom } from "@/lib/risk-ack-tap";
+import {
+  useGameManualClaimGuardianReady,
+  useGamePaymentGuardianReady,
+} from "@/hooks/use-game-payment-guardian-ready";
 import { z } from "zod";
 
 // Local YYYY-MM-DD for a Date, avoiding UTC shift from toISOString().
@@ -106,6 +143,18 @@ function externalPaymentResumeKey(gameId: string, methodId: string) {
   return `pay-opened:${gameId}:${methodId}`;
 }
 
+/** Whether the player already left for a payment app from this game's pay page in this tab (any method). */
+function externalPaymentOpenedFor(gameId: string, methods: PaymentMethod[]): boolean {
+  try {
+    return methods.some(
+      (method) =>
+        window.sessionStorage.getItem(externalPaymentResumeKey(gameId, method.id)) === "1",
+    );
+  } catch {
+    return false;
+  }
+}
+
 function markExternalPaymentOpened(gameId: string, methodId: string) {
   try {
     window.sessionStorage.setItem(externalPaymentResumeKey(gameId, methodId), "1");
@@ -121,8 +170,9 @@ function launchExternalPayment(url: string, copyText?: string | null) {
       .then(() => toast.success(`Copied ${copyText}`))
       .catch(() => {});
   }
-  const externalWindow = window.open(url, "_blank", "noopener,noreferrer");
-  if (!externalWindow) window.location.assign(url);
+  if (openExternalPaymentTab(url) === "refused") {
+    toast.error("This payment link can't be opened. Ask the host for another way to pay.");
+  }
 }
 
 function feeLabel(fee: number | null | undefined) {
@@ -175,12 +225,18 @@ export const Route = createFileRoute("/games/$gameId/pay")({
 function PayPage() {
   const { gameId, game: loaderGame } = Route.useLoaderData();
   const hostedGames = useHostedGames();
-  const [remoteGame, setRemoteGame] = useState<typeof loaderGame>(null);
+  // A boolean, not the list: useHostedGames() returns a new array every render.
+  const inLiveList = hostedGames.some((g) => g.id === gameId);
+  const { remoteGame, lookupDone: lookupTimedOut } = useGameLookup(
+    gameId,
+    !!loaderGame || inLiveList,
+  );
   const game = useMemo(
     () => hostedGames.find((g) => g.id === gameId) ?? remoteGame ?? loaderGame ?? null,
     [hostedGames, remoteGame, loaderGame, gameId],
   );
   const { user, loading } = useAuth();
+  const queryClient = useQueryClient();
   const { isParentMode } = useParentMode();
   const userId = user?.id ?? null;
   const hasGame = !!game;
@@ -188,22 +244,125 @@ function PayPage() {
   // the viewer is on the pay screen. Falls back to the static snapshot on
   // sample games and during hydration so nothing briefly flashes to zero.
   const liveCount = useLiveParticipantCount(game?.id);
+  // The viewer's own place (their game_participants rows, kept live by games-store).
+  const viewerHoldsPlace = useIsJoined(gameId);
+  // Until the store has read the roster, useIsJoined is only what this browser saved.
+  const rosterLoad = useRosterLoadState();
+  // The game page's checks for a new join (lockedForNewJoin, consentBlocksNewJoin) never ran for a player who came
+  // here by its Pay Host link, an invite or a bookmark; payEntryView asks them again before any payment is offered.
+  // No roster count in the gate: payEntryView decides a full roster itself (rosterCheck below), as the database's
+  // GAME_FULL does, for a viewer not on the roster.
+  const joinGate = useJoinGate(game);
+  const childQuery = useMyChildStatus();
+  const { can: canChildFeature } = childQuery;
+  // The game's age range, decided as the game page decides it (ageGateState from useMyAge): a viewer outside it, or
+  // with no birthday on file, asks the host first. payEntryView only waits for it on a game with a range.
+  const myAge = useMyAge();
 
   const maxPlayers = game?.maxPlayers ?? 0;
+  // The roster count a full-game block rests on (payment_claim_block's GAME_FULL): the store's live count, which
+  // answers once the store has loaded from the database, or once the by-id lookup (fetchHostedGame) has read this
+  // game from it. Only this browser's saved copy waits for the store's first load: fail closed.
+  const hostedGamesStatus = useHostedGamesStatus();
+  const rosterCount: CheckState<number> =
+    liveCount !== undefined
+      ? { state: "ready", value: liveCount }
+      : hostedGamesStatus === "error"
+        ? { state: "error" }
+        : { state: "loading" };
+  const rosterCheck: CheckState<{ count: number; maxPlayers: number }> =
+    rosterCount.state === "ready"
+      ? { state: "ready", value: { count: rosterCount.value, maxPlayers } }
+      : rosterCount;
   const effectiveJoined = Math.min(maxPlayers, liveCount ?? game?.joined ?? 0);
   const spotsLeft = Math.max(0, maxPlayers - effectiveJoined);
-  const justFilledDuringPay = liveCount !== undefined && spotsLeft <= 0;
   const nav = useNavigate();
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
+  // Who is paid and whether the host screens players: from the settings row when this viewer may read it, else from
+  // the public join policy and the game's host (paySetupFrom, docs/paid-path-gates.md section 6 (c)). Null when the
+  // host has no payment settings for this game: nothing is offered.
+  const [setup, setSetup] = useState<PaySetup | null>(null);
+  // The host's methods were not asked for: a viewer the host has not approved yet, on a game whose host reviews every
+  // player (payMethodsHeldForApproval). Read again once the host approves them.
+  const [methodsHeld, setMethodsHeld] = useState(false);
+  const gameHostId = game?.hostUserId ?? null;
+  // The host never pays for their own game; the game page applies no age range and no "Before you join" to them.
+  const isHost = !!userId && (game?.hostUserId === userId || settings?.host_id === userId);
   const refundTerms = useGameRefundTerms(game?.id, settings);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
-  const [paypalCfg, setPaypalCfg] = useState<{ clientId: string; merchantId: string } | null>(null);
   const [picked, setPicked] = useState<PaymentMethod | null>(null);
+  // The viewer was already shown how to pay (a method picked while nothing blocked them, or a payment app opened
+  // from this page in this tab). A block that turns up after that tells them to ask the host for a refund.
+  // Held per game: the route component stays mounted from /games/A/pay to /games/B/pay, and a start on A says
+  // nothing about B (it would tell B's viewer to ask for a refund of money they never sent).
+  const [paymentStartedFor, setPaymentStartedFor] = useState<string | null>(null);
+  const paymentStarted = paymentStartedFor === gameId;
+  // A PayPal payment went through on this page for this game: the viewer paid, so a block that turns up after it
+  // keeps the refund line. And while the viewer's places are read again after it (the server may have just put them
+  // on the roster), a block a place lifts waits for that read (payEntryFlow).
+  const [paypalPaidFor, setPaypalPaidFor] = useState<string | null>(null);
+  const [rosterReloadFor, setRosterReloadFor] = useState<string | null>(null);
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
+  // Read by the settings fetch (below) without restarting it on every change of the request.
+  const approvedNow = myReq?.status === "approved";
+  const approvedRef = useRef(approvedNow);
+  approvedRef.current = approvedNow;
+  // Whether mySubs and myReq have been read for this game and viewer: 'error' when the first read failed (a later
+  // poll that succeeds makes it 'ready'). Keyed so that another game's or account's answers never count here.
+  const viewerKey = `${gameId}:${userId ?? ""}`;
+  const viewerKeyRef = useRef(viewerKey);
+  viewerKeyRef.current = viewerKey;
+  type Lookup = "loading" | "ready" | "error";
+  const [viewerLookup, setViewerLookup] = useState<{ key: string; req: Lookup; subs: Lookup }>({
+    key: "",
+    req: "loading",
+    subs: "loading",
+  });
+  const [viewerAttempt, setViewerAttempt] = useState(0);
+  const markLookup = useCallback((key: string, which: "req" | "subs", ok: boolean) => {
+    setViewerLookup((prev) => {
+      const base =
+        prev.key === key ? prev : { key, req: "loading" as Lookup, subs: "loading" as Lookup };
+      // A failure after an answer keeps the answer (as the polls do).
+      const next: Lookup = ok ? "ready" : base[which] === "ready" ? "ready" : "error";
+      return base[which] === next && base === prev ? prev : { ...base, [which]: next };
+    });
+  }, []);
+  // A guarded minor pays only on a request their guardian approved; host approval alone clears the approval card.
+  const guardianRequestKey = `${myReq?.id ?? "none"}:${myReq?.status ?? ""}:${myReq?.guardian_approved_at ?? ""}`;
+  const guardianQuery = useGamePaymentGuardianReady(
+    hasGame ? gameId : undefined,
+    userId,
+    guardianRequestKey,
+  );
+  // The manual-claim trigger's own guardian rule, which has no adult exemption (docs/paid-path-gates.md section 6
+  // (d)): an adult whose guardian link from before 18 is still active may pay by PayPal, not by Venmo or Cash App.
+  const manualClaimQuery = useGameManualClaimGuardianReady(
+    hasGame ? gameId : undefined,
+    userId,
+    guardianRequestKey,
+  );
+  // "Before you join" (docs/paid-path-gates.md section 7, Option B): the same acknowledgment the join tap asks for
+  // (useSafetyAck / recordSafetyAck, participant_risk, SAFETY_ACK_VERSION), asked here before any payment option is
+  // drawn, because a paid game's Pay Host link and a direct visit never run the game page's handleJoin.
+  const riskAckQuery = useSafetyAck(hasGame ? gameId : null, "participant_risk");
+  // Cancel closes the dialog for this game only; the card it leaves offers it again.
+  const [riskAckDismissedFor, setRiskAckDismissedFor] = useState<string | null>(null);
+  const [riskAckSubmitting, setRiskAckSubmitting] = useState(false);
   const [fetching, setFetching] = useState(true);
-  const [lookupTimedOut, setLookupTimedOut] = useState(false);
   const [fetchAttempt, setFetchAttempt] = useState(0);
+  // PayPal checkout config loads on its own, with its own deadline, and Retry re-asks for it too. It holds the
+  // screen only when there is nothing else to offer (see the empty state below).
+  const paypalLookup = usePayPalCheckoutConfig(
+    hasGame ? gameId : undefined,
+    undefined,
+    fetchAttempt,
+  );
+  // PayPal refuses an ended or cancelled game to every player (paypal_payment_precondition), so it is not offered
+  // there; a rostered player who still owes for an ended game keeps the host's manual methods.
+  const paypal = payPalOffered(joinGate.joinState) ? paypalLookup : { config: null, settled: true };
+  const paypalCfg = paypal.config;
   const [fetchTimedOut, setFetchTimedOut] = useState(false);
   const stage: "auth" | "lookup" | "fetch" | "ready" = loading
     ? "auth"
@@ -244,8 +403,11 @@ function PayPage() {
 
   const refreshJoinRequest = useCallback(async () => {
     if (!userId) return;
+    const key = `${gameId}:${userId}`;
     try {
       const req = await getMyJoinRequest(gameId);
+      if (viewerKeyRef.current !== key) return;
+      markLookup(key, "req", true);
       setMyReq((prev) => {
         // Toast on approval transition (pending/rejected/none → approved).
         if (req?.status === "approved" && prev?.status !== "approved") {
@@ -256,33 +418,7 @@ function PayPage() {
     } catch {
       /* ignore polling errors */
     }
-  }, [gameId, userId]);
-
-  useEffect(() => {
-    if (loaderGame || hostedGames.some((g) => g.id === gameId)) {
-      setLookupTimedOut(true);
-      return;
-    }
-
-    let cancelled = false;
-    setLookupTimedOut(false);
-    setRemoteGame(null);
-    const timeout = new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 8000));
-    Promise.race([fetchHostedGame(gameId), timeout])
-      .then((found) => {
-        if (!cancelled) setRemoteGame(found ?? null);
-      })
-      .catch(() => {
-        if (!cancelled) setRemoteGame(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLookupTimedOut(true);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [gameId, hostedGames, loaderGame]);
+  }, [gameId, userId, markLookup]);
 
   useEffect(() => {
     if (!hasGame) return;
@@ -290,6 +426,8 @@ function PayPage() {
     setFetching(true);
     setFetchTimedOut(false);
     setSettings(null);
+    setSetup(null);
+    setMethodsHeld(false);
     setMethods([]);
     setPicked(null);
     const withTimeout = <T,>(p: Promise<T>, label: string): Promise<T> =>
@@ -303,51 +441,33 @@ function PayPage() {
       try {
         const s = await withTimeout(getGamePaymentSettings(gameId), "getGamePaymentSettings");
         if (cancelled) return;
+        // RLS hides the row from a viewer who is not yet the payee, an approved requester, a payer or a participant:
+        // ask the public join policy for that viewer (a failure is the Retry below, never "no approval needed").
+        const policy = s ? null : await withTimeout(getGameJoinPolicy(gameId), "getGameJoinPolicy");
+        if (cancelled) return;
+        const nextSetup = paySetupFrom({ settings: s, policy, gameHostId });
+        const held = payMethodsHeldForApproval({
+          setup: nextSetup,
+          approved: approvedRef.current,
+        });
+        const all =
+          nextSetup && !held
+            ? await withTimeout(
+                listPaymentMethodsForHost(nextSetup.hostId, gameId),
+                "listPaymentMethodsForHost",
+              )
+            : [];
+        if (cancelled) return;
         setSettings(s);
-        if (s) {
-          const all = await withTimeout(
-            listPaymentMethodsForHost(s.host_id, gameId),
-            "listPaymentMethodsForHost",
-          );
-          if (cancelled) return;
-          setMethods(all);
-        } else {
-          setMethods([]);
-        }
-
-        // PayPal checkout config is optional; failure never blocks the pay UI.
-        try {
-          const cfg = await getPayPalCheckoutConfig({ data: { gameId } });
-          if (!cancelled && cfg.clientId && cfg.merchantId) {
-            setPaypalCfg({ clientId: cfg.clientId, merchantId: cfg.merchantId });
-          }
-        } catch {
-          /* PayPal not configured — one-tap buttons remain */
-        }
+        setSetup(nextSetup);
+        setMethodsHeld(held);
+        setMethods(all);
 
         // Payment settings + host payment methods are the critical path for
-        // rendering the pay UI. User-specific status is helpful, but should
-        // never blank the screen or show the payment-service retry if a
-        // realtime/status lookup is slow on mobile.
+        // rendering the pay UI. The viewer's own request and payments load
+        // beside them (below) and never blank the screen or show the
+        // payment-service retry; only a block they could lift waits for them.
         if (!cancelled) setFetching(false);
-
-        if (userId) {
-          const [subsResult, reqResult] = await Promise.allSettled([
-            withTimeout(listMySubmissionsForGame(gameId), "listMySubmissionsForGame"),
-            withTimeout(getMyJoinRequest(gameId), "getMyJoinRequest"),
-          ]);
-          if (cancelled) return;
-          if (subsResult.status === "fulfilled") {
-            setMySubs(subsResult.value);
-          } else {
-            console.warn(`[pay] optional submissions lookup failed: ${subsResult.reason}`);
-          }
-          if (reqResult.status === "fulfilled") {
-            setMyReq(reqResult.value);
-          } else {
-            console.warn(`[pay] optional join-request lookup failed: ${reqResult.reason}`);
-          }
-        }
       } catch (e: any) {
         if (cancelled) return;
         const msg: string = e?.message ?? String(e);
@@ -360,7 +480,60 @@ function PayPage() {
     return () => {
       cancelled = true;
     };
-  }, [hasGame, gameId, userId, fetchAttempt]);
+  }, [hasGame, gameId, gameHostId, userId, fetchAttempt]);
+  // The host approved a viewer whose methods were held back: read the settings (now theirs to read) and the methods.
+  // Until that read is in, the options count as loading (optionsFetching), never as "Host hasn't set up payment yet".
+  const awaitingHeldMethods = methodsHeld && approvedNow;
+  useEffect(() => {
+    if (awaitingHeldMethods) setFetchAttempt((n) => n + 1);
+  }, [awaitingHeldMethods]);
+  const optionsFetching = fetching || awaitingHeldMethods;
+
+  // The viewer's own request and payments for this game. Until both have answered, payEntryView counts them as
+  // nothing and shows a block they could lift (a closed game, an ended one, a guardian's switch) as "Loading payment
+  // options…", not as "You can't pay for this game" to a player who is approved or has already paid.
+  const lastViewerKeyRef = useRef("");
+  useEffect(() => {
+    if (!hasGame || !userId) return;
+    const key = `${gameId}:${userId}`;
+    if (lastViewerKeyRef.current !== key) {
+      // Another game's (or account's) request and payments must not stand in for this one's.
+      lastViewerKeyRef.current = key;
+      setMySubs([]);
+      setMyReq(null);
+      setViewerLookup({ key, req: "loading", subs: "loading" });
+    }
+    let cancelled = false;
+    const withTimeout = <T,>(p: Promise<T>, label: string): Promise<T> =>
+      Promise.race([
+        p,
+        new Promise<T>((_, reject) =>
+          window.setTimeout(() => reject(new Error(`[pay] ${label} timed out after 6s`)), 6000),
+        ),
+      ]);
+    void (async () => {
+      const [subsResult, reqResult] = await Promise.allSettled([
+        withTimeout(listMySubmissionsForGame(gameId), "listMySubmissionsForGame"),
+        withTimeout(getMyJoinRequest(gameId), "getMyJoinRequest"),
+      ]);
+      if (cancelled) return;
+      if (subsResult.status === "fulfilled") {
+        setMySubs(subsResult.value);
+      } else {
+        console.warn(`[pay] submissions lookup failed: ${subsResult.reason}`);
+      }
+      markLookup(key, "subs", subsResult.status === "fulfilled");
+      if (reqResult.status === "fulfilled") {
+        setMyReq(reqResult.value);
+      } else {
+        console.warn(`[pay] join-request lookup failed: ${reqResult.reason}`);
+      }
+      markLookup(key, "req", reqResult.status === "fulfilled");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hasGame, gameId, userId, fetchAttempt, viewerAttempt, markLookup]);
 
   useEffect(() => {
     if (picked || methods.length === 0) return;
@@ -372,6 +545,7 @@ function PayPage() {
       );
       if (resumed) {
         setPicked(resumed);
+        setPaymentStartedFor(gameId);
         return;
       }
     }
@@ -426,8 +600,11 @@ function PayPage() {
   // review (verified/rejected) in real time. Realtime primary, poll fallback.
   const refreshSubs = useCallback(async () => {
     if (!userId) return;
+    const key = `${gameId}:${userId}`;
     try {
       const subs = await listMySubmissionsForGame(gameId);
+      if (viewerKeyRef.current !== key) return;
+      markLookup(key, "subs", true);
       setMySubs((prev) => {
         const prevLatest = prev[0];
         const nextLatest = subs[0];
@@ -446,7 +623,7 @@ function PayPage() {
     } catch {
       /* ignore polling errors */
     }
-  }, [gameId, userId]);
+  }, [gameId, userId, markLookup]);
 
   const refreshSubsRef = useRef(refreshSubs);
   useEffect(() => {
@@ -487,6 +664,110 @@ function PayPage() {
     };
   }, [gameId, userId]);
 
+  // Decided before any payment option is drawn. Fails closed: until the child-status policy and the guardian check
+  // have answered, the page shows "Loading payment options…" (or a retry), never the host's handles.
+  const childStatus = childQuery.status;
+  const lookupFor = viewerLookup.key === viewerKey ? viewerLookup : null;
+  const reqLookup: Lookup = lookupFor?.req ?? "loading";
+  const flowLookups: Lookup[] = [reqLookup, lookupFor?.subs ?? "loading", rosterLoad];
+  const flowState: Lookup = flowLookups.includes("error")
+    ? "error"
+    : flowLookups.every((l) => l === "ready")
+      ? "ready"
+      : "loading";
+  const paymentStartedHere =
+    paymentStarted || (typeof window !== "undefined" && externalPaymentOpenedFor(gameId, methods));
+  const entryView = payEntryView({
+    holdsPlace: viewerHoldsPlace,
+    paymentIn: hasPaymentIn(mySubs),
+    approved: myReq?.status === "approved",
+    flow: payEntryFlow({ flow: flowState, rosterReloading: rosterReloadFor === gameId }),
+    gate: joinGate,
+    child: checkStateOf({
+      data: childStatus
+        ? {
+            participation: canChildFeature("game_participation"),
+            payments: canChildFeature("game_payments"),
+            ageUnknown: childStatus.cohort === "unknown",
+          }
+        : null,
+      isError: childQuery.isError,
+    }),
+    guardian: checkStateOf({ data: guardianQuery.data, isError: guardianQuery.isError }),
+    paymentStarted: paymentStartedHere || paypalPaidFor === gameId,
+    isHost,
+    roster: rosterCheck,
+    ageReq: game ? { minAge: game.minAge ?? null, maxAge: game.maxAge ?? null } : null,
+    viewerAge: myAge.loading
+      ? { state: "loading" }
+      : myAge.error
+        ? { state: "error" }
+        : { state: "ready", value: myAge.age },
+  });
+  // Fails closed: until the acknowledgment read (and, for a viewer it would ask, their flow state) has answered, the
+  // page shows "Loading payment options…"; a failed read asks (src/lib/risk-ack-tap.ts).
+  const riskAck = payRiskAckView({
+    isHost,
+    holdsPlace: viewerHoldsPlace,
+    paymentIn: hasPaymentIn(mySubs),
+    approved: myReq?.status === "approved",
+    flow: flowState,
+    read: riskAckReadFrom(riskAckQuery.status, riskAckQuery.data),
+  });
+  const entryClear = entryView.kind === "clear" && riskAck === "none";
+  // The host's manual methods and the proof form, once nothing else stands in front of them: held back (PayPal only,
+  // or the block card) when the database would refuse this viewer's manual claim on the guardian rule.
+  const manualStep = payManualMethodsStep({
+    manualClaim: checkStateOf({ data: manualClaimQuery.data, isError: manualClaimQuery.isError }),
+    hasManualMethods: !!setup && methods.length > 0,
+    paypalOffered: !!paypalCfg && !!setup,
+    paypalSettled: paypal.settled,
+    methodPicked: !!picked,
+    paymentStarted: paymentStartedHere,
+    managedAccount: isManagedUser(user),
+  });
+  const manualOffered = manualStep.kind === "offer_all";
+  // A method's proof step on screen while nothing blocked the viewer: they have seen where to send the money. (Not
+  // while the approval card or a loading state stands in its place.)
+  const proofStepOnScreen =
+    !!picked &&
+    entryClear &&
+    manualOffered &&
+    !optionsFetching &&
+    !fetchTimedOut &&
+    !!setup &&
+    !(setup.requiresApproval && myReq?.status !== "approved");
+  useEffect(() => {
+    if (proofStepOnScreen) setPaymentStartedFor(gameId);
+  }, [proofStepOnScreen, gameId]);
+  const confirmRiskAck = async () => {
+    setRiskAckSubmitting(true);
+    try {
+      // The join path's write (game page confirmRiskAck): same kind, same version, idempotent.
+      await recordSafetyAck({ gameId, kind: "participant_risk" });
+      // The write succeeded: the current version is on file. Say so in the cache at once, as the join path carries on
+      // after its write whatever a re-read says, so a failing ack read (the case the fail-closed rule exists for) does
+      // not keep the dialog open over an acknowledgment already recorded. The re-read runs in the background; if it
+      // fails, react-query keeps this answer.
+      const key = safetyAckQueryKey(user?.id, gameId, "participant_risk");
+      queryClient.setQueryData(key, SAFETY_ACK_VERSION);
+      void queryClient.invalidateQueries({ queryKey: key });
+    } catch (e: unknown) {
+      toast.error(userErrorMessage(e, "Couldn't record your acknowledgment. Please try again."));
+    } finally {
+      setRiskAckSubmitting(false);
+    }
+  };
+  const retryEntryChecks = () => {
+    if (childQuery.isError) void childQuery.refetch();
+    if (guardianQuery.isError) void guardianQuery.refetch();
+    if (manualClaimQuery.isError) void manualClaimQuery.refetch();
+    if (lookupFor?.req === "error" || lookupFor?.subs === "error") setViewerAttempt((n) => n + 1);
+    if (rosterLoad === "error") retryRosterLoad();
+    if (myAge.error) myAge.retry();
+    if (rosterCount.state === "error") retryHostedGames();
+  };
+
   if (loading || (!game && !lookupTimedOut)) {
     return (
       <div className="p-6 text-sm text-muted-foreground">
@@ -500,22 +781,66 @@ function PayPage() {
   if (!user) return null;
 
   const fee = settings?.entry_fee ?? game.price;
-  const requiresApproval = !!settings?.requires_approval;
+  // PayPal counts as an option only with a payment setup: the button pays the game's payee, and with no settings row
+  // at all PayPal's precondition refuses a player the host has not approved (HOST_APPROVAL_REQUIRED). Without this a
+  // PayPal config alone made the page draw an empty "How do you want to pay?" list.
+  const paypalOptions = setup ? paypal : { config: null, settled: true };
+  const requiresApproval = !!setup?.requiresApproval;
   const isApproved = myReq?.status === "approved";
-  const approvalGateActive = requiresApproval && !isApproved;
 
   const hasSubmission = mySubs.length > 0;
+  // The block card replaces every payment option. It comes before "Waiting on host approval" unless the host's
+  // approval would lift it (blockOutranksApproval), so a 13-15 is never told payment unlocks after approval.
+  const blockCard = entryView.kind === "blocked" ? entryView : null;
+  // The host's setting, or (as on the game page) a pending request from a viewer outside the game's age range.
+  const approvalGateActive = payAwaitsApproval({
+    hostRequiresApproval: requiresApproval,
+    approved: isApproved,
+    requestPending: myReq?.status === "pending",
+    replaceBlock: blockCard?.block ?? null,
+  });
+  const blockCardFirst =
+    !!blockCard && blockOutranksApproval(blockCard.block, myReq?.status === "pending");
+  // The approval card's wording rests on the viewer's request ("Send a request to join first" when there is none), so
+  // it waits for that read like a block does.
+  const pendingCheck: "checking" | "check_failed" | null =
+    entryView.kind === "checking" || entryView.kind === "check_failed"
+      ? entryView.kind
+      : !blockCard && approvalGateActive && reqLookup !== "ready"
+        ? reqLookup === "error"
+          ? "check_failed"
+          : "checking"
+        : null;
+  // "Before you join" stands in for the payment options only where they would otherwise come next: not in front of a
+  // block card, a pending check or the approval card, and not before the host's settings have answered (they decide
+  // whether the approval card comes first).
+  const riskAckStep = payRiskAckStep({
+    riskAck,
+    outranked: !!blockCard || !!pendingCheck || approvalGateActive,
+    settings: optionsFetching ? "loading" : fetchTimedOut ? "error" : "ready",
+  });
   const currentStep: "pay" | "confirm" = picked ? "confirm" : "pay";
   const showStepper =
     !hasSubmission &&
     !approvalGateActive &&
-    !fetching &&
+    entryClear &&
+    manualOffered &&
+    !optionsFetching &&
     !fetchTimedOut &&
-    !!settings &&
+    !!setup &&
     methods.length > 0;
 
   return (
     <div className="page-shell-narrow pt-6 pb-32 space-y-4">
+      <RiskAcknowledgmentDialog
+        open={riskAckStep === "ask" && riskAckDismissedFor !== gameId}
+        onOpenChange={(v) => {
+          if (!v) setRiskAckDismissedFor(gameId);
+        }}
+        gameTitle={game.title}
+        submitting={riskAckSubmitting}
+        onConfirm={() => void confirmRiskAck()}
+      />
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link
@@ -567,15 +892,6 @@ function PayPage() {
             {new Date(settings.payment_deadline).toLocaleString()}
           </div>
         )}
-        {justFilledDuringPay && (
-          <p
-            role="status"
-            aria-live="assertive"
-            className="mt-3 text-[11px] font-semibold text-coral"
-          >
-            This game just filled up — message the host before submitting.
-          </p>
-        )}
       </div>
 
       {/* Status card replaces the stepper once a submission exists */}
@@ -583,14 +899,14 @@ function PayPage() {
         <PaymentStatusTimeline
           latest={mySubs[0]}
           history={mySubs.slice(1)}
-          hostId={settings?.host_id ?? null}
+          hostId={setup?.hostId ?? null}
           gameId={gameId}
           onChanged={async () => setMySubs(await listMySubmissionsForGame(gameId))}
         />
       )}
 
       <PaymentSafetyNotice
-        counterpartyId={settings?.host_id ?? null}
+        counterpartyId={setup?.hostId ?? null}
         counterpartyLabel="this host"
         gameId={gameId}
         showPressureWarning={Number(fee) >= 100}
@@ -603,7 +919,7 @@ function PayPage() {
       <PayApprovalIndicator
         gameId={gameId}
         isPaid={Number(fee) > 0}
-        requiresApproval={requiresApproval}
+        requiresApproval={requiresApproval || approvalGateActive}
       />
 
       {/* Two-step progress (Pay → Confirm) */}
@@ -630,7 +946,29 @@ function PayPage() {
       )}
 
       {/* Single active step body */}
-      {approvalGateActive ? (
+      {blockCard && blockCardFirst ? (
+        <PayEntryBlockedCard view={blockCard} gameId={game.id} />
+      ) : pendingCheck === "checking" ? (
+        <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center text-sm text-muted-foreground">
+          Loading payment options…
+        </div>
+      ) : pendingCheck === "check_failed" ? (
+        <div
+          className="rounded-2xl border border-dashed border-coral/40 bg-coral/5 p-5 text-center space-y-2"
+          data-testid="pay-entry-check-failed"
+        >
+          <div className="text-sm text-muted-foreground">
+            We couldn't check whether this account can pay for this game.
+          </div>
+          <button
+            type="button"
+            onClick={retryEntryChecks}
+            className="inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
+          >
+            Retry
+          </button>
+        </div>
+      ) : approvalGateActive ? (
         <div
           className="rounded-2xl border border-coral/40 bg-coral/10 p-5"
           role="status"
@@ -642,10 +980,10 @@ function PayPage() {
           </div>
           <p className="text-xs text-muted-foreground mt-1">
             {myReq?.status === "pending"
-              ? "Your request to join is pending. Payment unlocks after the host approves you."
+              ? "Your request for a spot is pending. Payment unlocks after the host approves you."
               : myReq?.status === "rejected"
                 ? "The host declined your request. You can't submit payment for this game."
-                : "This host reviews every player before payment. Send a request to join first."}
+                : "This host reviews every player before payment. Request a spot first."}
           </p>
           <div className="mt-3 flex items-center gap-3 flex-wrap">
             <Link
@@ -653,7 +991,7 @@ function PayPage() {
               params={{ gameId: game.id }}
               className="inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
             >
-              {myReq ? "Back to game" : "Request to join"}
+              {myReq ? "Back to game" : "Request Spot"}
             </Link>
             {myReq?.status === "pending" && (
               <LeaveFlowButton
@@ -665,7 +1003,15 @@ function PayPage() {
             )}
           </div>
         </div>
-      ) : fetching ? (
+      ) : blockCard ? (
+        <PayEntryBlockedCard view={blockCard} gameId={game.id} />
+      ) : riskAckStep === "checking" ? (
+        <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center text-sm text-muted-foreground">
+          Loading payment options…
+        </div>
+      ) : riskAckStep === "ask" ? (
+        <PayRiskAckCard gameId={game.id} onReview={() => setRiskAckDismissedFor(null)} />
+      ) : optionsFetching ? (
         <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center text-sm text-muted-foreground">
           Loading payment options…
         </div>
@@ -680,110 +1026,203 @@ function PayPage() {
             Retry
           </button>
         </div>
-      ) : (!settings || methods.length === 0) && !paypalCfg ? (
+      ) : manualStep.kind === "blocked" ? (
+        <PayEntryBlockedCard view={manualStep} gameId={game.id} />
+      ) : payOptionsView({
+          hasOtherMethods: !!setup && methods.length > 0,
+          paypal: paypalOptions,
+        }) === "loading" ? (
+        // No other method to offer: wait for PayPal (up to its deadline) before saying the host has none, or a
+        // PayPal-only host's players would be told to arrange payment directly.
+        <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center text-sm text-muted-foreground">
+          Loading payment options…
+        </div>
+      ) : payOptionsView({
+          hasOtherMethods: !!setup && methods.length > 0,
+          paypal: paypalOptions,
+        }) === "empty" ? (
         <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center">
           <div className="font-semibold text-sm">Host hasn't set up payment yet</div>
           <p className="text-xs text-muted-foreground mt-1">
             Message the host directly to arrange payment.
           </p>
         </div>
-      ) : !picked ? (
+      ) : !picked || manualStep.kind !== "offer_all" ? (
+        // One container for PayPal and whatever stands in place of the manual list, so the PayPal button keeps its
+        // place (and is not mounted again) when the manual-claim check answers. Once a method is picked its proof
+        // step stands here instead, without PayPal, unless the check holds the manual methods back.
         <div>
-          {paypalCfg && settings && (
-            <div className="mb-4">
-              <PayPalCheckoutButton
-                gameId={game.id}
-                clientId={paypalCfg.clientId}
-                merchantId={paypalCfg.merchantId}
-                feeLabel={feeLabel(settings.entry_fee ?? game.price)}
-                onPaid={async () => {
-                  const subs = await listMySubmissionsForGame(game.id);
-                  setMySubs(subs);
-                }}
-              />
+          {manualStep.kind === "paypal_only" && (
+            <div
+              className="mb-4 rounded-2xl border border-coral/40 bg-coral/10 p-4"
+              role="status"
+              aria-live="polite"
+              data-testid="pay-manual-guardian-hold"
+            >
+              <div className="flex items-center gap-2 font-display text-sm font-bold">
+                <AlertCircle className="h-4 w-4 text-coral" /> Manual payments need a guardian's
+                approval
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">{manualStep.message}</p>
+              <p className="text-xs text-muted-foreground mt-1">{manualStep.next}</p>
+              {manualStep.paymentStarted && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Don't send the host money by Venmo, Cash App or another app for it. If you already
+                  paid, message the host to ask for a refund.
+                </p>
+              )}
+              <div className="mt-3">
+                <Link
+                  to="/games/$gameId"
+                  params={{ gameId: game.id }}
+                  className="inline-flex items-center rounded-full border border-border px-4 py-1.5 text-xs font-bold"
+                >
+                  Back to game
+                </Link>
+              </div>
             </div>
           )}
-          <h2 className="text-sm font-semibold mb-2">
-            {paypalCfg ? "Or pay another way" : "How do you want to pay?"}
-          </h2>
-          <div className="space-y-2">
-            {methods.map((m) => {
-              const meta = paymentTypeMeta(m.payment_type);
-              const fee = settings?.entry_fee ?? game.price;
-              const link = resolvePaymentDeepLink(m, fee, game.title);
-              return (
-                <div
-                  key={m.id}
-                  className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40"
-                >
-                  <button
-                    onClick={() => setPicked(m)}
-                    className="flex items-center gap-3 flex-1 min-w-0 text-left"
-                  >
-                    <div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-lg">
-                      {meta.emoji}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-sm">{m.label || meta.name}</div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {m.username || m.contact_info}
-                      </div>
-                    </div>
-                  </button>
-                  {link.url ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPicked(m);
-                        markExternalPaymentOpened(game.id, m.id);
-                        launchExternalPayment(link.url as string, link.copyText);
-                      }}
-                      className="inline-flex items-center gap-1 rounded-full bg-lime-gradient px-3 py-1.5 text-xs font-bold text-primary-foreground"
-                      title={`Pay in ${meta.name}`}
-                      aria-label={`Pay ${feeLabel(fee)} in ${meta.name}`}
+          {paypalCfg &&
+            setup &&
+            (manualStep.kind === "offer_all" ||
+              manualStep.kind === "paypal_only" ||
+              manualStep.paypal) && (
+              <div className="mb-4">
+                <PayPalCheckoutButton
+                  gameId={game.id}
+                  clientId={paypalCfg.clientId}
+                  merchantId={paypalCfg.merchantId}
+                  feeLabel={feeLabel(settings?.entry_fee ?? game.price)}
+                  onPaid={async () => {
+                    // The capture may have put the viewer on the roster, and filled its last place: the count can
+                    // reach this page before their own place does (another channel), or their place may never
+                    // arrive by realtime. Read their places again now; until that answers, a block a place lifts
+                    // shows as loading, not as "You can't pay for this game" under this payment.
+                    const paidGame = game.id;
+                    setPaypalPaidFor(paidGame);
+                    setRosterReloadFor(paidGame);
+                    try {
+                      const [subs] = await Promise.all([
+                        listMySubmissionsForGame(paidGame),
+                        reloadRoster(),
+                      ]);
+                      setMySubs(subs);
+                    } finally {
+                      setRosterReloadFor((cur) => (cur === paidGame ? null : cur));
+                    }
+                  }}
+                />
+              </div>
+            )}
+          {manualStep.kind === "paypal_only" ? null : manualStep.kind === "checking" ? (
+            <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center text-sm text-muted-foreground">
+              Loading payment options…
+            </div>
+          ) : manualStep.kind === "check_failed" ? (
+            <div
+              className="rounded-2xl border border-dashed border-coral/40 bg-coral/5 p-5 text-center space-y-2"
+              data-testid="pay-manual-check-failed"
+            >
+              <div className="text-sm text-muted-foreground">
+                {manualStep.paypal
+                  ? "We couldn't check whether this account can pay the host by Venmo, Cash App or another app for this game."
+                  : "We couldn't check whether this account can pay for this game."}
+              </div>
+              <button
+                type="button"
+                onClick={retryEntryChecks}
+                className="inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
+              >
+                Retry
+              </button>
+            </div>
+          ) : (
+            <>
+              <h2 className="text-sm font-semibold mb-2">
+                {paypalCfg ? "Or pay another way" : "How do you want to pay?"}
+              </h2>
+              <div className="space-y-2">
+                {methods.map((m) => {
+                  const meta = paymentTypeMeta(m.payment_type);
+                  const fee = settings?.entry_fee ?? game.price;
+                  const link = resolvePaymentDeepLink(m, fee, game.title);
+                  return (
+                    <div
+                      key={m.id}
+                      className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40"
                     >
-                      <ExternalLink className="h-3.5 w-3.5" /> Pay {feeLabel(fee)}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => setPicked(m)}
-                      className="text-lime text-sm px-2"
-                      aria-label="Select payment method"
-                    >
-                      →
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <p className="mt-3 text-[11px] text-muted-foreground text-center">
-            Pay outside the app, then come back to send proof.
-          </p>
+                      <button
+                        onClick={() => setPicked(m)}
+                        className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                      >
+                        <div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-lg">
+                          {meta.emoji}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-sm">{m.label || meta.name}</div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {m.username || m.contact_info}
+                          </div>
+                        </div>
+                      </button>
+                      {link.url ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPicked(m);
+                            markExternalPaymentOpened(game.id, m.id);
+                            launchExternalPayment(link.url as string, link.copyText);
+                          }}
+                          className="inline-flex items-center gap-1 rounded-full bg-lime-gradient px-3 py-1.5 text-xs font-bold text-primary-foreground"
+                          title={`Pay in ${meta.name}`}
+                          aria-label={`Pay ${feeLabel(fee)} in ${meta.name}`}
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" /> Pay {feeLabel(fee)}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setPicked(m)}
+                          className="text-lime text-sm px-2"
+                          aria-label="Select payment method"
+                        >
+                          →
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="mt-3 text-[11px] text-muted-foreground text-center">
+                Pay outside the app, then come back to send proof.
+              </p>
+            </>
+          )}
         </div>
       ) : (
-        <PaymentInstructionsAndProof
-          game_id={game.id}
-          game_title={game.title}
-          fee={settings?.entry_fee ?? game.price}
-          host_id={settings!.host_id}
-          method={picked}
-          extraInstructions={settings?.payment_instructions ?? null}
-          refundTerms={refundDisclaimer(
-            normalizeRefundPolicy(refundTerms?.refund_rule, refundTerms?.late_refund_pct),
-            game.cancelCutoffMin,
-            refundTerms?.refund_policy,
-          )}
-          onCancel={() => setPicked(null)}
-          onSubmitted={async () => {
-            // Do NOT join the roster yet — player is only added after the
-            // host verifies the payment (handled on the game details page
-            // via a realtime listener on payment_submissions).
-            const subs = await listMySubmissionsForGame(game.id);
-            setMySubs(subs);
-            setPicked(null);
-          }}
-        />
+        <>
+          <PaymentInstructionsAndProof
+            game_id={game.id}
+            game_title={game.title}
+            fee={settings?.entry_fee ?? game.price}
+            host_id={setup!.hostId}
+            method={picked}
+            extraInstructions={settings?.payment_instructions ?? null}
+            refundTerms={refundDisclaimer(
+              normalizeRefundPolicy(refundTerms?.refund_rule, refundTerms?.late_refund_pct),
+              game.cancelCutoffMin,
+              refundTerms?.refund_policy,
+            )}
+            onCancel={() => setPicked(null)}
+            onSubmitted={async () => {
+              // Do NOT join the roster yet — player is only added after the
+              // host verifies the payment (handled on the game details page
+              // via a realtime listener on payment_submissions).
+              const subs = await listMySubmissionsForGame(game.id);
+              setMySubs(subs);
+              setPicked(null);
+            }}
+          />
+        </>
       )}
 
       {/* Footer: refund policy is collapsed by default; legal always shows */}
@@ -810,6 +1249,87 @@ function PayPage() {
       </details>
 
       <LegalNotice />
+    </div>
+  );
+}
+
+/**
+ * "You can't pay for this game", in place of the payment options and the proof form. The database refuses the
+ * viewer's own manual claim for every block (payEntryView), so a viewer who already paid is told to ask the host for
+ * a refund, not to submit proof.
+ */
+function PayEntryBlockedCard({
+  view,
+  gameId,
+}: {
+  view: Extract<PayEntryView, { kind: "blocked" }>;
+  gameId: string;
+}) {
+  return (
+    <div
+      className="rounded-2xl border border-coral/40 bg-coral/10 p-5"
+      role="status"
+      aria-live="polite"
+      data-testid="pay-entry-blocked"
+      data-block={view.block.kind}
+    >
+      <div className="flex items-center gap-2 font-display text-sm font-bold">
+        <AlertCircle className="h-4 w-4 text-coral" /> You can't pay for this game
+      </div>
+      <p className="text-xs text-muted-foreground mt-1">{view.block.message}</p>
+      <p className="text-xs text-muted-foreground mt-1">
+        {view.paymentStarted
+          ? "Don't send the host any money for it. If you already paid, message the host to ask for a refund."
+          : "Don't send the host any money for it."}
+      </p>
+      <div className="mt-3">
+        <Link
+          to="/games/$gameId"
+          params={{ gameId }}
+          className="inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
+        >
+          Back to game
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * In place of the payment options until the viewer acknowledges "Before you join" (the dialog over it). Cancel leaves
+ * this card: nothing payable, a way to open the dialog again, and a way back to the game.
+ */
+function PayRiskAckCard({ gameId, onReview }: { gameId: string; onReview: () => void }) {
+  return (
+    <div
+      className="rounded-2xl border border-border bg-surface p-5"
+      role="status"
+      aria-live="polite"
+      data-testid="pay-risk-ack-required"
+    >
+      <div className="flex items-center gap-2 font-display text-sm font-bold">
+        <ShieldAlert className="h-4 w-4 text-lime" aria-hidden /> {RISK_ACKNOWLEDGMENT.title}
+      </div>
+      <p className="text-xs text-muted-foreground mt-1">
+        Acknowledge the risks of this activity before you pay the host. The payment options show
+        once you agree.
+      </p>
+      <div className="mt-3 flex items-center gap-3 flex-wrap">
+        <button
+          type="button"
+          onClick={onReview}
+          className="inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
+        >
+          Review and agree
+        </button>
+        <Link
+          to="/games/$gameId"
+          params={{ gameId }}
+          className="text-xs font-semibold text-muted-foreground underline"
+        >
+          Back to game
+        </Link>
+      </div>
     </div>
   );
 }
@@ -1088,8 +1608,10 @@ function PaymentClaimActions({
       setMode(null);
       setReason("");
       await onChanged?.();
-    } catch (e: any) {
-      toast.error(e?.message ?? "Couldn't update this payment");
+    } catch (e: unknown) {
+      // disputeMyPaymentSubmission's own "tell us what went wrong" refusal can't happen: Send is disabled until
+      // there is a reason.
+      toast.error(paymentSubmissionErrorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -1335,10 +1857,14 @@ function PaymentInstructionsAndProof({
       setUploadProgress(0);
       setUploadedPath(null);
       setUploadState("error");
-      const msg =
-        err instanceof Error ? err.message : "Upload failed. Check your connection and retry.";
+      // uploadProofScreenshot refuses a file that isn't a JPG, PNG or WEBP under 8 MB with its own sentence (pickFile
+      // lets videos and larger files through); say that. Anything else is a storage or network failure (WP 4.0).
+      const invalid = validateImageMeta({ mime: f.type, bytes: f.size });
+      const msg = invalid
+        ? `${invalid}.`
+        : userErrorMessage(err, "Couldn't upload your proof. Check your connection and try again.");
       setUploadError(msg);
-      toast.error(`Upload failed: ${msg}`);
+      toast.error(msg);
     }
   }, []);
 
@@ -1453,8 +1979,8 @@ function PaymentInstructionsAndProof({
         /* ignore */
       }
       onSubmitted();
-    } catch (e: any) {
-      toast.error(e.message);
+    } catch (e: unknown) {
+      toast.error(paymentSubmissionErrorMessage(e));
     } finally {
       setSubmitting(false);
     }

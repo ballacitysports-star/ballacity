@@ -1,11 +1,11 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { toast } from "sonner";
-import { describeMessagingError } from "@/lib/minor-messaging";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Calendar, Clapperboard, MapPin, BarChart3, ExternalLink } from "lucide-react";
 import { pageHead, ogImageUrl } from "@/lib/seo";
 import { InlineVideoPlayer } from "@/components/InlineVideoPlayer";
 import { PublicXpCard } from "@/components/players/PublicXpCard";
+import { ContactGuardianButton } from "@/components/players/ContactGuardianButton";
+import { ProfileUnavailable } from "@/components/players/ProfileUnavailable";
 import { FamilyClipsSection } from "@/components/reels/FamilyClipsSection";
 import { listPublicReels } from "@/lib/reels.functions";
 import { getPlayerCard, type PlayerCardData } from "@/lib/player-card.functions";
@@ -140,22 +140,9 @@ function PlayerCardPage() {
     );
   }
 
-  if (!card?.profile) {
-    return (
-      <div className="page-shell-content pt-6 pb-24">
-        <Link
-          to="/players"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" /> Back to players
-        </Link>
-        <div className="mt-4 rounded-2xl border border-dashed border-border bg-surface/40 p-8 text-center">
-          <p className="font-semibold">Player not found</p>
-          <p className="mt-1 text-sm text-muted-foreground">This card may have been removed.</p>
-        </div>
-      </div>
-    );
-  }
+  // getPlayerCard answers profile: null for nonexistent, non-public and suspended
+  // players alike (and a failed call lands here too): one screen for all of them.
+  if (!card?.profile) return <ProfileUnavailable kind="card" />;
 
   const p = card.profile;
   const stats = card.stats;
@@ -339,9 +326,7 @@ function PlayerCardPage() {
         </div>
         {stats.sports.length > 0 && (
           <div className="mt-3 rounded-2xl border border-border bg-surface p-3">
-            <p className="section-eyebrow text-muted-foreground">
-              Sports
-            </p>
+            <p className="section-eyebrow text-muted-foreground">Sports</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {stats.sports.map((s) => (
                 <span
@@ -371,9 +356,7 @@ function PlayerCardPage() {
 function GameGroup({ title, games }: { title: string; games: PlayerCardData["games"] }) {
   return (
     <div>
-      <p className="mb-1.5 section-eyebrow text-muted-foreground">
-        {title}
-      </p>
+      <p className="mb-1.5 section-eyebrow text-muted-foreground">{title}</p>
       <ul className="space-y-2">
         {games.map((g) => (
           <li key={g.id}>
@@ -417,52 +400,5 @@ function EmptyBlock({ text }: { text: string }) {
     <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-6 text-center text-sm text-muted-foreground">
       {text}
     </div>
-  );
-}
-
-function ContactGuardianButton({ childId, childName }: { childId: string; childName: string }) {
-  const navigate = useNavigate();
-  const [busy, setBusy] = useState(false);
-  const onClick = async () => {
-    setBusy(true);
-    try {
-      const { supabase } = await import("@/integrations/supabase/client");
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) {
-        navigate({ to: "/auth" });
-        return;
-      }
-      const { data: guardianId, error } = await supabase.rpc("public_minor_guardian", {
-        _child: childId,
-      });
-      if (error || !guardianId) throw new Error("Guardian contact isn't available right now.");
-      const { getOrCreateDirectConversation, sendMessage } = await import("@/lib/messages");
-      const convoId = await getOrCreateDirectConversation(guardianId as string);
-      try {
-        await sendMessage(convoId, `Inquiry regarding ${childName}`);
-      } catch {
-        /* intro line is optional */
-      }
-      navigate({ to: "/messages/$conversationId", params: { conversationId: convoId } });
-    } catch (e) {
-      toast.error(describeMessagingError(e, "Could not contact guardian.", "guardian"));
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <>
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={busy}
-        className="mt-2 inline-flex w-full items-center justify-center rounded-full border border-border px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
-      >
-        {busy ? "Opening…" : "Contact guardian"}
-      </button>
-      <p className="mt-1 text-center text-xs text-muted-foreground">
-        This athlete is a minor. Messages go to their parent/guardian. Sign-in required.
-      </p>
-    </>
   );
 }

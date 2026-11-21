@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { BellRing } from "lucide-react";
 import { toast } from "sonner";
-import { REMINDER_PRESETS, formatDuration } from "@/lib/datetime";
+import { REMINDER_PRESETS } from "@/lib/datetime";
+import { reminderLeadSummary } from "@/lib/reminder-copy";
 import {
   DEFAULT_GAME_REMINDER_OFFSETS,
   getMyGameReminderOffsets,
@@ -55,7 +56,7 @@ export function GameReminderPicker({
       <Chips value={value} onChange={onChange} />
       <p className="text-[11px] text-muted-foreground">
         {value.length
-          ? `We'll notify you ${value.map((m) => `${formatDuration(m)} before`).join(" and ")}.`
+          ? `We'll notify you ${reminderLeadSummary(value)}.`
           : "No reminders — you can add them later on this page."}
       </p>
     </div>
@@ -97,7 +98,7 @@ export function GameReminderCard({ gameId }: { gameId: string }) {
       <Chips value={value} onChange={update} />
       <p className="text-[11px] text-muted-foreground">
         {value.length
-          ? `You'll get a notification ${value.map((m) => `${formatDuration(m)} before`).join(" and ")} start.`
+          ? `You'll get a notification ${reminderLeadSummary(value)} the start.`
           : "Reminders off for this game."}
       </p>
     </div>

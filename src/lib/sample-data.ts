@@ -111,6 +111,8 @@ export type Game = {
   orgOfficial?: boolean;
   /** Shared id linking sessions of one multi-day event. */
   seriesId?: string | null;
+  /** Set while the game is part of a repeating series the server keeps going (WP 3.1). */
+  repeat?: { freq: "weekly" | "biweekly"; until: string | null } | null;
   /** Total sessions in the series (set when the feed collapses a series to one card). */
   seriesCount?: number;
   /** Exact end instant. Preferred over `duration` for length and status. */

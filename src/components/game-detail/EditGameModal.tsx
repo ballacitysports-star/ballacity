@@ -7,6 +7,8 @@ import { gameEndsAt } from "@/lib/game-time";
 import { GamePolicyFields } from "@/components/games/GamePolicyFields";
 import { normalizeGamePolicy, validateGamePolicy, type GamePolicy } from "@/lib/game-policy";
 import { toast } from "sonner";
+import { userErrorMessage } from "@/lib/user-error";
+import { IMAGE_FLAGGED_MESSAGE, imageUploadErrorMessage } from "@/lib/image-upload-errors";
 import { useEffect, useRef, useState } from "react";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import {
@@ -276,7 +278,7 @@ export function EditGameModal({
               orgId: selectedAff?.source === "org" ? selectedAff.id : null,
             }),
       } as Partial<Game>).catch((err: unknown) => {
-        toast.error((err as { message?: string } | null)?.message ?? "Couldn't save changes.");
+        toast.error(userErrorMessage(err, "Couldn't save your changes. Please try again."));
         return undefined;
       });
       if (!updated) {
@@ -305,8 +307,10 @@ export function EditGameModal({
         if (next) onSettingsSaved(next);
       } catch (err: unknown) {
         toast.error(
-          (err as { message?: string } | null)?.message ??
-            "Saved game, but couldn't update host settings.",
+          userErrorMessage(
+            err,
+            "Saved the game, but couldn't update its payment settings. Please try again.",
+          ),
         );
       }
 
@@ -515,14 +519,15 @@ export function EditGameModal({
                       data: { bucket: "game-covers", path },
                     });
                     if (check?.quarantined) {
-                      throw new Error(
-                        "This image was flagged by our automated safety check and is pending review.",
-                      );
+                      throw new Error(IMAGE_FLAGGED_MESSAGE);
                     }
                     // Persist a reference, not a long-lived signed URL.
                     setImage(buildMediaRef("game-covers", path));
                   } catch (err: unknown) {
-                    toast.error((err as { message?: string } | null)?.message ?? "Upload failed");
+                    // Our own refusals (the safety hold, the stored-bytes checks) show as they are (WP 4.0).
+                    toast.error(
+                      imageUploadErrorMessage(err, "Couldn't upload that image. Please try again."),
+                    );
                   } finally {
                     setCoverUploading(false);
                   }
@@ -918,7 +923,7 @@ function BlockedUsersSection({ hostId }: { hostId: string }) {
         <div className="text-xs text-muted-foreground">Loading…</div>
       ) : users.length === 0 ? (
         <div className="text-xs text-muted-foreground">
-          You haven&apos;t blocked anyone. Blocked accounts can&apos;t ask to join your games,
+          You haven&apos;t blocked anyone. Blocked accounts can&apos;t request a spot in your games,
           message you or follow you.
         </div>
       ) : (

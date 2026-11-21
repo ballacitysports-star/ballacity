@@ -9,6 +9,8 @@ import { useAcceptLegal, useMyLegalConsents } from "@/lib/legal-consent";
 import { LEGAL_DOCUMENT_LIST, effectiveVersion } from "@/lib/legal-documents";
 import { LegalConsent, allAccepted, emptyConsentValue } from "@/components/legal/LegalConsent";
 import { LegalReviewBanner } from "@/components/legal/LegalDocumentBody";
+import { useAuthSearchHere } from "@/lib/auth-return";
+import { userErrorMessage } from "@/lib/user-error";
 
 export const Route = createFileRoute("/account/legal")({
   head: () =>
@@ -24,6 +26,7 @@ export const Route = createFileRoute("/account/legal")({
 
 function LegalSettingsPage() {
   const { user } = useAuth();
+  const authSearch = useAuthSearchHere();
   const { statuses, records, isLoading, published } = useMyLegalConsents();
   const accept = useAcceptLegal();
   const [value, setValue] = useState(emptyConsentValue);
@@ -56,7 +59,7 @@ function LegalSettingsPage() {
       setValue(emptyConsentValue);
       toast.success("Agreement recorded");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't record your agreement");
+      toast.error(userErrorMessage(e, "Couldn't record your agreement. Please try again."));
     }
   };
 
@@ -91,7 +94,7 @@ function LegalSettingsPage() {
 
         {!user ? (
           <p className="rounded-2xl border border-border bg-surface p-4 text-sm text-muted-foreground">
-            <Link to="/auth" className="text-lime underline">
+            <Link to="/auth" search={authSearch} className="text-lime underline">
               Sign in
             </Link>{" "}
             to see your consent history.

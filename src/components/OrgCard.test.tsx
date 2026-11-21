@@ -78,3 +78,19 @@ describe("OrgCard for trainers", () => {
     expect(screen.queryByText("Trains at")).toBeNull();
   });
 });
+
+describe("OrgCard follower count (P1-1)", () => {
+  it("shows the real count the list passes in, read out as followers", () => {
+    render(<OrgCard org={coach({ followers: 0 })} followers={42} />);
+    expect(screen.getByTestId("org-followers").textContent).toBe("42 followers");
+    cleanup();
+    render(<OrgCard org={coach({ followers: 0 })} followers={1} />);
+    expect(screen.getByTestId("org-followers").textContent).toBe("1 follower");
+  });
+
+  it("shows no number without one, instead of the unmaintained teams.followers", () => {
+    render(<OrgCard org={coach({ followers: 10 })} />);
+    expect(screen.queryByTestId("org-followers")).toBeNull();
+    expect(screen.queryByText("10")).toBeNull();
+  });
+});

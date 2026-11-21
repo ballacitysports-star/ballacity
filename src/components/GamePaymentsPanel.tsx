@@ -17,6 +17,8 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { withManagedProfileNames } from "@/lib/managed-profile-names";
+import { getCurrentUserId } from "@/lib/current-user-id";
 import {
   listMySubmissionsForGame,
   getSignedProofUrl,
@@ -31,6 +33,8 @@ import { reviewPaymentAction } from "@/lib/payments.functions";
 import { hostCancelPaymentSubmission } from "@/lib/payments";
 import {
   CANCELLATION_REASON_LABELS,
+  CANCELLED_CLAIM_REVIEW_MESSAGE,
+  DECLINED_CLAIM_REVIEW_MESSAGE,
   PAYMENT_DISCLAIMER,
   PAYMENT_STATE_META,
   canHostConfirm,
@@ -41,9 +45,62 @@ import { PaymentSafetyNotice } from "@/components/PaymentSafetyNotice";
 import { createNotification } from "@/lib/notifications";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useMyChildStatus } from "@/lib/child-safety";
-import { PAYMENTS_BLOCKED_MESSAGE } from "@/lib/payments-policy";
+import {
+  PAID_NOT_PLACED_MESSAGE,
+  PAYMENTS_BLOCKED_MESSAGE,
+  PAYMENT_SAVE_FAILED_MESSAGE,
+} from "@/lib/payments-policy";
+import { errorText, paymentSubmissionErrorMessage, userErrorMessage } from "@/lib/user-error";
+
+/** The sentences reviewPaymentAction words itself for a host; shown as they are (WP 4.0). Same list as RosterPlayerRow. */
+const PAYMENT_REVIEW_SENTENCES: readonly string[] = [
+  "Only this game's host can review its payments.",
+  "This player isn't part of this game.",
+  "Payment coordination isn't available for this account yet.",
+  "Payment coordination isn't available for this player's account yet.",
+  "No payment submission to update.",
+  CANCELLED_CLAIM_REVIEW_MESSAGE,
+  DECLINED_CLAIM_REVIEW_MESSAGE,
+];
+
+/**
+ * What a host sees when cancelling a claim or marking a refund sent fails: the payment mapper's words for a payment
+ * refusal, else userErrorMessage with `fallback`, which names the action (not "couldn't save this payment").
+ */
+function hostPaymentActionErrorMessage(e: unknown, fallback: string): string {
+  const mapped = paymentSubmissionErrorMessage(e);
+  return mapped === PAYMENT_SAVE_FAILED_MESSAGE ? userErrorMessage(e, fallback) : mapped;
+}
+
+/** What a host sees when reviewing a payment fails: our own sentence, else the payment mapper's, never raw text. */
+function paymentReviewErrorMessage(e: unknown): string {
+  const text = errorText(e) ?? "";
+  if (text.startsWith("Payment status changed since you loaded the page")) {
+    return "This payment changed since you loaded the page. Refresh and try again.";
+  }
+  if (PAYMENT_REVIEW_SENTENCES.includes(text)) return text;
+  return paymentSubmissionErrorMessage(e);
+}
+import { MANUAL_GUARDIAN_HOLD_MESSAGE } from "@/lib/pay-entry-gate";
+import { useAuth } from "@/hooks/use-auth";
+import { useGameManualClaimGuardianReady } from "@/hooks/use-game-payment-guardian-ready";
 
 type Filter = "all" | "pending" | "verified" | "rejected" | "disputed";
+
+let paymentsTopicSeq = 0;
+
+/**
+ * A realtime topic no channel in this tab has used yet (WP 4.3). supabase.channel() hands back the existing channel
+ * when one with the same topic is still in its list, and a removed channel stays there until the server acknowledges
+ * the leave. Reopening the Payments tab (or React's dev double mount) therefore got the old, already subscribed
+ * channel back, and adding the postgres_changes listener to it threw "cannot add `postgres_changes` callbacks ...
+ * after `subscribe()`". A fresh suffix per subscription means every mount gets its own channel. The topic name is not
+ * an access control: Row Level Security decides which rows each subscriber receives.
+ */
+function freshPaymentsTopic(base: string): string {
+  paymentsTopicSeq += 1;
+  return `${base}:${paymentsTopicSeq}`;
+}
 
 function fmtWhen(iso: string | null): string {
   if (!iso) return "";
@@ -125,10 +182,17 @@ export function PaymentPoliciesCard({
   gameId,
   settings,
   isHost,
+  manualHandles = "show",
 }: {
   gameId: string;
   settings: GamePaymentSettings | null;
   isHost: boolean;
+  /**
+   * Where to send a manual payment (the methods' handles and the host's payment instructions). A player's card shows
+   * them only once game_manual_claim_guardian_ready says the database would take their manual claim: 'hide' while it
+   * loads or failed, 'held' (hidden, with a line) when it said no (docs/paid-path-gates.md section 6 (d)).
+   */
+  manualHandles?: "show" | "hide" | "held";
 }) {
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
@@ -166,6 +230,7 @@ export function PaymentPoliciesCard({
     !!settings?.refund_policy ||
     !!settings?.payment_instructions ||
     methods.length > 0;
+  const showHandles = manualHandles === "show";
 
   return (
     <div className="rounded-2xl border border-border bg-surface p-4">
@@ -205,9 +270,7 @@ export function PaymentPoliciesCard({
                 className={`h-4 w-4 mt-0.5 shrink-0 ${isPastDue ? "text-coral" : "text-lime"}`}
               />
               <div className="min-w-0 flex-1">
-                <div className="micro-label text-muted-foreground">
-                  Payment deadline
-                </div>
+                <div className="micro-label text-muted-foreground">Payment deadline</div>
                 <div className="text-sm font-semibold">{fmtDeadline(deadline)}</div>
                 {isPastDue && (
                   <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold text-coral">
@@ -234,7 +297,9 @@ export function PaymentPoliciesCard({
                       <span className="font-semibold">
                         {meta.emoji} {meta.name}
                       </span>
-                      {m.username && <span className="text-muted-foreground">· {m.username}</span>}
+                      {showHandles && m.username && (
+                        <span className="text-muted-foreground">· {m.username}</span>
+                      )}
                     </li>
                   );
                 })}
@@ -242,7 +307,16 @@ export function PaymentPoliciesCard({
             </div>
           )}
 
-          {settings?.payment_instructions && (
+          {manualHandles === "held" && methods.length > 0 && (
+            <div
+              className="rounded-xl border border-coral/40 bg-coral/10 p-3 text-xs text-muted-foreground"
+              data-testid="payment-details-manual-held"
+            >
+              {MANUAL_GUARDIAN_HOLD_MESSAGE}
+            </div>
+          )}
+
+          {showHandles && settings?.payment_instructions && (
             <div className="rounded-xl border border-border bg-background p-3">
               <div className="flex items-center gap-2 micro-label text-muted-foreground">
                 <FileText className="h-3.5 w-3.5" /> Instructions
@@ -321,11 +395,13 @@ export function HostPaymentsPanel({
       const ids = Array.from(new Set(subs.map((s) => s.player_id)));
       const nameMap: Record<string, { n: string; i: string; a: string | null }> = {};
       if (ids.length) {
-        const { data: profs } = await supabase
+        const { data: read } = await supabase
           .from("profiles")
           .select("id, display_name, avatar_initials, avatar_url")
           .in("id", ids);
-        for (const p of (profs ?? []) as Array<{
+        // A block or suspension hides the row; the host still needs the name.
+        const profs = await withManagedProfileNames(supabase, ids, read);
+        for (const p of profs as Array<{
           id: string;
           display_name: string | null;
           avatar_initials: string | null;
@@ -347,7 +423,7 @@ export function HostPaymentsPanel({
         })),
       );
     } catch (e: any) {
-      toast.error(e?.message ?? "Could not load payments.");
+      toast.error(userErrorMessage(e, "Couldn't load payments. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -356,7 +432,7 @@ export function HostPaymentsPanel({
   useEffect(() => {
     void load();
     const ch = supabase
-      .channel(`host_payments:${gameId}`)
+      .channel(freshPaymentsTopic(`host_payments:${gameId}`))
       .on(
         "postgres_changes",
         {
@@ -369,7 +445,7 @@ export function HostPaymentsPanel({
       )
       .subscribe();
     return () => {
-      supabase.removeChannel(ch);
+      void supabase.removeChannel(ch);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId]);
@@ -400,9 +476,12 @@ export function HostPaymentsPanel({
       const res = await reviewPaymentAction({
         data: { gameId: row.game_id, playerId: row.player_id, next, expectedFrom: row.status },
       });
+      const notPlaced = next === "verified" && res.placed === false;
       if (!res.changed) toast.info("Already up to date.");
+      else if (notPlaced) toast.warning(PAID_NOT_PLACED_MESSAGE);
       else toast.success(next === "verified" ? "Payment verified." : "Payment declined.");
-      if (res.changed) {
+      // A verified payment without a place: the server already told the player, so don't say "all set".
+      if (res.changed && !notPlaced) {
         await createNotification({
           user_id: row.player_id,
           type: next === "verified" ? "payment_verified" : "payment_rejected",
@@ -420,7 +499,7 @@ export function HostPaymentsPanel({
     } catch (e: any) {
       // rollback
       setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status: row.status } : r)));
-      toast.error(e?.message ?? "Could not update payment.");
+      toast.error(paymentReviewErrorMessage(e));
     } finally {
       setBusyId(null);
     }
@@ -445,7 +524,9 @@ export function HostPaymentsPanel({
       toast.success("Payment claim cancelled.");
       await load();
     } catch (e: any) {
-      toast.error(e?.message ?? "Could not cancel this claim.");
+      toast.error(
+        hostPaymentActionErrorMessage(e, "Couldn't cancel this payment claim. Please try again."),
+      );
     } finally {
       setBusyId(null);
     }
@@ -466,10 +547,14 @@ export function HostPaymentsPanel({
     setBusyId(row.id);
     try {
       await markRefundSent(row.id);
-      toast.success(`Marked $${Number(row.refund_amount ?? 0).toFixed(2)} refunded to ${row.playerName}.`);
+      toast.success(
+        `Marked $${Number(row.refund_amount ?? 0).toFixed(2)} refunded to ${row.playerName}.`,
+      );
       void load();
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Could not update the refund.");
+      toast.error(
+        hostPaymentActionErrorMessage(e, "Couldn't mark this refund as sent. Please try again."),
+      );
     } finally {
       setBusyId(null);
     }
@@ -551,21 +636,15 @@ export function HostPaymentsPanel({
         <div className="mt-3 grid grid-cols-3 gap-2 text-center">
           <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-2">
             <div className="font-display text-lg font-bold text-amber-500">{counts.pending}</div>
-            <div className="micro-label text-muted-foreground">
-              Pending
-            </div>
+            <div className="micro-label text-muted-foreground">Pending</div>
           </div>
           <div className="rounded-xl border border-lime/30 bg-lime/10 p-2">
             <div className="font-display text-lg font-bold text-lime">{counts.verified}</div>
-            <div className="micro-label text-muted-foreground">
-              Verified
-            </div>
+            <div className="micro-label text-muted-foreground">Verified</div>
           </div>
           <div className="rounded-xl border border-coral/40 bg-coral/10 p-2">
             <div className="font-display text-lg font-bold text-coral">{counts.rejected}</div>
-            <div className="micro-label text-muted-foreground">
-              Declined
-            </div>
+            <div className="micro-label text-muted-foreground">Declined</div>
           </div>
         </div>
         <p className="mt-3 rounded-xl border border-border bg-background p-2 text-[11px] text-muted-foreground">
@@ -686,24 +765,26 @@ export function HostPaymentsPanel({
                   {row.screenshot_path && <ExternalLink className="h-3 w-3" />}
                 </button>
                 <div className="ml-auto flex gap-2">
-                  {canHostConfirm(
-                    row.status === "verified"
-                      ? "confirmed"
-                      : row.status === "cancelled"
-                        ? "cancelled"
-                        : row.status === "disputed"
-                          ? "disputed"
-                          : "host_confirmation_pending",
-                  ) && (
-                    <button
-                      type="button"
-                      disabled={busyId === row.id}
-                      onClick={() => act(row, "verified")}
-                      className="inline-flex items-center gap-1 rounded-full bg-lime px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-60"
-                    >
-                      <Check className="h-3.5 w-3.5" /> Confirm received
-                    </button>
-                  )}
+                  {/* A declined payment is final for the host (DECISION_FINAL, 20261125100000): the player sends it again. */}
+                  {row.status !== "rejected" &&
+                    canHostConfirm(
+                      row.status === "verified"
+                        ? "confirmed"
+                        : row.status === "cancelled"
+                          ? "cancelled"
+                          : row.status === "disputed"
+                            ? "disputed"
+                            : "host_confirmation_pending",
+                    ) && (
+                      <button
+                        type="button"
+                        disabled={busyId === row.id}
+                        onClick={() => act(row, "verified")}
+                        className="inline-flex items-center gap-1 rounded-full bg-lime px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-60"
+                      >
+                        <Check className="h-3.5 w-3.5" /> Confirm received
+                      </button>
+                    )}
                   {row.status !== "rejected" && (
                     <button
                       type="button"
@@ -745,6 +826,9 @@ export function PlayerPaymentsPanel({
 }) {
   const { can: canFeature } = useMyChildStatus();
   const paymentsGate = canFeature("game_payments");
+  const { user } = useAuth();
+  // The manual-claim trigger's guardian rule (section 6 (d)): no handles for a manual payment the database would refuse.
+  const manualClaim = useGameManualClaimGuardianReady(gameId, user?.id ?? null, "payments-tab");
   const [subs, setSubs] = useState<PaymentSubmission[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -753,7 +837,7 @@ export function PlayerPaymentsPanel({
       const list = await listMySubmissionsForGame(gameId);
       setSubs(list);
     } catch (e: any) {
-      toast.error(e?.message ?? "Could not load your payments.");
+      toast.error(userErrorMessage(e, "Couldn't load your payments. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -761,14 +845,15 @@ export function PlayerPaymentsPanel({
 
   useEffect(() => {
     void load();
-    let uid: string | null = null;
+    // The user id arrives after the effect returns. A cleanup that runs first (unmount, or a new game) must stop the
+    // subscription from opening at all; before, it found no channel to remove and the late one leaked.
+    let cancelled = false;
     let ch: ReturnType<typeof supabase.channel> | null = null;
-    (async () => {
-      const { data } = await supabase.auth.getUser();
-      uid = data.user?.id ?? null;
-      if (!uid) return;
+    void (async () => {
+      const uid = await getCurrentUserId();
+      if (cancelled || !uid) return;
       ch = supabase
-        .channel(`my_payments:${gameId}:${uid}`)
+        .channel(freshPaymentsTopic(`my_payments:${gameId}:${uid}`))
         .on(
           "postgres_changes",
           {
@@ -786,7 +871,8 @@ export function PlayerPaymentsPanel({
         .subscribe();
     })();
     return () => {
-      if (ch) supabase.removeChannel(ch);
+      cancelled = true;
+      if (ch) void supabase.removeChannel(ch);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId]);
@@ -800,7 +886,14 @@ export function PlayerPaymentsPanel({
 
   return (
     <div className="space-y-4">
-      <PaymentPoliciesCard gameId={gameId} settings={settings} isHost={false} />
+      <PaymentPoliciesCard
+        gameId={gameId}
+        settings={settings}
+        isHost={false}
+        manualHandles={
+          manualClaim.data === true ? "show" : manualClaim.data === false ? "held" : "hide"
+        }
+      />
       {/* Status card */}
 
       <div className="rounded-2xl border border-border bg-surface p-4">

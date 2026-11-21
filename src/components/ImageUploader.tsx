@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Upload, Loader2, X, ImagePlus, Crop } from "lucide-react";
 import { toast } from "sonner";
+import { imageUploadErrorMessage } from "@/lib/image-upload-errors";
 import { ImageEditorDialog } from "@/components/ImageEditorDialog";
 import { uploadDataUrlToBucket, type ImageBucket } from "@/lib/image-upload";
 import { originalImageCache, originalKey } from "@/lib/original-image-cache";
@@ -131,8 +132,7 @@ export function ImageUploader({
       if (source) void originalImageCache().save(originalKey(pathPrefix, url), source);
       onChange(url);
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Upload failed";
-      toast.error(message);
+      toast.error(imageUploadErrorMessage(e, "Couldn't upload that image. Please try again."));
     } finally {
       setUploading(false);
     }
@@ -263,9 +263,7 @@ export function ImageUploader({
 
       {isCover && presets && presets.length > 0 && (
         <div>
-          <div className="mb-2 micro-label text-muted-foreground">
-            Or pick a preset
-          </div>
+          <div className="mb-2 micro-label text-muted-foreground">Or pick a preset</div>
           <div className="grid grid-cols-3 gap-2">
             {(presets.length ? presets : DEFAULT_PRESETS).map((s) => {
               const src = imageFor(s);
@@ -274,6 +272,8 @@ export function ImageUploader({
                 <button
                   key={s}
                   type="button"
+                  aria-label={`Use the ${s} cover`}
+                  aria-pressed={active}
                   disabled={uploading || disabled}
                   onClick={() => onChange(src)}
                   className={`relative aspect-video overflow-hidden rounded-xl border-2 transition-all ${

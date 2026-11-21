@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { useAllOrgs, useOrgsSettled } from "@/lib/org-store";
+import { followersDesc, useOrgFollowCounts } from "@/lib/org-follow-counts";
 import { ListSkeleton } from "@/components/ui/loading-state";
 import { OrgCard } from "@/components/OrgCard";
 import { SportChips } from "@/components/SportChips";
@@ -172,6 +173,8 @@ function TeamsPage() {
 
   const orgs = useAllOrgs();
   const orgsSettled = useOrgsSettled();
+  // Real follower counts for the cards and the "Most followers" order (P1-1).
+  const followCounts = useOrgFollowCounts();
   const { coords } = useUserLocation();
 
   const list = useMemo(() => {
@@ -200,11 +203,13 @@ function TeamsPage() {
         if (ax !== bx) return ax - bx;
         return a.o.name.localeCompare(b.o.name);
       }
-      if (sortBy === "followers") return b.o.followers - a.o.followers;
+      if (sortBy === "followers") {
+        return followersDesc(followCounts, a.o.id, b.o.id) || a.o.name.localeCompare(b.o.name);
+      }
       return a.o.name.localeCompare(b.o.name);
     });
     return withDist;
-  }, [orgs, sports, q, sortBy, avail, coords]);
+  }, [orgs, sports, q, sortBy, avail, coords, followCounts]);
 
   const featured = featuredRecruitingTeam(orgs);
   const featuredSpots = featured ? openSpotCount(featured.positionsNeeded) : 0;
@@ -322,7 +327,7 @@ function TeamsPage() {
         >
           {list.map(({ o, dist }, i) => (
             <div key={o.id} className="relative">
-              <OrgCard org={o} index={i} />
+              <OrgCard org={o} index={i} followers={followCounts?.get(o.id)?.followers} />
               {/* P2-5: follow, and parents message the team's staff, from the list. */}
               <DiscoverCardActions org={o} />
               {dist && (

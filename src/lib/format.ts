@@ -9,13 +9,28 @@ function dayAnchorMs() {
   return d.getTime();
 }
 
+/** "Sat, Sep 5" in the app's zone. */
+function dayLabel(d: Date) {
+  return d.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    timeZone: TZ,
+  });
+}
+
+/** "6:00 PM" in the app's zone. */
+function timeLabel(d: Date) {
+  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: TZ });
+}
+
 export function formatWhen(iso: string) {
   const d = new Date(iso);
-  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: TZ });
+  const time = timeLabel(d);
   const hrs = Math.round((d.getTime() - dayAnchorMs()) / HOUR_MS);
   if (hrs < 24 && hrs >= 0) return `Today · ${time}`;
   if (hrs < 48 && hrs >= 0) return `Tomorrow · ${time}`;
-  return `${d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: TZ })} · ${time}`;
+  return `${dayLabel(d)} · ${time}`;
 }
 
 /** Date-only "when" line (no time), used for all-day events. */
@@ -24,7 +39,7 @@ export function formatWhenDate(iso: string) {
   const hrs = Math.round((d.getTime() - dayAnchorMs()) / HOUR_MS);
   if (hrs < 24 && hrs >= 0) return `Today`;
   if (hrs < 48 && hrs >= 0) return `Tomorrow`;
-  return `${d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: TZ })}`;
+  return dayLabel(d);
 }
 
 /** Minimal shape needed to format an event's "when" line. */
@@ -73,4 +88,16 @@ export function formatGameEnds(game: EndsLike): string {
  */
 export function formatNotificationWhen(game: WhenLike): string {
   return game.allDay ? `${formatWhenDate(game.date)} (all day)` : formatWhen(game.date);
+}
+
+/**
+ * Notification "when" line that names the weekday and date and never says "Today" or
+ * "Tomorrow", for text read away from the app, such as a push on a lock screen. formatWhen
+ * counts days from noon UTC, so on a New York evening its "Today" is already tomorrow. Same
+ * format and zone (America/New_York) as the app's other game times, whatever zone the server
+ * runs in. All-day games show the date only.
+ */
+export function formatDatedWhen(game: WhenLike): string {
+  const d = new Date(game.date);
+  return game.allDay ? `${dayLabel(d)} (all day)` : `${dayLabel(d)} · ${timeLabel(d)}`;
 }

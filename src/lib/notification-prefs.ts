@@ -1,72 +1,24 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  DEFAULT_NOTIF_PREFS,
+  applyLocks,
+  isAllowedIn,
+  isLockedChannel,
+  mergeNotifPrefs,
+  type NotifCategory,
+  type NotifChannel,
+  type NotifPrefs,
+} from "@/lib/notification-prefs-core";
 
 /**
  * Notification preferences — one canonical set of categories for the whole app.
  *
- * Rules that must not drift:
- * - Every toggle is phrased positively ("Game reminders" on = you get them). No
- *   double negatives, no "opt out of not receiving".
- * - Marketing is its own category and is OFF by default. It is never bundled
- *   with product or safety messages.
- * - Safety & security in-app alerts cannot be switched off: muting them would
- *   hide blocks, reports, account suspensions and security notices that a
- *   member materially needs to see. Push for safety stays user-controlled.
+ * The rules (categories, defaults, locked channels, how stored prefs merge) live in
+ * `notification-prefs-core.ts`, which the server uses too, and are re-exported here. This
+ * file is the app's side: labels, the local copy, syncing with the backend, and the hooks.
  */
-
-export type NotifCategory =
-  | "gameReminders"
-  | "gameUpdates"
-  | "nearbyGames"
-  | "messages"
-  | "invitations"
-  | "payments"
-  | "safety"
-  | "social"
-  | "general"
-  | "marketing";
-
-export type NotifChannel = "inApp" | "push";
-
-export type NotifPrefs = Record<NotifCategory, Record<NotifChannel, boolean>>;
-
-export const NOTIF_CATEGORIES: NotifCategory[] = [
-  "gameReminders",
-  "gameUpdates",
-  "nearbyGames",
-  "messages",
-  "invitations",
-  "payments",
-  "safety",
-  "social",
-  "general",
-  "marketing",
-];
-
-export const DEFAULT_NOTIF_PREFS: NotifPrefs = {
-  gameReminders: { inApp: true, push: true },
-  gameUpdates: { inApp: true, push: true },
-  nearbyGames: { inApp: true, push: false },
-  messages: { inApp: true, push: true },
-  invitations: { inApp: true, push: true },
-  payments: { inApp: true, push: true },
-  safety: { inApp: true, push: true },
-  social: { inApp: true, push: false },
-  general: { inApp: true, push: false },
-  marketing: { inApp: false, push: false },
-};
-
-/**
- * Channels that stay on no matter what the stored prefs say. Keep this list as
- * small as it can possibly be — it is the only place the app overrides a member.
- */
-export const LOCKED_CHANNELS: Partial<Record<NotifCategory, NotifChannel[]>> = {
-  safety: ["inApp"],
-};
-
-export function isLockedChannel(category: NotifCategory, channel: NotifChannel): boolean {
-  return (LOCKED_CHANNELS[category] ?? []).includes(channel);
-}
+export * from "@/lib/notification-prefs-core";
 
 export const CATEGORY_META: Record<
   NotifCategory,
@@ -124,93 +76,12 @@ export const CATEGORY_META: Record<
 const KEY = "openrun.notifPrefs.v3";
 const LEGACY_KEY = "openrun.notifPrefs.v2";
 
-/** Old category names → current ones, so stored prefs keep their meaning. */
-const LEGACY_CATEGORY_MAP: Record<string, NotifCategory> = {
-  approvals: "gameUpdates",
-  joinRequests: "gameUpdates",
-  follows: "social",
-  trainerAvailability: "gameUpdates",
-  messages: "messages",
-  general: "general",
-};
-
-export function categoryFor(type: string): NotifCategory {
-  if (type === "game_reminder") return "gameReminders";
-  if (type === "message") return "messages";
-  if (type === "game_invite" || type === "org_membership" || type === "team_invite")
-    return "invitations";
-  if (type.startsWith("payment")) return "payments";
-  if (
-    type === "moderation" ||
-    type === "report" ||
-    type.startsWith("safety") ||
-    type.startsWith("security") ||
-    type === "account_suspended" ||
-    type === "account_warning" ||
-    type === "guardian_approval_needed"
-  )
-    return "safety";
-  if (type === "nearby_game" || type === "new_nearby_game") return "nearbyGames";
-  if (
-    type === "join_request" ||
-    type === "join_approved" ||
-    type === "join_declined" ||
-    type === "availability_updated" ||
-    type === "trainer_availability" ||
-    type === "team_announcement" ||
-    type.startsWith("game_")
-  )
-    return "gameUpdates";
-  if (
-    type === "follow" ||
-    type === "follow_request" ||
-    type === "unfollow" ||
-    type === "comment" ||
-    type === "reaction" ||
-    type.startsWith("reel_")
-  )
-    return "social";
-  if (type === "announcement" || type === "marketing") return "marketing";
-  return "general";
-}
-
-function applyLocks(prefs: NotifPrefs): NotifPrefs {
-  const next = { ...prefs };
-  for (const [cat, channels] of Object.entries(LOCKED_CHANNELS) as Array<
-    [NotifCategory, NotifChannel[]]
-  >) {
-    next[cat] = { ...next[cat] };
-    for (const ch of channels) next[cat][ch] = true;
-  }
-  return next;
-}
-
-function merge(partial: Record<string, unknown> | null | undefined): NotifPrefs {
-  const p = (partial ?? {}) as Record<string, Partial<Record<NotifChannel, boolean>>>;
-  const out = {} as NotifPrefs;
-  for (const cat of NOTIF_CATEGORIES) {
-    out[cat] = { ...DEFAULT_NOTIF_PREFS[cat] };
-  }
-  // Legacy shape first, so an explicit current-shape value always wins.
-  for (const [legacy, target] of Object.entries(LEGACY_CATEGORY_MAP)) {
-    const row = p[legacy];
-    if (row && typeof row === "object" && !NOTIF_CATEGORIES.includes(legacy as NotifCategory)) {
-      out[target] = { ...out[target], ...row };
-    }
-  }
-  for (const cat of NOTIF_CATEGORIES) {
-    const row = p[cat];
-    if (row && typeof row === "object") out[cat] = { ...out[cat], ...row };
-  }
-  return applyLocks(out);
-}
-
 function readLocal(): NotifPrefs {
   if (typeof window === "undefined") return DEFAULT_NOTIF_PREFS;
   try {
     const raw = window.localStorage.getItem(KEY) ?? window.localStorage.getItem(LEGACY_KEY);
     if (!raw) return DEFAULT_NOTIF_PREFS;
-    return merge(JSON.parse(raw) as Record<string, unknown>);
+    return mergeNotifPrefs(JSON.parse(raw) as Record<string, unknown>);
   } catch {
     return DEFAULT_NOTIF_PREFS;
   }
@@ -282,7 +153,7 @@ export async function hydrateNotifPrefsFromBackend(userId: string) {
     }
     const prefs = (data as { prefs?: Record<string, unknown> } | null)?.prefs;
     if (prefs) {
-      commit(merge(prefs));
+      commit(mergeNotifPrefs(prefs));
     } else {
       // No row yet — seed with current local prefs so devices stay in sync going forward.
       await persistToBackend(getNotifPrefs());
@@ -313,7 +184,5 @@ export function useHydrateNotifPrefs(userId: string | undefined | null) {
 }
 
 export function isAllowed(type: string, channel: NotifChannel): boolean {
-  const cat = categoryFor(type);
-  if (isLockedChannel(cat, channel)) return true;
-  return getNotifPrefs()[cat][channel];
+  return isAllowedIn(getNotifPrefs(), type, channel);
 }

@@ -10,16 +10,24 @@ import {
 
 type Rows = Record<string, any[]>;
 
-/** Just enough of the query builder: select, eq chains, gte, limit, maybeSingle, insert. */
-function fakeAdmin(tables: Rows) {
+/**
+ * Just enough of the query builder: select, eq chains, in, gte, limit, maybeSingle, insert. `inForce` stands in for
+ * public.guardian_links_in_force (the database rule: a link to someone who has turned 18 is not in force); without
+ * it the stub has no such function and the server reads the active rows, as before the migration.
+ */
+function fakeAdmin(tables: Rows, inForce?: (children: string[]) => any[]) {
   const inserted: { table: string; row: any }[] = [];
   const admin = {
     inserted,
+    ...(inForce
+      ? { rpc: async (fn: string, args: any) => ({ data: inForce(args._children), error: null }) }
+      : {}),
     from(table: string) {
       let rows = [...(tables[table] ?? [])];
       const q: any = {
         select: () => q,
         eq: (k: string, v: unknown) => ((rows = rows.filter((r) => r[k] === v)), q),
+        in: (k: string, v: unknown[]) => ((rows = rows.filter((r) => v.includes(r[k]))), q),
         gte: (k: string, v: string) => ((rows = rows.filter((r) => String(r[k]) >= v)), q),
         limit: (n: number) => ((rows = rows.slice(0, n)), q),
         maybeSingle: async () => ({ data: rows[0] ?? null }),
@@ -73,7 +81,7 @@ describe("planGuardianApprovalPush", () => {
     expect(plan.messages.map((m) => m.userId).sort()).toEqual(["dad", "mom"]);
     expect(plan.messages[0]).toMatchObject({
       title: "Approval needed",
-      body: "Nathaniel asked to join Sunday 14U scrimmage. Review it in the Parent Center.",
+      body: "Nathaniel requested a spot in Sunday 14U scrimmage. Review it in the Parent Center.",
       url: GUARDIAN_APPROVAL_LINK,
     });
     expect(plan.writeNotification).toBe(true);
@@ -102,6 +110,20 @@ describe("planGuardianApprovalPush", () => {
       const plan = await planGuardianApprovalPush(admin, { kind, id, callerId });
       expect(plan.messages).toEqual([]);
     }
+  });
+
+  it("says nothing about an invite held back because of a block (20261111120000)", async () => {
+    const plan = await planGuardianApprovalPush(
+      fakeAdmin(world({ team_invite_suppressions: [{ invite_id: "inv1" }] })) as any,
+      { kind: "team_invite", id: "inv1", callerId: "coach" },
+    );
+    expect(plan.messages).toEqual([]);
+    // Any other invite is still raised with the guardians.
+    const other = await planGuardianApprovalPush(
+      fakeAdmin(world({ team_invite_suppressions: [{ invite_id: "inv-other" }] })) as any,
+      { kind: "team_invite", id: "inv1", callerId: "coach" },
+    );
+    expect(other.messages).toHaveLength(2);
   });
 
   it("says nothing once it is answered or has been approved", async () => {
@@ -143,6 +165,36 @@ describe("planGuardianApprovalPush", () => {
     ).toEqual([]);
   });
 
+  it("does not tell a guardian whose child has turned 18, even while the link still says active", async () => {
+    // The database rule (20261125200000) says only the guardian in force: dad's child is 18 now, mom's is not.
+    const plan = await planGuardianApprovalPush(
+      fakeAdmin(world(), (children) =>
+        [{ parent_user_id: "mom", child_user_id: "kid", verified_at: "2026-10-01" }].filter((l) =>
+          children.includes(l.child_user_id),
+        ),
+      ) as any,
+      { kind: "join_request", id: "jr1", callerId: "kid" },
+    );
+    expect(plan.messages.map((m) => m.userId)).toEqual(["mom"]);
+    const none = await planGuardianApprovalPush(fakeAdmin(world(), () => []) as any, {
+      kind: "join_request",
+      id: "jr1",
+      callerId: "kid",
+    });
+    expect(none.messages).toEqual([]);
+  });
+
+  it("falls back to the active rows when the rule is not there (app ahead of the migration)", async () => {
+    const admin = fakeAdmin(world()) as any;
+    admin.rpc = async () => ({ data: null, error: { message: "function does not exist" } });
+    const plan = await planGuardianApprovalPush(admin, {
+      kind: "join_request",
+      id: "jr1",
+      callerId: "kid",
+    });
+    expect(plan.messages.map((m) => m.userId).sort()).toEqual(["dad", "mom"]);
+  });
+
   it("falls back to plain words when a name or title is missing", async () => {
     const w = world({ profiles: [], hosted_games: [] });
     const plan = await planGuardianApprovalPush(fakeAdmin(w) as any, {
@@ -151,7 +203,7 @@ describe("planGuardianApprovalPush", () => {
       callerId: "kid",
     });
     expect(plan.messages[0]!.body).toBe(
-      "Your child asked to join a game. Review it in the Parent Center.",
+      "Your child requested a spot in a game. Review it in the Parent Center.",
     );
   });
 

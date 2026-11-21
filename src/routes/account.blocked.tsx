@@ -3,6 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { BackHeader } from "@/components/layout/BackHeader";
 import { Loader2, ShieldOff } from "lucide-react";
 import { toast } from "sonner";
+import { userErrorMessage } from "@/lib/user-error";
 import { pageHead } from "@/lib/seo";
 import { Button } from "@/components/ui/button";
 import { UserAvatarById } from "@/components/UserAvatar";
@@ -28,8 +29,8 @@ function BlockedUsersPage() {
     try {
       await unblock(id);
       toast.success(`${name} unblocked`);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Couldn't unblock");
+    } catch (e) {
+      toast.error(userErrorMessage(e, "Couldn't unblock this player. Please try again."));
     }
   }
 

@@ -89,8 +89,14 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
     try {
       const id = await getOrCreateDirectConversation(hostUserId, game.id);
       navigate({ to: "/messages/$conversationId", params: { conversationId: id } });
-    } catch (err: any) {
-      toast.error(describeMessagingError(err, undefined, "host"));
+    } catch (err: unknown) {
+      toast.error(
+        describeMessagingError(
+          err,
+          "Couldn't open a chat with the host. Please try again.",
+          "host",
+        ),
+      );
     } finally {
       setOpening(false);
     }
@@ -155,7 +161,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               </span>
             )}
             {gate.joinState === "in_progress" && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-coral px-2 py-0.5 text-[11px] font-bold text-white">
+              <span className="inline-flex items-center gap-1 rounded-full bg-coral-strong px-2 py-0.5 text-[11px] font-bold text-white">
                 <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> In progress
               </span>
             )}

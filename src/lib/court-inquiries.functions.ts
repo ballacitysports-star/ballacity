@@ -2,16 +2,13 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { courtInquirySchema, courtTypeLabel, formatInquiryWhen } from "./court-inquiries";
+import { errorInsteadOf } from "@/lib/error-report";
+import { userErrorMessage } from "@/lib/user-error";
 
-// Friendly messages for the guardrails enforced by the database trigger.
+// Friendly messages for the guardrails enforced by the database trigger; any other failure reads as a generic
+// sentence, never as raw text.
 function inquiryErrorMessage(message: string): string {
-  if (message.includes("CHILD_CANNOT_INQUIRE"))
-    return "An adult needs to contact the facility for you.";
-  if (message.includes("INQUIRY_RATE_LIMIT"))
-    return "You've sent a lot of inquiries today. Try again tomorrow.";
-  if (message.includes("INQUIRY_PENDING_LIMIT"))
-    return "You already have open inquiries with this facility. Wait for a reply first.";
-  return message;
+  return userErrorMessage(message, "Couldn't send your court inquiry. Please try again.");
 }
 
 /**
@@ -48,7 +45,7 @@ export const submitCourtInquiry = createServerFn({ method: "POST" })
       })
       .select("id")
       .single();
-    if (error) throw new Error(inquiryErrorMessage(error.message));
+    if (error) throw errorInsteadOf(error, inquiryErrorMessage(error.message));
 
     // Best effort: the inquiry is saved even if notifying a manager fails.
     try {

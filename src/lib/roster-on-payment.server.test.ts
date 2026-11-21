@@ -22,16 +22,31 @@ const db: {
   rows: Rows;
   inserts: { table: string; row: any }[];
   insertError: any;
+  /** Writing a notification throws (the notifications table is unreachable). */
+  notificationsDown: boolean;
   /** The game's payee, as `game_payee_id` answers it; null means nobody. */
   payee: string | null;
   /** Every .eq() the code made, so a test can see which settings row it asked for. */
   eqs: { table: string; col: string; val: unknown }[];
+  /**
+   * What `blocks_exist_between` would answer for the host and the player (a block either way). The code must not
+   * refuse on it: the join gate refuses only the host's own block, which is a `user_blocks` row (db.rows.user_blocks).
+   */
+  blocked: boolean | "error";
+  /** The arguments each blocks_exist_between call was made with. */
+  blockChecks: unknown[];
+  /** Tables whose reads fail. */
+  failing: string[];
 } = {
   rows: {},
   inserts: [],
   insertError: null,
+  notificationsDown: false,
   payee: "host-1",
   eqs: [],
+  blocked: false,
+  blockChecks: [],
+  failing: [],
 };
 
 function from(table: string) {
@@ -55,8 +70,14 @@ function from(table: string) {
     maybeSingle: async () =>
       chain.error
         ? { data: null, error: chain.error }
-        : { data: db.rows[table] ?? null, error: null },
+        : db.failing.includes(table)
+          ? {
+              data: null,
+              error: { code: "57014", message: "canceling statement due to statement timeout" },
+            }
+          : { data: db.rows[table] ?? null, error: null },
     insert: async (row: any) => {
+      if (table === "notifications" && db.notificationsDown) throw new Error("notifications down");
       db.inserts.push({ table, row });
       return { error: table === "game_participants" ? db.insertError : null };
     },
@@ -64,20 +85,42 @@ function from(table: string) {
   return chain;
 }
 
-const rpc = async (fn: string) => ({ data: fn === "game_payee_id" ? db.payee : null, error: null });
+const rpc = async (fn: string, args?: unknown) => {
+  if (fn === "blocks_exist_between") {
+    db.blockChecks.push(args);
+    return db.blocked === "error"
+      ? { data: null, error: { message: "unavailable" } }
+      : { data: db.blocked, error: null };
+  }
+  return { data: fn === "game_payee_id" ? db.payee : null, error: null };
+};
 
 vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: { from, rpc } }));
 
-const { addPaidPlayerToRoster } = await import("./roster-on-payment.server");
+const { addPaidPlayerToRoster, holdsPlace, notPlacedWhy, placedAfterVerify } =
+  await import("./roster-on-payment.server");
 
 const rostered = () => db.inserts.filter((i) => i.table === "game_participants");
+/** The "payment_not_placed" notices written, flattened (one insert carries both). */
+const notPlaced = () =>
+  db.inserts
+    .filter((i) => i.table === "notifications")
+    .flatMap((i) => (Array.isArray(i.row) ? i.row : [i.row]))
+    .filter((n) => n.type === "payment_not_placed");
 
 beforeEach(() => {
-  db.rows = { hosted_games: { id: "g1", cancelled_at: null } };
+  db.rows = {
+    hosted_games: { id: "g1", host_id: "host-1", title: "Sunday Run", cancelled_at: null },
+    profiles: { display_name: "Pat" },
+  };
   db.inserts = [];
   db.insertError = null;
+  db.notificationsDown = false;
   db.payee = "host-1";
   db.eqs = [];
+  db.blocked = false;
+  db.blockChecks = [];
+  db.failing = [];
 });
 
 describe("addPaidPlayerToRoster", () => {
@@ -102,10 +145,20 @@ describe("addPaidPlayerToRoster", () => {
     expect(rostered()[0]!.row).toEqual({ game_id: "g1", user_id: "p1", position: "Guard" });
   });
 
-  it("does not roster an unapproved player on an approval-required game", async () => {
+  it("does not roster an unapproved player on an approval-required game, and says so to both", async () => {
     db.rows.game_payment_settings = { requires_approval: true };
-    await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toEqual({ added: false });
+    await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toEqual({
+      added: false,
+      reason: "approval_required",
+      noticeSent: true,
+    });
     expect(rostered()).toHaveLength(0);
+    const [host, player] = notPlaced();
+    expect(host).toMatchObject({ user_id: "host-1", link: "/games/g1" });
+    expect(host.body).toMatch(/Pat's payment for Sunday Run is confirmed/);
+    expect(host.body).toMatch(/haven't approved their request/);
+    expect(player).toMatchObject({ user_id: "p1", link: "/games/g1" });
+    expect(player.body).toMatch(/the host still has to approve your request/);
   });
 
   it("rosters an approved player on an approval-required game", async () => {
@@ -115,36 +168,210 @@ describe("addPaidPlayerToRoster", () => {
   });
 
   it("treats a game with no settings row as request-to-join, like the game page", async () => {
-    await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toEqual({ added: false });
+    await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toMatchObject({
+      added: false,
+      reason: "approval_required",
+    });
     db.rows.join_requests = { id: "r1" };
     await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toEqual({ added: true });
   });
 
-  it("does nothing for a missing or cancelled game", async () => {
+  it("does nothing for a missing game", async () => {
     db.rows.hosted_games = null;
-    await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toEqual({ added: false });
-    db.rows.hosted_games = { id: "g1", cancelled_at: "2026-10-01T00:00:00Z" };
-    db.rows.game_payment_settings = { requires_approval: false };
-    await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toEqual({ added: false });
+    await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toEqual({
+      added: false,
+      reason: "game_missing",
+    });
     expect(rostered()).toHaveLength(0);
+    expect(db.inserts).toHaveLength(0);
+  });
+
+  it("does not roster anyone on a cancelled game, and tells the host and the player", async () => {
+    db.rows.hosted_games = {
+      id: "g1",
+      host_id: "host-1",
+      title: "Sunday Run",
+      cancelled_at: "2026-10-01T00:00:00Z",
+    };
+    db.rows.game_payment_settings = { requires_approval: false };
+    await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toEqual({
+      added: false,
+      reason: "cancelled",
+      noticeSent: true,
+    });
+    expect(rostered()).toHaveLength(0);
+    const notices = notPlaced();
+    expect(notices.map((n) => n.user_id)).toEqual(["host-1", "p1"]);
+    expect(notices[0].body).toMatch(/the game was cancelled\. .*send their money back/);
+    expect(notices[1].title).toBe("Payment confirmed, but you're not on the roster yet");
+    expect(notices[1].body).toMatch(/Ask them for your spot or your money back/);
   });
 
   it("is quiet when the player is already on the roster", async () => {
     db.rows.game_payment_settings = { requires_approval: false };
     db.insertError = { code: "23505", message: "duplicate" };
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toEqual({ added: false });
+    const result = await addPaidPlayerToRoster("g1", "p1");
+    expect(result).toEqual({ added: false, reason: "already_on_roster" });
+    expect(holdsPlace(result)).toBe(true);
     expect(db.inserts.some((i) => i.table === "notifications")).toBe(false);
     expect(error).not.toHaveBeenCalled();
     error.mockRestore();
+  });
+
+  it("keeps a player already on the roster of an approval-required game without an approved request", async () => {
+    // The host added them, or they joined before approval was switched on: no request, but the place is theirs.
+    db.rows.game_payment_settings = { requires_approval: true };
+    db.rows.game_participants = { user_id: "p1" };
+    const result = await addPaidPlayerToRoster("g1", "p1");
+    expect(result).toEqual({ added: false, reason: "already_on_roster" });
+    expect(holdsPlace(result)).toBe(true);
+    expect(rostered()).toHaveLength(0);
+    expect(notPlaced()).toHaveLength(0);
+    expect(db.eqs).toEqual(
+      expect.arrayContaining([
+        { table: "game_participants", col: "game_id", val: "g1" },
+        { table: "game_participants", col: "user_id", val: "p1" },
+      ]),
+    );
+  });
+
+  it("keeps a player already on the roster of a game with no settings row", async () => {
+    db.rows.game_participants = { user_id: "p1" };
+    await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toEqual({
+      added: false,
+      reason: "already_on_roster",
+    });
+    expect(notPlaced()).toHaveLength(0);
   });
 
   it("reports a refusal from the join gate (full, ended) instead of pretending", async () => {
     db.rows.game_payment_settings = { requires_approval: false };
     db.insertError = { code: "P0001", message: "GAME_FULL: the roster is full." };
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toEqual({ added: false });
+    const result = await addPaidPlayerToRoster("g1", "p1");
+    expect(result).toEqual({
+      added: false,
+      reason: "refused",
+      code: "GAME_FULL",
+      noticeSent: true,
+    });
+    expect(holdsPlace(result)).toBe(false);
     expect(error).toHaveBeenCalled();
+    error.mockRestore();
+    // Not silent: the host and the player are both told, with the reason.
+    const [host, player] = notPlaced();
+    expect(host).toMatchObject({ user_id: "host-1", title: "Paid, not on the roster · Pat" });
+    expect(host.body).toMatch(/couldn't be added to the roster: the roster is full\./);
+    expect(player).toMatchObject({ user_id: "p1" });
+    expect(player.body).toMatch(/Your payment for Sunday Run is confirmed.*the roster is full/);
+    // And the "you're on the roster" notice is not sent.
+    expect(
+      db.inserts.some((i) => i.table === "notifications" && i.row?.type === "join_approved"),
+    ).toBe(false);
+  });
+
+  it("names only the game's own state to the host, never a rule about the player", () => {
+    expect(notPlacedWhy("GAME_FULL")).toBe("the roster is full");
+    expect(notPlacedWhy("GAME_COMPLETED")).toBe("the game has ended");
+    expect(notPlacedWhy("GAME_JOINS_CLOSED")).toBe("joining is closed");
+    expect(notPlacedWhy("GAME_SIGNUP_CLOSED")).toBe("joining is closed");
+    for (const code of [
+      "AGE_REQUIREMENT_NOT_MET",
+      "CHILD_GAME_PARTICIPATION_BLOCKED",
+      "BLOCKED_BY_HOST",
+      "AGE_VERIFICATION_REQUIRED",
+      undefined,
+    ]) {
+      expect(notPlacedWhy(code)).toBe("the game's joining rules don't allow it");
+    }
+  });
+
+  it("falls back to 'A player' when the player has no profile name", async () => {
+    db.rows.game_payment_settings = { requires_approval: false };
+    db.rows.profiles = null;
+    db.insertError = { code: "P0001", message: "GAME_COMPLETED: this game has already ended." };
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toEqual({
+      added: false,
+      reason: "refused",
+      code: "GAME_COMPLETED",
+      noticeSent: true,
+    });
+    expect(notPlaced()[0].title).toBe("Paid, not on the roster · A player");
+    expect(notPlaced()[0].body).toMatch(/the game has ended/);
+    error.mockRestore();
+  });
+
+  it("does not place a player the host blocked, as the join gate refuses them", async () => {
+    db.rows.game_payment_settings = { requires_approval: false };
+    db.rows.user_blocks = { blocker_id: "host-1" };
+    db.blocked = true;
+    const result = await addPaidPlayerToRoster("g1", "p1");
+    expect(result).toEqual({ added: false, reason: "refused", noticeSent: true });
+    expect(holdsPlace(result)).toBe(false);
+    expect(rostered()).toHaveLength(0);
+    // the gate's test: the host's own block of the player (blocker = host, blocked = player)
+    expect(db.eqs).toContainEqual({ table: "user_blocks", col: "blocker_id", val: "host-1" });
+    expect(db.eqs).toContainEqual({ table: "user_blocks", col: "blocked_id", val: "p1" });
+    const [host, player] = notPlaced();
+    // the host knows whom they blocked
+    expect(host.title).toBe("Paid, not on the roster · Pat");
+    expect(host.body).toMatch(/the game's joining rules don't allow it/);
+    expect(player).toMatchObject({ user_id: "p1" });
+  });
+
+  it("places a player who blocked the host, as the join gate and the payment claim gate let them in", async () => {
+    // enforce_host_block and payment_claim_block refuse only the host's block of the player; this one could request a
+    // spot, be approved and pay, so the host's verification must not leave them paid and off the roster.
+    db.rows.game_payment_settings = { requires_approval: false };
+    db.rows.user_blocks = null;
+    db.blocked = true;
+    await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toEqual({ added: true });
+    expect(rostered()).toHaveLength(1);
+    expect(notPlaced()).toHaveLength(0);
+    expect(db.blockChecks).toHaveLength(0);
+  });
+
+  it("names a player who blocked the host in a not-placed notice, as the host's screens do", async () => {
+    // "A player" only for those who blocked the host would tell the host exactly who did (managed_profile_names names
+    // them on every screen, 20261125100000).
+    db.rows.game_payment_settings = { requires_approval: true };
+    db.blocked = true;
+    await addPaidPlayerToRoster("g1", "p1");
+    expect(notPlaced()[0].title).toBe("Paid, not on the roster · Pat");
+    expect(notPlaced()[0].body).toMatch(/^Pat's payment for Sunday Run/);
+  });
+
+  it("does not name a suspended player in a not-placed notice", async () => {
+    db.rows.game_payment_settings = { requires_approval: true };
+    db.rows.profiles = { display_name: "Pat", suspended_at: "2026-11-01T00:00:00Z" };
+    await addPaidPlayerToRoster("g1", "p1");
+    expect(notPlaced()[0].title).toBe("Paid, not on the roster · A player");
+  });
+
+  it("still places the player when the block check cannot be read", async () => {
+    db.failing = ["user_blocks"];
+    db.rows.game_payment_settings = { requires_approval: false };
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toEqual({ added: true });
+    expect(error).toHaveBeenCalledWith("[roster] block check before placing failed");
+    error.mockRestore();
+  });
+
+  it("a notice that cannot be written never fails the caller", async () => {
+    db.rows.game_payment_settings = { requires_approval: false };
+    db.insertError = { code: "P0001", message: "GAME_FULL: the roster is full." };
+    db.notificationsDown = true;
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    // noticeSent false: the caller must not tell the host a notice went out.
+    await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toEqual({
+      added: false,
+      reason: "refused",
+      code: "GAME_FULL",
+      noticeSent: false,
+    });
+    expect(error).toHaveBeenCalledWith("[roster] not-placed notice failed", expect.any(Error));
     error.mockRestore();
   });
 
@@ -159,8 +386,43 @@ describe("addPaidPlayerToRoster", () => {
   it("with no payee it asks for no real settings row, so the game is request-to-join", async () => {
     db.payee = null;
     db.rows.game_payment_settings = null;
-    await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toEqual({ added: false });
+    await expect(addPaidPlayerToRoster("g1", "p1")).resolves.toMatchObject({ added: false });
     const asked = db.eqs.find((e) => e.table === "game_payment_settings" && e.col === "host_id");
     expect(asked?.val).toBe("00000000-0000-0000-0000-000000000000");
+  });
+});
+
+describe("placedAfterVerify (what the host's verify call reports)", () => {
+  it("is true when the player holds the place", () => {
+    expect(placedAfterVerify({ added: true })).toBe(true);
+    expect(placedAfterVerify({ added: false, reason: "already_on_roster" })).toBe(true);
+  });
+
+  it("is false only when both sides were sent the notice", () => {
+    expect(
+      placedAfterVerify({ added: false, reason: "refused", code: "GAME_FULL", noticeSent: true }),
+    ).toBe(false);
+    expect(placedAfterVerify({ added: false, reason: "approval_required", noticeSent: true })).toBe(
+      false,
+    );
+  });
+
+  it("is null when no notice went out, so the caller sends the usual verified notice", () => {
+    expect(placedAfterVerify({ added: false, reason: "game_missing" })).toBeNull();
+    expect(
+      placedAfterVerify({ added: false, reason: "refused", code: "GAME_FULL", noticeSent: false }),
+    ).toBeNull();
+  });
+
+  it("follows addPaidPlayerToRoster end to end", async () => {
+    db.rows.game_payment_settings = { requires_approval: false };
+    db.insertError = { code: "P0001", message: "GAME_FULL: the roster is full." };
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(placedAfterVerify(await addPaidPlayerToRoster("g1", "p1"))).toBe(false);
+    db.notificationsDown = true;
+    expect(placedAfterVerify(await addPaidPlayerToRoster("g1", "p1"))).toBeNull();
+    db.rows.hosted_games = null;
+    expect(placedAfterVerify(await addPaidPlayerToRoster("g1", "p1"))).toBeNull();
+    error.mockRestore();
   });
 });

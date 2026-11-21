@@ -17,6 +17,7 @@ import {
   normalizeRefundPolicy,
   refundPolicySummary,
   type RefundRule,
+  type RefundTerms,
 } from "@/lib/refund-policy";
 import { DEFAULT_CANCEL_CUTOFF_MIN, normalizeCutoff } from "@/lib/cancel-window";
 
@@ -219,6 +220,61 @@ export function normalizeGamePolicy(input: Partial<GamePolicy> | null | undefine
     refundPolicy: (input?.refundPolicy ?? "").trim(),
     gameRules: (input?.gameRules ?? "").trim(),
   };
+}
+
+/** What the game page knows when it builds the policy a player reads. */
+export type ViewerPolicySource = {
+  game:
+    | {
+        cancellationPolicy?: string | null;
+        cancellationNotes?: string | null;
+        minPlayers?: number | null;
+        maxPlayers?: number | null;
+        allowWaitlist?: boolean | null;
+        price?: number | null;
+        cancelCutoffMin?: number | null;
+        gameRules?: string | null;
+      }
+    | null
+    | undefined;
+  /** The host's settings row: readable by the host and linked players only. */
+  settings: { entry_fee?: number | string | null } | null;
+  /**
+   * Whether joining needs the host's approval, as the join button decides it:
+   * the settings row when readable, otherwise the public join policy
+   * (get_game_join_policy); null while unknown, which means approval.
+   */
+  requiresApproval: boolean | null;
+  /** Refund terms: the settings row when readable, otherwise the public terms. */
+  refundTerms: RefundTerms | null;
+};
+
+/**
+ * The policy shown in "Before you join". A visitor or a player who has not asked
+ * to join cannot read the host's settings row; they get the same public reads the
+ * join button and the payment terms use, so this block never contradicts them
+ * (P0-7). With the row readable, the result is what it always was.
+ */
+export function viewerGamePolicy({
+  game,
+  settings,
+  requiresApproval,
+  refundTerms,
+}: ViewerPolicySource): GamePolicy {
+  return normalizeGamePolicy({
+    cancellationPolicy: (game?.cancellationPolicy ?? undefined) as GamePolicy["cancellationPolicy"],
+    cancellationNotes: game?.cancellationNotes ?? "",
+    minPlayers: game?.minPlayers ?? 0,
+    maxPlayers: game?.maxPlayers ?? 10,
+    allowWaitlist: game?.allowWaitlist ?? true,
+    entryFee: Number(settings?.entry_fee ?? game?.price ?? 0) || 0,
+    requiresApproval: requiresApproval ?? true,
+    refundRule: (refundTerms?.refund_rule ?? undefined) as GamePolicy["refundRule"],
+    lateRefundPct: refundTerms?.late_refund_pct ?? 0,
+    cancelCutoffMin: game?.cancelCutoffMin ?? undefined,
+    refundPolicy: refundTerms?.refund_policy ?? "",
+    gameRules: game?.gameRules ?? "",
+  });
 }
 
 function clamp(n: number, lo: number, hi: number) {

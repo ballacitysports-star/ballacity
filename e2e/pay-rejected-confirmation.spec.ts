@@ -1,4 +1,7 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
+import { PAY_FIXTURE_HOST_ID, payFixtureGameRow, serveFixtureGame } from "./helpers/pay-fixtures";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
+import { answerSessionChecks } from "./helpers/signed-in";
 
 /**
  * E2E: end-to-end mocked payment that transitions to rejected.
@@ -6,10 +9,11 @@ import { test, expect, type Page, type Route } from "@playwright/test";
  * Submits a mocked payment on the pay screen, then simulates the host
  * rejecting it (mocked payment_submissions GET starts returning the same
  * row as `rejected` with reviewer_notes). Asserts the pay screen updates
- * to the rejected state with the correct rejection copy:
+ * to the rejected state with the correct rejection copy (the shared
+ * payment-state vocabulary in src/lib/payment-states.ts):
  *   - status timeline data-status="rejected"
- *   - "Rejected" badge
- *   - "Rejected — try again" step
+ *   - "Payment required" badge: a declined claim puts the fee back on the player
+ *   - "Declined — try again" step
  *   - reviewer notes rendered as the failure hint
  *
  * Auto-skips when no signed-in Supabase session is available.
@@ -24,7 +28,7 @@ test.skip(
 );
 
 const GAME_ID = "g2";
-const HOST_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+const HOST_ID = PAY_FIXTURE_HOST_ID;
 const METHOD_ID = "mock-method-venmo-1";
 const REJECT_NOTE = "Couldn't find your Venmo transfer — please resend.";
 
@@ -33,6 +37,11 @@ function tableUrl(url: string, table: string) {
 }
 
 async function restoreSession(page: Page) {
+  // Answer the session checks every load starts (GET /auth/v1/user and the root gate's
+  // age, onboarding and child-status server functions) from the injected session, as the
+  // pay specs do. They are not what this spec is about, and each signed-in load
+  // otherwise sends the shared sandbox 8-13 requests for them. See helpers/signed-in.ts.
+  await answerSessionChecks(page);
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(
     ([key, value]) => window.localStorage.setItem(key!, value!),
@@ -77,9 +86,11 @@ test("payment rejected by host updates pay screen to rejected state", async ({ b
   );
 
   await page.route(
-    (url) => tableUrl(url, "host_payment_methods") || String(url).includes("/rest/v1/rpc/get_game_host_payment_methods"),
+    (url) =>
+      tableUrl(url, "host_payment_methods") ||
+      String(url).includes("/rest/v1/rpc/get_game_host_payment_methods"),
     async (route) => {
-      if (!["GET","POST"].includes(route.request().method())) return route.fallback();
+      if (!["GET", "POST"].includes(route.request().method())) return route.fallback();
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -108,13 +119,10 @@ test("payment rejected by host updates pay screen to rejected state", async ({ b
     },
   );
 
-  await page.route(
-    (url) => tableUrl(url, "hosted_games"),
-    async (route) => {
-      if (route.request().method() !== "GET") return route.fallback();
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-    },
-  );
+  // The game itself: src/lib/sample-data.ts ships no games any more, so the pay
+  // page looks g2 up in hosted_games. Answering that with [] rendered "Game not
+  // found."; serve the row instead, hosted by the same mocked host.
+  await serveFixtureGame(page, payFixtureGameRow(GAME_ID));
 
   await page.route(
     (url) => tableUrl(url, "game_participants"),
@@ -196,12 +204,19 @@ test("payment rejected by host updates pay screen to rejected state", async ({ b
 
   // ---- Flow ----------------------------------------------------------
 
+  // Not a spec about "Before you join": the viewer has acknowledged it, so the pay page (which asks it
+  // before any payment option, docs/paid-path-gates.md section 7) goes straight to the options.
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
   await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
 
-  const methodButton = page.getByRole("button", { name: /e2e-host|venmo/i }).first();
-  await expect(methodButton).toBeVisible({ timeout: 10_000 });
-  await methodButton.click();
+  // The host takes exactly one method, so the pay screen skips the picker and
+  // opens that method's proof step itself. (There is no method row to tap: the
+  // only button naming Venmo there launches the Venmo app.)
+  await expect(page.getByRole("heading", { name: /i have paid — submit proof/i })).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect(page.getByText("e2e-host", { exact: true })).toBeVisible();
 
   // Amount (the $15 fee) and date (today) are prefilled and tucked away.
 
@@ -229,8 +244,9 @@ test("payment rejected by host updates pay screen to rejected state", async ({ b
   });
 
   await expect(timeline).toHaveAttribute("data-status", "rejected", { timeout: 10_000 });
-  await expect(timeline).toContainText(/rejected/i);
-  await expect(timeline).toContainText(/rejected — try again/i);
+  await expect(timeline).toHaveAttribute("data-payment-state", "payment_required");
+  await expect(timeline).toContainText(/payment required/i);
+  await expect(timeline).toContainText(/declined — try again/i);
   await expect(timeline).toContainText(REJECT_NOTE);
 
   await ctx.close();

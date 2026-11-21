@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { settledClaimReviewRefusal } from "@/lib/payment-states";
 
 type Next = "verified" | "rejected" | "pending";
 /** Any status a submission may currently hold (host actions only set `Next`). */
@@ -8,6 +9,13 @@ type From = Next | "disputed" | "cancelled";
 export type ReviewPaymentResult = {
   ok: true;
   changed: boolean;
+  /**
+   * Set when this call verified the payment: whether the player now holds a roster place (true), could not be given
+   * one and the host and the player were both sent a "payment_not_placed" notice (false), or neither is known (null:
+   * the placement or its notice failed, or the game is gone), in which case the caller says what it says for any
+   * verified payment.
+   */
+  placed?: boolean | null;
   submission: {
     id: string;
     status: From;
@@ -17,6 +25,21 @@ export type ReviewPaymentResult = {
     host_id: string;
   };
 };
+
+/**
+ * After the host verified a payment: give the player their roster place. A place that cannot be given is reported to
+ * both sides by addPaidPlayerToRoster; the verification itself stands either way. False only when those notices were
+ * written, so the caller never tells the host a notice went out that did not.
+ */
+async function placeVerifiedPlayer(gameId: string, playerId: string): Promise<boolean | null> {
+  try {
+    const { addPaidPlayerToRoster, placedAfterVerify } = await import("./roster-on-payment.server");
+    return placedAfterVerify(await addPaidPlayerToRoster(gameId, playerId));
+  } catch (e) {
+    console.error("[payments] roster placement after verification failed", e);
+    return null;
+  }
+}
 
 /**
  * Idempotent host action on a player's payment for a game.
@@ -60,14 +83,54 @@ export const reviewPaymentAction = createServerFn({ method: "POST" })
     // PERMISSION_MATRIX in child-policy.ts) may never record or confirm a
     // payment, even if the client-side gate is bypassed. The database
     // trigger `enforce_game_payment_cohort` is the final backstop.
+    //
+    // SEC-2: a signed-in client may ask the gate only about itself (about
+    // anyone else the database answers a fixed `false`). So the player is
+    // checked with the service role, and only once the server has shown that
+    // the caller hosts this game and the player is already part of it: this
+    // function cannot be used to probe an arbitrary account's age cohort.
+    // Only the host reviews payments (payment_submissions' row security asks
+    // for host_id = auth.uid(), and every read and write below does too).
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: game, error: gameErr } = await supabaseAdmin
+      .from("hosted_games")
+      .select("host_id")
+      .eq("id", gameId)
+      .maybeSingle();
+    if (gameErr) throw new Error(gameErr.message);
+    if (!game || game.host_id !== userId) {
+      throw new Error("Only this game's host can review its payments.");
+    }
+    const linked = await Promise.all([
+      supabaseAdmin
+        .from("game_participants")
+        .select("user_id", { count: "exact", head: true })
+        .eq("game_id", gameId)
+        .eq("user_id", playerId),
+      supabaseAdmin
+        .from("join_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("game_id", gameId)
+        .eq("player_id", playerId)
+        .in("status", ["pending", "approved"]),
+      supabaseAdmin
+        .from("payment_submissions")
+        .select("id", { count: "exact", head: true })
+        .eq("game_id", gameId)
+        .eq("player_id", playerId),
+    ]);
+    if (!linked.some((r) => !r.error && (r.count ?? 0) > 0)) {
+      throw new Error("This player isn't part of this game.");
+    }
+
     for (const [party, id] of [
       ["host", userId],
       ["player", playerId],
     ] as const) {
-      const { data: allowed, error: gateErr } = await (supabase.rpc as any)(
-        "game_payments_allowed",
-        { _user: id },
-      );
+      const client = party === "host" ? supabase : supabaseAdmin;
+      const { data: allowed, error: gateErr } = await (client.rpc as any)("game_payments_allowed", {
+        _user: id,
+      });
       if (gateErr) throw new Error(gateErr.message);
       if (allowed === false) {
         throw new Error(
@@ -137,13 +200,10 @@ export const reviewPaymentAction = createServerFn({ method: "POST" })
         }
         throw new Error(insErr.message);
       }
-      {
-        const { addPaidPlayerToRoster } = await import("./roster-on-payment.server");
-        await addPaidPlayerToRoster(gameId, playerId).catch(() => {});
-      }
       return {
         ok: true,
         changed: true,
+        placed: await placeVerifiedPlayer(gameId, playerId),
         submission: inserted as ReviewPaymentResult["submission"],
       };
     }
@@ -163,6 +223,11 @@ export const reviewPaymentAction = createServerFn({ method: "POST" })
         `Payment status changed since you loaded the page (now ${existing.status}). Please refresh.`,
       );
     }
+
+    // A cancelled or declined claim is final for the host (DECISION_FINAL in the database, 20261125100000): only the
+    // player reopens it. Say so instead of sending an update the database refuses ("Mark as paid" on a cancelled claim).
+    const refusal = settledClaimReviewRefusal(existing.status, next);
+    if (refusal) throw new Error(refusal);
 
     // Conditional update: only apply when the row is still in its prior status.
     // Serializes concurrent host clicks — the second one affects zero rows.
@@ -192,13 +257,10 @@ export const reviewPaymentAction = createServerFn({ method: "POST" })
       };
     }
 
-    if (next === "verified") {
-      const { addPaidPlayerToRoster } = await import("./roster-on-payment.server");
-      await addPaidPlayerToRoster(gameId, playerId).catch(() => {});
-    }
     return {
       ok: true,
       changed: true,
+      ...(next === "verified" ? { placed: await placeVerifiedPlayer(gameId, playerId) } : {}),
       submission: updated as ReviewPaymentResult["submission"],
     };
   });

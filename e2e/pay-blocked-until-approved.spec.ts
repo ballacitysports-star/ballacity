@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { restoreSession } from "./helpers/signed-in";
 
 /**
  * E2E: while a join request is still unapproved, the pay page must not let
@@ -27,14 +28,6 @@ const GAME_ID = "g2";
 const FAKE_HOST_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
 const METHOD_ID = "mock-method-venmo";
 const ENTRY_FEE = 15;
-
-async function restoreSession(page: Page) {
-  await page.goto("/", { waitUntil: "domcontentloaded" });
-  await page.evaluate(
-    ([key, value]) => window.localStorage.setItem(key!, value!),
-    [STORAGE_KEY!, SESSION_JSON!],
-  );
-}
 
 function sessionUserId(): string {
   const s = JSON.parse(SESSION_JSON!);

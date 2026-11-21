@@ -30,8 +30,9 @@ CREATE TEMP VIEW fn_hash AS
 -- player_trait_counts 939f6254eb2516ab01b1f4f3fb354061.
 SELECT t.eq((SELECT h FROM fn_hash WHERE fn = 'enforce_review_integrity()'), '200bf368b5cdd8e9763e3555d4756dfd',
   'enforce_review_integrity is the captured version as PRIV-1 extends it');
-SELECT t.eq((SELECT h FROM fn_hash WHERE fn = 'player_trait_counts(uuid)'), '8aca32746b2b12a62bd47a949edde559',
-  'player_trait_counts is the captured version as PRIV-1 extends it');
+-- SEC-2b (20261113120000_sec2b_oracle_followup) then narrows player_trait_counts' gate to the caller (PRIV-1's version: 8aca32746b2b12a62bd47a949edde559).
+SELECT t.eq((SELECT h FROM fn_hash WHERE fn = 'player_trait_counts(uuid)'), 'dc61bbfdb514effb278cec77896d012c',
+  'player_trait_counts is the captured version as PRIV-1 and SEC-2b extend it');
 SELECT t.eq((SELECT h FROM fn_hash WHERE fn = 'review_question_keys(text)'), '7be31278957db98b5c477d25b279e9c9',
   'review_question_keys is production''s');
 SELECT t.eq((SELECT h FROM fn_hash WHERE fn = 'review_tag_keys(text)'), '4627f1e129b4aa158d5d65d46a6c3d56',

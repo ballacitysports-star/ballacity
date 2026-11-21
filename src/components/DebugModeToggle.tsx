@@ -1,7 +1,13 @@
 import { Bug } from "lucide-react";
 import { useDebugMode } from "@/lib/debug-mode";
 
+// Developer aid for spotting SSR vs client differences. Never ship it to end users.
 export function DebugModeToggle() {
+  if (!import.meta.env.DEV) return null;
+  return <DebugModeToggleButton />;
+}
+
+function DebugModeToggleButton() {
   const [on, setOn] = useDebugMode();
   return (
     <button
@@ -10,7 +16,7 @@ export function DebugModeToggle() {
       title={on ? "Disable debug mode" : "Enable debug mode (highlight SSR vs client diffs)"}
       className={`fixed bottom-24 right-4 z-[100] grid h-10 w-10 place-items-center rounded-full border shadow-lg transition-colors ${
         on
-          ? "border-coral bg-coral text-white"
+          ? "border-coral bg-coral-strong text-white"
           : "border-border bg-surface/90 text-muted-foreground backdrop-blur hover:text-foreground"
       }`}
       aria-pressed={on}

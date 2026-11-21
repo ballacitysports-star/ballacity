@@ -28,15 +28,22 @@ function isStandalone() {
   );
 }
 
-function detect(): { os: "ios" | "android" | "other"; mode: Exclude<Mode, "native"> | null; browser: string } {
+function detect(): {
+  os: "ios" | "android" | "other";
+  mode: Exclude<Mode, "native"> | null;
+  browser: string;
+} {
   const ua = navigator.userAgent;
-  const ios = /iPhone|iPad|iPod/.test(ua) || (ua.includes("Macintosh") && navigator.maxTouchPoints > 1);
+  const ios =
+    /iPhone|iPad|iPod/.test(ua) || (ua.includes("Macintosh") && navigator.maxTouchPoints > 1);
   const android = /Android/i.test(ua);
   const os = ios ? "ios" : android ? "android" : "other";
   if (os === "other") return { os, mode: null, browser: "" };
 
   const inApp =
-    /FBAN|FBAV|FB_IAB|Instagram|Line\/|TikTok|musical_ly|Snapchat|Twitter|LinkedInApp|Pinterest|GSA\//i.test(ua) ||
+    /FBAN|FBAV|FB_IAB|Instagram|Line\/|TikTok|musical_ly|Snapchat|Twitter|LinkedInApp|Pinterest|GSA\//i.test(
+      ua,
+    ) ||
     (android && /; wv\)/.test(ua));
   if (inApp) return { os, mode: "in-app", browser: "" };
 
@@ -121,26 +128,52 @@ export function PwaInstallPrompt() {
   const steps: ReactNode[] | null =
     mode === "ios-safari"
       ? [
-          <>Tap <Share className="h-4 w-4 text-primary" /> <b>Share</b> in Safari's toolbar</>,
-          <>Choose <SquarePlus className="h-4 w-4 text-primary" /> <b>Add to Home Screen</b></>,
-          <>Tap <b>Add</b></>,
+          <>
+            Tap <Share className="h-4 w-4 text-primary" /> <b>Share</b> in Safari's toolbar
+          </>,
+          <>
+            Choose <SquarePlus className="h-4 w-4 text-primary" /> <b>Add to Home Screen</b>
+          </>,
+          <>
+            Tap <b>Add</b>
+          </>,
         ]
       : mode === "ios-other"
         ? [
-            <>Tap <Share className="h-4 w-4 text-primary" /> <b>Share</b> in {browser} (next to the address bar, or under <b>•••</b>)</>,
-            <>Choose <SquarePlus className="h-4 w-4 text-primary" /> <b>Add to Home Screen</b></>,
-            <>Tap <b>Add</b></>,
+            <>
+              Tap <Share className="h-4 w-4 text-primary" /> <b>Share</b> in {browser} (next to the
+              address bar, or under <b>•••</b>)
+            </>,
+            <>
+              Choose <SquarePlus className="h-4 w-4 text-primary" /> <b>Add to Home Screen</b>
+            </>,
+            <>
+              Tap <b>Add</b>
+            </>,
           ]
         : mode === "android-menu"
           ? [
-              <>Tap the <EllipsisVertical className="h-4 w-4 text-primary" /> <b>menu</b> in {browser}</>,
-              <>Choose <b>Install</b> or <b>Add to Home screen</b></>,
-              <>Confirm with <b>Add</b></>,
+              <>
+                Tap the <EllipsisVertical className="h-4 w-4 text-primary" /> <b>menu</b> in{" "}
+                {browser}
+              </>,
+              <>
+                Choose <b>Install</b> or <b>Add to Home screen</b>
+              </>,
+              <>
+                Confirm with <b>Add</b>
+              </>,
             ]
           : mode === "in-app"
             ? [
-                <>Tap the <b>•••</b> or <EllipsisVertical className="h-4 w-4 text-primary" /> menu in this app</>,
-                <>Choose <b>Open in {info.os === "ios" ? "Safari" : "Chrome"}</b> (or "Open in browser")</>,
+                <>
+                  Tap the <b>•••</b> or <EllipsisVertical className="h-4 w-4 text-primary" /> menu
+                  in this app
+                </>,
+                <>
+                  Choose <b>Open in {info.os === "ios" ? "Safari" : "Chrome"}</b> (or "Open in
+                  browser")
+                </>,
                 <>Then add BallaCity to your home screen from there</>,
               ]
             : null;
@@ -149,7 +182,8 @@ export function PwaInstallPrompt() {
     <div
       role="dialog"
       aria-label="Install BallaCity"
-      className="fixed inset-x-3 z-[60] rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-2xl"
+      // Above the bottom nav (z-40), below every sheet and dialog (z-50), so it never covers their buttons.
+      className="fixed inset-x-3 z-[45] rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-2xl"
       style={{ bottom: "calc(env(safe-area-inset-bottom) + 84px)" }}
     >
       <button

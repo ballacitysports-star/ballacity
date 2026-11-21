@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { errorInsteadOf } from "@/lib/error-report";
 import { postErrorMessage } from "@/lib/network-posts-rules";
 
 const CreatePostInput = z
@@ -47,7 +48,7 @@ export const createNetworkPost = createServerFn({ method: "POST" })
       } as never)
       .select("id")
       .single();
-    if (error) throw new Error(postErrorMessage(error.message));
+    if (error) throw errorInsteadOf(error, postErrorMessage(error.message));
     const id = (row as unknown as { id: string }).id;
     const status = await mod.settlePostModeration(supabaseAdmin, "posts", id, screen);
     return { id, held: status !== "approved" };

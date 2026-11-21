@@ -46,49 +46,11 @@ export function RiskAcknowledgmentDialog({
           <DialogDescription className="truncate">{gameTitle}</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
-          <p className="rounded-2xl border border-border bg-surface px-3 py-3 text-xs leading-relaxed text-foreground">
-            {RISK_ACKNOWLEDGMENT.text}
-          </p>
-          <ul className="space-y-1.5">
-            {RISK_ACKNOWLEDGMENT.points.map((p) => (
-              <li key={p} className="flex gap-2 text-[12px] leading-relaxed text-muted-foreground">
-                <span aria-hidden className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-lime" />
-                {p}
-              </li>
-            ))}
-          </ul>
-
-          <div className="flex items-start gap-3 rounded-2xl border border-border bg-surface px-3 py-3">
-            <button
-              type="button"
-              id="risk-ack-checkbox"
-              role="checkbox"
-              aria-checked={checked}
-              disabled={submitting}
-              onClick={() => setChecked((v) => !v)}
-              className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md border transition disabled:opacity-50 ${
-                checked
-                  ? "border-lime bg-lime text-primary-foreground"
-                  : "border-border bg-background"
-              }`}
-            >
-              {checked ? <Check className="h-4 w-4" aria-hidden /> : null}
-            </button>
-            <label htmlFor="risk-ack-checkbox" className="flex-1 text-xs leading-relaxed">
-              {RISK_ACKNOWLEDGMENT.checkboxLabel}
-            </label>
-          </div>
-
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
-            <LegalReviewTag area="safetyAcknowledgments" />
-            {RISK_ACKNOWLEDGMENT.disclaimer} Read the{" "}
-            <Link to="/safety" target="_blank" rel="noreferrer" className="text-lime underline">
-              Safety Center
-            </Link>
-            .
-          </p>
-        </div>
+        <RiskAcknowledgmentFields
+          checked={checked}
+          onCheckedChange={setChecked}
+          disabled={submitting}
+        />
 
         <DialogFooter className="gap-2">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={submitting}>
@@ -101,5 +63,65 @@ export function RiskAcknowledgmentDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * The risk acknowledgment itself: the RISK_ACKNOWLEDGMENT text and points, the
+ * checkbox (never pre-checked; the caller owns its state), the legal-review tag
+ * and the disclaimer. Shared by "Before you join" and the free-game join dialog
+ * so both show the same wording.
+ */
+export function RiskAcknowledgmentFields({
+  checked,
+  onCheckedChange,
+  disabled,
+}: {
+  checked: boolean;
+  onCheckedChange: (v: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="space-y-3">
+      <p className="rounded-2xl border border-border bg-surface px-3 py-3 text-xs leading-relaxed text-foreground">
+        {RISK_ACKNOWLEDGMENT.text}
+      </p>
+      <ul className="space-y-1.5">
+        {RISK_ACKNOWLEDGMENT.points.map((p) => (
+          <li key={p} className="flex gap-2 text-[12px] leading-relaxed text-muted-foreground">
+            <span aria-hidden className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-lime" />
+            {p}
+          </li>
+        ))}
+      </ul>
+
+      <div className="flex items-start gap-3 rounded-2xl border border-border bg-surface px-3 py-3">
+        <button
+          type="button"
+          id="risk-ack-checkbox"
+          role="checkbox"
+          aria-checked={checked}
+          disabled={disabled}
+          onClick={() => onCheckedChange(!checked)}
+          className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md border transition disabled:opacity-50 ${
+            checked ? "border-lime bg-lime text-primary-foreground" : "border-border bg-background"
+          }`}
+        >
+          {checked ? <Check className="h-4 w-4" aria-hidden /> : null}
+        </button>
+        <label htmlFor="risk-ack-checkbox" className="flex-1 text-xs leading-relaxed">
+          {RISK_ACKNOWLEDGMENT.checkboxLabel}
+        </label>
+      </div>
+
+      <p className="text-[11px] leading-relaxed text-muted-foreground">
+        <LegalReviewTag area="safetyAcknowledgments" />
+        {RISK_ACKNOWLEDGMENT.disclaimer} Read the{" "}
+        <Link to="/safety" target="_blank" rel="noreferrer" className="text-lime underline">
+          Safety Center
+        </Link>
+        .
+      </p>
+    </div>
   );
 }

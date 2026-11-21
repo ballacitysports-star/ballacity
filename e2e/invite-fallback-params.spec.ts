@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { restoreSession } from "./helpers/signed-in";
 
 /**
  * E2E: when a game deep-link carries fallback/invalid invite params, the app
@@ -25,14 +26,6 @@ test.skip(
 
 const GAME_ID = "g1";
 const FAKE_HOST_ID = "11111111-2222-3333-4444-555555555555";
-
-async function restoreSession(page: Page) {
-  await page.goto("/", { waitUntil: "domcontentloaded" });
-  await page.evaluate(
-    ([key, value]) => window.localStorage.setItem(key!, value!),
-    [STORAGE_KEY!, SESSION_JSON!],
-  );
-}
 
 async function assertNoInviteBanner(page: Page) {
   const banner = page.getByRole("status").filter({ hasText: /you're invited to this game/i });

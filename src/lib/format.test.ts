@@ -1,5 +1,12 @@
-import { describe, expect, it } from "vitest";
-import { formatGameEnds, formatGameWhen, formatNotificationWhen, formatWhenDate } from "./format";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  formatDatedWhen,
+  formatGameEnds,
+  formatGameWhen,
+  formatNotificationWhen,
+  formatWhen,
+  formatWhenDate,
+} from "./format";
 
 const TIME_RE = /\d{1,2}:\d{2}/;
 
@@ -61,5 +68,34 @@ describe("formatNotificationWhen", () => {
     const label = formatNotificationWhen({ date: iso, allDay: true });
     expect(label).not.toMatch(TIME_RE);
     expect(label).toContain("all day");
+  });
+});
+
+describe("formatDatedWhen (push text)", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("names the weekday and date in New York time where the relative line says Today", () => {
+    // 7:30 PM on Sunday Nov 8 in New York is already Monday in UTC, where days are counted.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-09T00:30:00Z"));
+    const mondayEvening = "2026-11-09T23:00:00Z";
+    expect(formatWhen(mondayEvening)).toBe("Today · 6:00 PM");
+    expect(formatDatedWhen({ date: mondayEvening })).toBe("Mon, Nov 9 · 6:00 PM");
+  });
+
+  it("names the New York date when the UTC date is already the next day", () => {
+    // 10 PM on Tuesday in New York is 3 AM on Wednesday in UTC.
+    expect(formatDatedWhen({ date: "2026-11-11T03:00:00Z" })).toBe("Tue, Nov 10 · 10:00 PM");
+  });
+
+  it("uses the same day and time format as the app's other game times, in daylight time too", () => {
+    expect(formatDatedWhen({ date: "2026-07-04T22:00:00Z" })).toBe("Sat, Jul 4 · 6:00 PM");
+    expect(formatDatedWhen({ date: "2026-07-04T22:00:00Z", allDay: null })).toMatch(TIME_RE);
+  });
+
+  it("shows the date only for an all-day game (stored as midnight in New York)", () => {
+    expect(formatDatedWhen({ date: "2026-11-10T05:00:00Z", allDay: true })).toBe(
+      "Tue, Nov 10 (all day)",
+    );
   });
 });

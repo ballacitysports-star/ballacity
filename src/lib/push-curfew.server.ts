@@ -14,6 +14,7 @@ import {
   DEFAULT_AGE_POLICY,
   notificationCurfewDecision,
   parseAgePolicy,
+  isMinorCohort,
   parseChildControls,
   parseCohort,
   type AgePolicyConfig,
@@ -28,25 +29,55 @@ export type CurfewGate =
 
 type Admin = {
   from: (table: string) => any;
+  /** Optional: a stub without it reads as "authority has not ended" (the stored cohort and switches apply). */
+  rpc?: (
+    fn: string,
+    args: Record<string, unknown>,
+  ) => PromiseLike<{ data: unknown; error: unknown }>;
 };
 
-export async function loadAgePolicy(admin: Admin): Promise<AgePolicyConfig> {
+/**
+ * A known adult no guardian has authority over (owner decision 2026-11-20: a guardian link ends when the child turns
+ * 18; managed accounts are the exception). The stored cohort never ages, so such a person can still read as a teen:
+ * the guardian's notification switch and the night curfew must not hold them.
+ *
+ * Any doubt (the function is missing because the app is ahead of the migration, or the call fails) answers false, which
+ * keeps the stored cohort and the guardian's switch in charge: it can only be stricter, never open a minor's curfew.
+ */
+async function guardianAuthorityEnded(admin: Admin, userId: string): Promise<boolean> {
+  if (typeof admin.rpc !== "function") return false;
   try {
-    const { data } = await admin
-      .from("app_settings")
-      .select("value")
-      .eq("key", "age_policy")
-      .maybeSingle();
-    return data ? parseAgePolicy((data as { value: unknown }).value) : { ...DEFAULT_AGE_POLICY };
+    const res = await admin.rpc("guardian_authority_has_ended", { _user: userId });
+    return !res?.error && res?.data === true;
   } catch {
-    return { ...DEFAULT_AGE_POLICY };
+    return false;
   }
+}
+
+/**
+ * The active age policy, or the default when none is stored. Throws when the lookup fails: a
+ * stored window may be stricter than the default, so the default is never used on a guess.
+ */
+export async function loadAgePolicy(admin: Admin): Promise<AgePolicyConfig> {
+  const { data, error } = await admin
+    .from("app_settings")
+    .select("value")
+    .eq("key", "age_policy")
+    .maybeSingle();
+  if (error) throw new Error(`age policy lookup failed: ${error.message}`);
+  return data ? parseAgePolicy((data as { value: unknown }).value) : { ...DEFAULT_AGE_POLICY };
 }
 
 /**
  * Decide whether a push may go out to this user right now. Adults always send.
  * Minors inside the curfew are QUEUED, never dropped — the in-app notification
  * row is written by the caller regardless, so nothing is silently lost.
+ *
+ * Fails CLOSED: if any lookup (policy, profile, guardian controls) errors or
+ * throws, this throws rather than guess. A failed profile read must not make a
+ * minor look like an adult, nor a failed controls read hide a guardian's off
+ * switch. Callers hold the push when it throws: deliverPush queues it for the
+ * flush job, and the flush job keeps a queued row waiting and retries.
  */
 export async function curfewGateFor(
   admin: Admin,
@@ -62,10 +93,23 @@ export async function curfewGateFor(
       .eq("child_user_id", userId)
       .maybeSingle(),
   ]);
+  if (!profileRes || profileRes.error) {
+    throw new Error(`profile lookup failed: ${profileRes?.error?.message ?? "no response"}`);
+  }
+  if (!controlsRes || controlsRes.error) {
+    throw new Error(
+      `guardian controls lookup failed: ${controlsRes?.error?.message ?? "no response"}`,
+    );
+  }
 
-  const cohort = parseCohort((profileRes?.data as any)?.age_cohort);
+  let cohort = parseCohort((profileRes?.data as any)?.age_cohort);
   const timezone = ((profileRes?.data as any)?.timezone as string | null) ?? null;
-  const controlsRow = (controlsRes?.data as Record<string, unknown> | null) ?? null;
+  let controlsRow = (controlsRes?.data as Record<string, unknown> | null) ?? null;
+  // Only a minor cohort can be stale, so adults never pay for the extra lookup.
+  if (isMinorCohort(cohort) && (await guardianAuthorityEnded(admin, userId))) {
+    cohort = "adult";
+    controlsRow = null;
+  }
   const controls = controlsRow ? parseChildControls(controlsRow) : null;
 
   const decision = notificationCurfewDecision({

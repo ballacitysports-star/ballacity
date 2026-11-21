@@ -18,7 +18,7 @@ import {
   UserPlus,
   CalendarClock,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import {
   listMyNotifications,
@@ -28,10 +28,22 @@ import {
   deleteNotification,
   pushPermissionState,
   requestPushPermission,
+  ensureOneSignalSubscription,
   dismissPushPrompt,
   isPushPromptDismissed,
+  useUnreadNotificationCountState,
   type Notification,
 } from "@/lib/notifications";
+import { devicePushSubscriptionState } from "@/lib/onesignal";
+import { isManagedUser } from "@/lib/managed-children";
+import {
+  MEMBER_PUSH_COPY,
+  memberPushPrompt,
+  type DevicePushSubscription,
+  type PushPermission,
+} from "@/lib/push-prompt";
+import { useStaffAccess } from "@/hooks/use-staff-access";
+import { userErrorMessage } from "@/lib/user-error";
 import {
   CATEGORY_META,
   setNotifPref,
@@ -47,24 +59,40 @@ import { resolveNotificationTarget } from "@/lib/deep-links";
 import { useNotificationActorId, usePrefetchNotificationActors } from "@/lib/notification-actors";
 import { UserAvatarById } from "@/components/UserAvatar";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  loadPushDeliveryIssues,
+  type DeliveryIssue,
+  type DeliveryLogReader,
+} from "@/lib/push-delivery";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ListSkeleton } from "@/components/ui/loading-state";
+import { useAuthSearchHere } from "@/lib/auth-return";
 
 const iconFor = (type: string) => {
   if (type === "message") return MessageCircle;
   if (type === "join_request" || type === "join_approved" || type === "join_declined") return Users;
   if (type === "payment") return CreditCard;
   if (type === "follow" || type === "unfollow") return UserPlus;
-  if (type === "trainer_availability") return CalendarClock;
+  if (type === "trainer_availability" || type === "availability_reconfirm") return CalendarClock;
   return Zap;
 };
 
 export function NotificationsPanel() {
   const { user, loading } = useAuth();
+  const authSearch = useAuthSearchHere();
   const [items, setItems] = useState<Notification[]>([]);
   const [fetching, setFetching] = useState(true);
   const nav = useNavigate();
+  const { access } = useStaffAccess();
+  // The true unread total on the server, not the (at most 100) loaded rows. No type is left out: "Mark all read"
+  // marks every unread notification, messages included, and this is the number it reports.
+  const {
+    count: serverUnread,
+    refresh: refreshUnread,
+    setCount: setUnreadCount,
+  } = useUnreadNotificationCountState("alerts-panel-");
+  const [markingAll, setMarkingAll] = useState(false);
 
   const [live, setLive] = useState(false);
 
@@ -143,7 +171,10 @@ export function NotificationsPanel() {
 
     // Catch up on anything missed while the tab was hidden or offline.
     const resync = () => {
-      if (document.visibilityState === "visible") void load();
+      if (document.visibilityState === "visible") {
+        void load();
+        refreshUnread();
+      }
     };
     document.addEventListener("visibilitychange", resync);
     window.addEventListener("online", resync);
@@ -154,15 +185,25 @@ export function NotificationsPanel() {
       window.removeEventListener("online", resync);
       supabase.removeChannel(channel);
     };
-  }, [user?.id, loading]);
+  }, [user?.id, loading, refreshUnread]);
 
   // Warm every row's avatar (including below the fold) before it scrolls in.
   usePrefetchNotificationActors(items);
 
-  const unreadCount = useMemo(() => items.filter((n) => !n.read_at).length, [items]);
+  // The server's count is the truth, but it can be unknown (not answered yet, or the read failed) or a moment
+  // behind: unread rows on screen always count, so "Mark all read" is never disabled while some are showing.
+  const loadedUnread = useMemo(() => items.filter((n) => !n.read_at).length, [items]);
+  const unreadCount = Math.max(serverUnread ?? 0, loadedUnread);
 
   const handleClick = async (n: Notification) => {
-    if (!n.read_at) await markNotificationRead(n.id);
+    if (!n.read_at) {
+      try {
+        await markNotificationRead(n.id);
+        refreshUnread();
+      } catch {
+        // Opening the alert matters more than its read mark; it stays unread and can be marked later.
+      }
+    }
     nav({ href: resolveNotificationTarget(n) } as any);
   };
 
@@ -176,6 +217,7 @@ export function NotificationsPanel() {
         </p>
         <Link
           to="/auth"
+          search={authSearch}
           className="inline-flex rounded-full bg-lime-gradient px-5 py-2.5 text-sm font-bold text-primary-foreground"
         >
           Sign in
@@ -191,9 +233,10 @@ export function NotificationsPanel() {
     try {
       if (willMarkRead) await markNotificationRead(n.id);
       else await markNotificationUnread(n.id);
-    } catch {
+      refreshUnread();
+    } catch (e) {
       setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, read_at: n.read_at } : x)));
-      toast.error("Couldn't update notification");
+      toast.error(userErrorMessage(e, "Couldn't update this notification. Please try again."));
     }
   };
 
@@ -202,24 +245,43 @@ export function NotificationsPanel() {
     setItems((curr) => curr.filter((x) => x.id !== n.id));
     try {
       await deleteNotification(n.id);
+      if (!n.read_at) refreshUnread();
       toast.success("Notification deleted", {
         action: { label: "Undo", onClick: () => setItems(prev) },
       });
-    } catch {
+    } catch (e) {
       setItems(prev);
-      toast.error("Couldn't delete notification");
+      toast.error(userErrorMessage(e, "Couldn't delete this notification. Please try again."));
     }
   };
 
   const handleMarkAll = async () => {
-    if (unreadCount === 0) return;
+    if (!user || unreadCount === 0 || markingAll) return;
+    setMarkingAll(true);
     const stamp = new Date().toISOString();
+    const before = serverUnread;
+    const wasUnread = new Set(items.filter((n) => !n.read_at).map((n) => n.id));
     setItems((prev) => prev.map((n) => ({ ...n, read_at: n.read_at ?? stamp })));
+    setUnreadCount(0);
     try {
-      await markAllNotificationsRead();
-      toast.success(`Marked ${unreadCount} as read`);
-    } catch {
-      toast.error("Couldn't mark all as read");
+      // One update on the server for every unread notification, including ones not loaded here.
+      const marked = await markAllNotificationsRead(user.id);
+      toast.success(
+        marked === 0
+          ? "You're all caught up"
+          : `Marked ${marked} notification${marked === 1 ? "" : "s"} as read`,
+      );
+    } catch (e) {
+      setItems((prev) =>
+        prev.map((n) => (wasUnread.has(n.id) && n.read_at === stamp ? { ...n, read_at: null } : n)),
+      );
+      setUnreadCount(before);
+      toast.error(
+        userErrorMessage(e, "Couldn't mark your notifications as read. Please try again."),
+      );
+    } finally {
+      setMarkingAll(false);
+      refreshUnread();
     }
   };
 
@@ -246,7 +308,7 @@ export function NotificationsPanel() {
         </Link>
         <button
           onClick={handleMarkAll}
-          disabled={unreadCount === 0}
+          disabled={unreadCount === 0 || markingAll}
           className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-foreground hover:border-lime/60 hover:text-lime disabled:opacity-40 disabled:hover:border-border disabled:hover:text-foreground"
         >
           <CheckCheck className="h-3.5 w-3.5" />
@@ -254,8 +316,9 @@ export function NotificationsPanel() {
         </button>
       </div>
 
-      <PushPrompt />
-      <PushDeliveryFallback userId={user?.id} />
+      <PushPrompt managed={isManagedUser(user)} />
+      {/* Delivery diagnostics are for operations: superadmins only. Members get the plain prompt above. */}
+      {access.isSuperadmin && <PushDeliveryFallback userId={user?.id} />}
       <NotificationPreferences />
 
       {fetching ? (
@@ -470,12 +533,8 @@ function NotificationPreferences() {
       <div className="border-t border-border px-3 py-3 space-y-4">
         <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 gap-y-1 items-center">
           <div />
-          <div className="micro-label text-muted-foreground text-center">
-            In-app
-          </div>
-          <div className="micro-label text-muted-foreground text-center">
-            Push
-          </div>
+          <div className="micro-label text-muted-foreground text-center">In-app</div>
+          <div className="micro-label text-muted-foreground text-center">Push</div>
           {categories.map((cat) => (
             <PrefRow key={cat} category={cat} prefs={prefs} />
           ))}
@@ -518,51 +577,123 @@ function PrefRow({
   );
 }
 
-function PushPrompt() {
-  const [perm, setPerm] = useState<"granted" | "denied" | "default" | "unsupported">("default");
+/** How often, and how many times, to look again while the push SDK is still loading. */
+const DEVICE_CHECK_RETRY_MS = 2000;
+const DEVICE_CHECK_TRIES = 5;
+
+/**
+ * The member's push prompt: "Turn on push notifications" when push is off, not yet allowed, or allowed but this
+ * device has no push subscription; a short "blocked" note when the browser blocks it. It uses the app's one enable
+ * path (requestPushPermission, and ensureOneSignalSubscription when the browser already allows it).
+ */
+export function PushPrompt({ managed = false }: { managed?: boolean }) {
+  // null until the mount effect has read the browser's permission and the dismissal flag, so the first paint
+  // never flashes the banner at someone who already has push or dismissed it (and server and client agree).
+  const [perm, setPerm] = useState<PushPermission | null>(null);
+  const [device, setDevice] = useState<DevicePushSubscription>("unknown");
   const [dismissed, setDismissed] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     setPerm(pushPermissionState());
     setDismissed(isPushPromptDismissed());
   }, []);
 
-  if (perm === "unsupported" || perm === "granted") return null;
-  if (perm === "default" && dismissed) return null;
+  const checkDevice = useCallback(async () => {
+    const state = await devicePushSubscriptionState();
+    setDevice(state);
+    return state;
+  }, []);
+
+  useEffect(() => {
+    if (perm !== "granted" || managed) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let tries = 0;
+    const run = async () => {
+      tries += 1;
+      const state = await checkDevice();
+      if (!cancelled && state === "unknown" && tries < DEVICE_CHECK_TRIES) {
+        timer = setTimeout(run, DEVICE_CHECK_RETRY_MS);
+      }
+    };
+    void run();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void checkDevice();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [perm, managed, checkDevice]);
+
+  const prompt =
+    perm === null ? null : memberPushPrompt({ permission: perm, device, dismissed, managed });
+  if (!prompt) return null;
 
   const enable = async () => {
-    const result = await requestPushPermission();
-    if (result === "granted") {
-      setPerm("granted");
-      toast.success("Push notifications enabled");
-    } else if (result === "denied") {
-      setPerm("denied");
-      toast("Push blocked. Enable it from your browser site settings.");
+    if (busy) return;
+    setBusy(true);
+    try {
+      if (perm === "granted") {
+        // Already allowed in the browser: only this device's subscription is missing.
+        if (await ensureOneSignalSubscription()) {
+          setDevice("subscribed");
+          toast.success(MEMBER_PUSH_COPY.enabled);
+        } else {
+          toast.error(MEMBER_PUSH_COPY.failed);
+        }
+        return;
+      }
+      const { permission: result, subscribed } = await requestPushPermission();
+      if (result === "granted") {
+        setPerm("granted");
+        if (subscribed) {
+          setDevice("subscribed");
+          toast.success(MEMBER_PUSH_COPY.enabled);
+        } else {
+          // Allowed in the browser, but this device still has no subscription: not a success. The device
+          // check that follows decides whether to offer the prompt again.
+          setDevice("not_subscribed");
+          toast.error(MEMBER_PUSH_COPY.failed);
+        }
+      } else if (result === "denied") {
+        setPerm("denied");
+        toast(MEMBER_PUSH_COPY.blockedToast);
+      }
+    } catch {
+      toast.error(MEMBER_PUSH_COPY.failed);
+    } finally {
+      setBusy(false);
     }
   };
 
+  const blocked = prompt === "blocked";
   return (
     <div className="mb-4 rounded-2xl border border-lime/40 bg-lime/10 p-3 flex items-start gap-3">
-      <BellRing className="h-5 w-5 text-lime shrink-0 mt-0.5" />
+      <BellRing className="h-5 w-5 text-lime shrink-0 mt-0.5" aria-hidden />
       <div className="min-w-0 flex-1">
         <div className="font-semibold text-sm">
-          {perm === "denied" ? "Push notifications blocked" : "Get push alerts for approvals"}
+          {blocked ? MEMBER_PUSH_COPY.blockedTitle : MEMBER_PUSH_COPY.enableTitle}
         </div>
         <p className="text-xs text-muted-foreground mt-0.5">
-          {perm === "denied"
-            ? "Re-enable notifications for this site in your browser settings to get instant approval alerts."
-            : "Know the moment a host approves or declines your join request — even when BallaCity isn't open."}
+          {blocked ? MEMBER_PUSH_COPY.blockedBody : MEMBER_PUSH_COPY.enableBody}
         </p>
-        {perm !== "denied" && (
+        {!blocked && (
           <button
+            type="button"
             onClick={enable}
-            className="mt-2 inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
+            disabled={busy}
+            className="mt-2 inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-60"
           >
-            Turn on push
+            {MEMBER_PUSH_COPY.enableButton}
           </button>
         )}
       </div>
       <button
+        type="button"
         onClick={() => {
           dismissPushPrompt();
           setDismissed(true);
@@ -576,10 +707,12 @@ function PushPrompt() {
   );
 }
 
+/**
+ * Operations diagnostics: failed or skipped pushes from the delivery log, with the provider's reason. Rendered for
+ * superadmins only (see NotificationsPanel); members get PushPrompt instead and never see provider reasons.
+ */
 function PushDeliveryFallback({ userId }: { userId: string | undefined }) {
-  const [failures, setFailures] = useState<
-    Array<{ id: string; created_at: string; error: string | null; notification_id: string | null }>
-  >([]);
+  const [failures, setFailures] = useState<DeliveryIssue[]>([]);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set();
     try {
@@ -595,25 +728,11 @@ function PushDeliveryFallback({ userId }: { userId: string | undefined }) {
     if (!userId) return;
     let cancelled = false;
     const load = async () => {
-      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      const { data } = await supabase
-        .from("notification_delivery_log" as any)
-        .select("id, created_at, error, notification_id, status, channel")
-        .eq("user_id", userId)
-        .eq("channel", "push")
-        .in("status", ["failed", "skipped"])
-        .gte("created_at", since)
-        .order("created_at", { ascending: false })
-        .limit(10);
-      if (!cancelled)
-        setFailures(
-          ((data ?? []) as any[]).map((r) => ({
-            id: r.id,
-            created_at: r.created_at,
-            error: r.error,
-            notification_id: r.notification_id,
-          })),
-        );
+      // Failed or skipped pushes from the last 7 days, without the ones held for a minor's quiet
+      // hours (or a settings check) and the ones dropped as expired: those are not a problem.
+      // "No subscribers" stays: it tells the superadmin no device of theirs is subscribed.
+      const rows = await loadPushDeliveryIssues(supabase as unknown as DeliveryLogReader, userId);
+      if (!cancelled) setFailures(rows);
     };
     load();
     const channel = supabase

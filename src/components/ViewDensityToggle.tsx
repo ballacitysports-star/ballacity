@@ -7,6 +7,14 @@ export type Density = "grid" | "list";
 const VIEW_ICONS: Record<ViewMode, LucideIcon> = { list: List, map: MapIcon };
 const VIEW_LABELS: Record<ViewMode, string> = { list: "List", map: "Map" };
 
+/** One combined layout choice: grid cards, compact list, or map. */
+type LayoutChoice = "grid" | "compact" | "map";
+const LAYOUT_CHOICES: Array<{ id: LayoutChoice; label: string; Icon: LucideIcon }> = [
+  { id: "grid", label: "Grid", Icon: LayoutGrid },
+  { id: "compact", label: "Compact", Icon: Rows3 },
+  { id: "map", label: "Map", Icon: MapIcon },
+];
+
 const DENSITY_META: Array<{ id: Density; label: string; Icon: LucideIcon }> = [
   { id: "grid", label: "Grid", Icon: LayoutGrid },
   { id: "list", label: "Compact", Icon: Rows3 },
@@ -29,22 +37,45 @@ export function ViewDensityToggle({
   showDensity?: boolean;
   /**
    * "icons" folds view and density into one icon-only control (Grid, Compact,
-   * Map) that fits on a header row. Needs the default list + map views.
+   * Map) that fits on a header row. "sheet" is the same single choice with
+   * words and 44px buttons, for inside a filter sheet. Both need the default
+   * list + map views.
    */
-  variant?: "full" | "icons";
+  variant?: "full" | "icons" | "sheet";
 }) {
+  const current: LayoutChoice = view === "map" ? "map" : density === "list" ? "compact" : "grid";
+  const choose = (id: LayoutChoice) => {
+    if (id === "map") return onViewChange("map");
+    onViewChange("list");
+    onDensityChange(id === "compact" ? "list" : "grid");
+  };
+  if (variant === "sheet") {
+    return (
+      <div role="group" aria-label="Results layout" className="flex flex-wrap gap-2">
+        {LAYOUT_CHOICES.map(({ id, label, Icon }) => {
+          const active = current === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={active}
+              onClick={() => choose(id)}
+              className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-4 text-sm font-semibold transition-colors ${
+                active
+                  ? "border-lime bg-lime text-primary-foreground"
+                  : "border-border bg-background text-muted-foreground"
+              }`}
+            >
+              <Icon className="h-4 w-4" aria-hidden />
+              {label}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
   if (variant === "icons") {
-    const options = [
-      { id: "grid", label: "Grid view", Icon: LayoutGrid },
-      { id: "compact", label: "Compact view", Icon: Rows3 },
-      { id: "map", label: "Map view", Icon: MapIcon },
-    ] as const;
-    const current = view === "map" ? "map" : density === "list" ? "compact" : "grid";
-    const choose = (id: (typeof options)[number]["id"]) => {
-      if (id === "map") return onViewChange("map");
-      onViewChange("list");
-      onDensityChange(id === "compact" ? "list" : "grid");
-    };
+    const options = LAYOUT_CHOICES.map((o) => ({ ...o, label: `${o.label} view` }));
     return (
       <div
         role="group"
@@ -72,7 +103,10 @@ export function ViewDensityToggle({
     );
   }
   return (
-    <div className="mb-4 flex items-center gap-2">
+    // Wraps: on a 320px screen the two switches side by side are wider than the
+    // column, so the density switch drops to its own line instead of pushing
+    // the page sideways.
+    <div className="mb-4 flex flex-wrap items-center gap-2">
       <div
         className="inline-flex items-center gap-1 rounded-full border border-border bg-surface p-1"
         role="tablist"

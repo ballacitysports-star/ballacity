@@ -20,6 +20,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { CHILD_CONSENT_ROUTE, needsAgeGate, useMyAgeStatus } from "@/lib/age-verification";
 import { AgeGateScreen } from "@/components/onboarding/AgeGateScreen";
+import { errorText, userErrorMessage } from "@/lib/user-error";
+
+/** approveConsentAsGuardian's own refusal for an account that isn't a known adult; shown as it is. */
+const ADULT_APPROVER_REQUIRED =
+  "Only an adult account can approve a child account. Add your birthday to your profile first.";
 
 export const Route = createFileRoute("/parent/consent/$token")({
   head: () =>
@@ -118,7 +123,11 @@ function ConsentApprovalPage() {
       toast.success("Approved — you can manage settings in the Parent Center.");
       void navigate({ to: "/parent" });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not approve this request.");
+      toast.error(
+        errorText(e) === ADULT_APPROVER_REQUIRED
+          ? ADULT_APPROVER_REQUIRED
+          : userErrorMessage(e, "Couldn't approve this request. Please try again."),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -128,9 +137,7 @@ function ConsentApprovalPage() {
     <main className="page-shell-narrow pt-6 pb-24">
       <div className="flex items-center gap-2 text-primary">
         <ShieldCheck className="h-5 w-5" aria-hidden />
-        <span className="section-eyebrow">
-          Parent / guardian approval
-        </span>
+        <span className="section-eyebrow">Parent / guardian approval</span>
       </div>
       <h1 className="mt-2 page-title">
         Approve {info?.childDisplayName ?? "a child"}&rsquo;s BallaCity account

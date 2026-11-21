@@ -23,6 +23,8 @@ import { ListSkeleton } from "@/components/ui/loading-state";
 import { FamilyInboxSection } from "@/components/child/FamilyInboxSection";
 import { PreviewGate } from "@/components/public/PreviewGate";
 import { BackButton } from "@/components/layout/BackButton";
+import { useAuthSearchHere } from "@/lib/auth-return";
+import { userErrorMessage } from "@/lib/user-error";
 
 const searchSchema = z.object({
   tab: fallback(z.string(), "messages").default("messages"),
@@ -53,6 +55,7 @@ function MessagesInboxGate() {
 
 function MessagesInbox() {
   const { user, loading } = useAuth();
+  const authSearch = useAuthSearchHere();
   const { tab: tabRaw } = Route.useSearch();
   const top: TopTab = tabRaw === "alerts" ? "alerts" : "messages";
   const nav = Route.useNavigate();
@@ -140,6 +143,7 @@ function MessagesInbox() {
         <h1 className="page-title mb-2">Sign in to your inbox</h1>
         <Link
           to="/auth"
+          search={authSearch}
           className="inline-flex rounded-full bg-lime-gradient px-5 py-2.5 text-sm font-bold text-primary-foreground"
         >
           Sign in
@@ -156,7 +160,7 @@ function MessagesInbox() {
       setConvs((prev) => prev.map((c) => (c.id === id ? { ...c, is_request: false } : c)));
       toast.success("Message request accepted");
     } catch (e: any) {
-      toast.error(e.message);
+      toast.error(userErrorMessage(e, "Couldn't accept this message request. Please try again."));
     }
   };
 
@@ -168,7 +172,7 @@ function MessagesInbox() {
       await declineConversation(id);
       setConvs((prev) => prev.filter((c) => c.id !== id));
     } catch (e: any) {
-      toast.error(e.message);
+      toast.error(userErrorMessage(e, "Couldn't decline this message request. Please try again."));
     }
   };
 
@@ -190,7 +194,7 @@ function MessagesInbox() {
           Messages
           {msgUnread + waitingRequests > 0 && (
             <span
-              className="ml-1.5 grid h-5 min-w-5 px-1.5 place-items-center rounded-full bg-coral text-[10px] font-bold text-white"
+              className="ml-1.5 grid h-5 min-w-5 px-1.5 place-items-center rounded-full bg-coral-strong text-[10px] font-bold text-white"
               aria-label={`${msgUnread} unread, ${waitingRequests} ${waitingRequests === 1 ? "request" : "requests"}`}
             >
               {msgUnread + waitingRequests > 9 ? "9+" : msgUnread + waitingRequests}
@@ -201,7 +205,7 @@ function MessagesInbox() {
           <Bell className="h-4 w-4" />
           Alerts
           {alertUnread > 0 && (
-            <span className="ml-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-coral px-1.5 text-[10px] font-bold text-white">
+            <span className="ml-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-coral-strong px-1.5 text-[10px] font-bold text-white">
               {alertUnread > 9 ? "9+" : alertUnread}
             </span>
           )}
@@ -220,7 +224,7 @@ function MessagesInbox() {
             <SubTabButton active={msgTab === "primary"} onClick={() => setMsgTab("primary")}>
               Primary
               {msgUnread > 0 && (
-                <span className="ml-2 grid h-5 min-w-5 px-1.5 place-items-center rounded-full bg-coral text-[10px] font-bold text-white">
+                <span className="ml-2 grid h-5 min-w-5 px-1.5 place-items-center rounded-full bg-coral-strong text-[10px] font-bold text-white">
                   {msgUnread}
                 </span>
               )}
@@ -340,7 +344,7 @@ function MessagesInbox() {
                     </div>
                   ) : (
                     c.unread > 0 && (
-                      <span className="grid h-5 min-w-5 px-1.5 place-items-center rounded-full bg-coral text-[10px] font-bold text-white shrink-0">
+                      <span className="grid h-5 min-w-5 px-1.5 place-items-center rounded-full bg-coral-strong text-[10px] font-bold text-white shrink-0">
                         {c.unread}
                       </span>
                     )

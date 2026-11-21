@@ -9,6 +9,7 @@ import { formatWhen } from "@/lib/format";
 import { LAUNCH_CITIES, cityBySlug, cityLabel, distanceKm } from "@/lib/launch-cities";
 import { pageHead, SITE_URL } from "@/lib/seo";
 import { SPORT_GUIDES } from "@/lib/sports-guide";
+import { useAuthSearchHere } from "@/lib/auth-return";
 
 const CITY_KEY = "bc.publicFeedCity";
 const DEFAULT_CITY = LAUNCH_CITIES[0];
@@ -98,6 +99,7 @@ function PublicFeed() {
   const { citySlug, listings: all } = Route.useLoaderData();
   const { city: cityParam, sport } = Route.useSearch();
   const navigate = useNavigate({ from: "/cities/" });
+  const authSearch = useAuthSearchHere();
   const city = cityBySlug(citySlug) ?? DEFAULT_CITY;
   const [locating, setLocating] = useState(false);
   const [locationNote, setLocationNote] = useState<string | null>(null);
@@ -164,7 +166,7 @@ function PublicFeed() {
       <main className="page-shell-prose py-6 pb-28">
         <h1 className="page-title">Games in {cityLabel(city)}</h1>
         <p className="mt-2 page-subtitle">
-          Upcoming public pickup runs, plus teams and gyms nearby. Browse freely; you only need an
+          Upcoming public pickup games, plus teams and gyms nearby. Browse freely; you only need an
           account to join or host.
         </p>
 
@@ -314,13 +316,14 @@ function PublicFeed() {
         )}
 
         <section className="mt-8 rounded-2xl border border-border bg-surface p-4">
-          <h2 className="text-sm font-bold">Want to join a run?</h2>
+          <h2 className="text-sm font-bold">Want to join a game?</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Create a free account to request a spot, message hosts and get game alerts.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Link
               to="/auth"
+              search={authSearch}
               className="inline-flex min-h-11 items-center rounded-full bg-lime px-5 text-sm font-bold text-primary-foreground"
             >
               Sign up or sign in

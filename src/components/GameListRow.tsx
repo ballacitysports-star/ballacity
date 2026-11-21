@@ -49,7 +49,7 @@ export function GameListRow({ game, index = 0 }: { game: Game; index?: number })
               : "Free";
   const statusTone =
     liveStatus === "in_progress"
-      ? "bg-coral text-white"
+      ? "bg-coral-strong text-white"
       : liveStatus === "completed"
         ? "bg-surface border border-border text-muted-foreground"
         : joinedByMe

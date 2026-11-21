@@ -10,6 +10,7 @@ import type { Game } from "@/lib/sample-data";
 import { formatGameWhen } from "@/lib/format";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import type { JoinRequest } from "@/lib/payments";
+import { playerRequestLine } from "@/lib/guarded-open-join";
 import { GamePlaceDistance } from "@/components/GameDistance";
 import {
   AlertDialog,
@@ -252,11 +253,7 @@ function RequestGameCardInner({
                   : isApproved
                     ? "You approved this player."
                     : "You declined this player."
-                : isPending
-                  ? "Waiting for host approval"
-                  : isApproved
-                    ? "Approved — you're on the roster."
-                    : "Declined by host."}
+                : playerRequestLine(request)}
             </p>
             <RequestTimeline request={request} />
           </div>

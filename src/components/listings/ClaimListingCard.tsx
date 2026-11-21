@@ -26,6 +26,7 @@ import {
   type ClaimRelationship,
 } from "@/lib/listings";
 import type { ListingSubjectType } from "@/lib/listings.functions";
+import { useAuthSearchHere } from "@/lib/auth-return";
 
 /**
  * Shown on a team or gym page that has no owner. Filing a claim does not grant
@@ -41,6 +42,7 @@ export function ClaimListingCard({
   name: string;
 }) {
   const { user } = useAuth();
+  const authSearch = useAuthSearchHere();
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [evidence, setEvidence] = useState("");
@@ -181,7 +183,9 @@ export function ClaimListingCard({
             </Button>
           ) : (
             <Button className="w-full" asChild>
-              <Link to="/auth">Sign in to claim</Link>
+              <Link to="/auth" search={authSearch}>
+                Sign in to claim
+              </Link>
             </Button>
           )}
         </CardContent>

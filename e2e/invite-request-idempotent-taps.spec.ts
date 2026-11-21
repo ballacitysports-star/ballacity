@@ -1,4 +1,7 @@
+import { fulfillRows } from "./helpers/invite-postgrest";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
+import { answerSessionChecks } from "./helpers/signed-in";
 
 /**
  * E2E: rapidly tapping "Request to join" must result in exactly one pending
@@ -28,6 +31,11 @@ const INVITE_URL = `/games/${GAME_ID}?invite=1&from=${FAKE_HOST_ID}&exp=${FUTURE
 const POST_DELAY_MS = 400;
 
 async function restoreSession(page: Page) {
+  // Answer the session checks every load starts (GET /auth/v1/user and the root gate's
+  // age, onboarding and child-status server functions) from the injected session, as the
+  // pay specs do. They are not what this spec is about, and each signed-in load
+  // otherwise sends the shared sandbox 8-13 requests for them. See helpers/signed-in.ts.
+  await answerSessionChecks(page);
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(
     ([key, value]) => window.localStorage.setItem(key!, value!),
@@ -150,23 +158,13 @@ test("rapid taps on Request-to-join create exactly one pending row (server-side 
         const existing = rowsByKey.get(key);
         if (existing) {
           // Return the same row (idempotent success).
-          await route.fulfill({
-            status: 201,
-            contentType: "application/json",
-            headers: { "content-range": "0-0/1" },
-            body: JSON.stringify([existing]),
-          });
+          await fulfillRows(route, [existing], { status: 201 });
           return;
         }
 
         const row = makeRow(key);
         rowsByKey.set(key, row);
-        await route.fulfill({
-          status: 201,
-          contentType: "application/json",
-          headers: { "content-range": "0-0/1" },
-          body: JSON.stringify([row]),
-        });
+        await fulfillRows(route, [row], { status: 201 });
         return;
       }
 
@@ -174,6 +172,7 @@ test("rapid taps on Request-to-join create exactly one pending row (server-side 
     },
   );
 
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
   await page.goto(INVITE_URL, { waitUntil: "domcontentloaded" });
 
@@ -196,11 +195,17 @@ test("rapid taps on Request-to-join create exactly one pending row (server-side 
     cta.click({ force: true, noWaitAfter: true }).catch(() => {}),
   ]);
 
-  // Wait for the pending UI (implies at least one POST resolved successfully).
+  // The pending UI shows at once (optimistic), before the POST is sent.
   await expect(page.getByText(/request pending · tap to cancel/i).first()).toBeVisible({
     timeout: 10_000,
   });
   await expect(page.getByRole("button", { name: /^request spot/i })).toHaveCount(0);
+
+  // The POST goes out once the app has asked the auth server who is signed in
+  // (createJoinRequest), which a loaded sandbox can take seconds to answer.
+  await expect
+    .poll(() => joinPosts.length, { timeout: 10_000, message: "no join_requests POST was sent" })
+    .toBeGreaterThanOrEqual(1);
 
   // Give any late in-flight POSTs a moment to settle.
   await page.waitForTimeout(POST_DELAY_MS + 300);

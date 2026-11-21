@@ -19,6 +19,7 @@ import {
 } from "@/lib/account-type";
 import { useMyAgeStatus } from "@/lib/age-verification";
 import { trackEvent } from "@/lib/analytics";
+import { userErrorMessage } from "@/lib/user-error";
 
 /** How long the cards wait for the age answer before showing without Parent / Guardian. */
 const AGE_WAIT_MS = 3000;
@@ -108,7 +109,7 @@ export function AccountTypeScreen({
         window.location.replace(hrefForSetup(choice));
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not save.");
+      toast.error(userErrorMessage(err, "Couldn't save your account type. Please try again."));
       setBusy(false);
     }
   };

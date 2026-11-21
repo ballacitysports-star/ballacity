@@ -6,6 +6,8 @@
  * Never throws for provider errors: a push is auxiliary to the in-app
  * notification row, which the caller writes first.
  */
+import { EXPIRED, HELD_CHECK_FAILED, HELD_FOR_CURFEW } from "@/lib/push-delivery";
+import type { CurfewGate } from "@/lib/push-curfew.server";
 
 export const ONESIGNAL_APP_ID = "c6024ea7-b1a2-4f64-b43a-783971d802f9";
 export const ONESIGNAL_API = "https://api.onesignal.com/notifications";
@@ -15,7 +17,69 @@ export type PushInput = {
   title: string;
   body?: string | null;
   url?: string | null;
+  /**
+   * When the push stops mattering (a game reminder: the game's start). A push that would be
+   * delivered at or after this time, now or after being held, is not sent or queued; the
+   * delivery log records it as skipped, "expired".
+   */
+  expiresAt?: string | null;
+  /** The in-app notification this push mirrors; the delivery log links to it. */
+  notificationId?: string | null;
 };
+
+type LogStatus = "sent" | "failed" | "skipped";
+type Log = (
+  status: LogStatus,
+  extra?: { error?: string | null; detail?: unknown },
+) => Promise<void>;
+
+/** At or past the push's expiry, if it has one. */
+function expiredAt(data: PushInput, deliverAtMs: number): boolean {
+  const expires = data.expiresAt ? Date.parse(data.expiresAt) : Number.NaN;
+  return Number.isFinite(expires) && deliverAtMs >= expires;
+}
+
+/**
+ * Holds a push in scheduled_notifications for the flush job, which checks the
+ * recipient's settings again before it sends. A push that would come out of the
+ * hold at or after its expiry is dropped instead. A hold that cannot be written
+ * is logged as failed: the push is then lost, never sent unchecked.
+ */
+async function hold(data: PushInput, log: Log, reason: string, deliverAfter: string) {
+  if (expiredAt(data, Date.parse(deliverAfter))) {
+    await log("skipped", {
+      error: EXPIRED,
+      detail: { held_for: reason, deliver_after: deliverAfter, expires_at: data.expiresAt },
+    });
+    return { ok: false as const, reason: EXPIRED };
+  }
+  let failure: string | null = null;
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("scheduled_notifications" as any).insert({
+      user_id: data.userId,
+      title: data.title,
+      body: data.body ?? null,
+      url: data.url ?? null,
+      channel: "push",
+      reason,
+      deliver_after: deliverAfter,
+    } as any);
+    if (error) failure = error.message;
+  } catch (e) {
+    failure = String(e);
+  }
+  if (failure) {
+    console.warn("[push] could not hold the push", reason, failure);
+    await log("failed", {
+      error: "queue_failed",
+      detail: { held_for: reason, deliver_after: deliverAfter, message: failure.slice(0, 300) },
+    });
+    return { ok: false as const, reason: "queue_failed" as const };
+  }
+  await log("skipped", { error: reason, detail: { deliver_after: deliverAfter } });
+  return { ok: true as const, queued: true as const, deliverAfter };
+}
 
 /**
  * Push URLs must be absolute for the provider to open them. Callers normally
@@ -46,56 +110,49 @@ export async function absolutizeUrl(url: string | null): Promise<string | undefi
 }
 
 export async function deliverPush(data: PushInput) {
-  const log = async (
-    status: "sent" | "failed" | "skipped",
-    extra: { error?: string | null; detail?: unknown } = {},
-  ) => {
+  const log: Log = async (status, extra = {}) => {
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      await supabaseAdmin.from("notification_delivery_log" as any).insert({
+      const { error } = await supabaseAdmin.from("notification_delivery_log" as any).insert({
         user_id: data.userId,
+        notification_id: data.notificationId ?? null,
         channel: "push",
         status,
         provider: "onesignal",
         error: extra.error ?? null,
         detail: extra.detail ? (extra.detail as any) : null,
       } as any);
+      if (error) console.warn("[push] delivery log insert failed", error.message);
     } catch (e) {
       console.warn("[push] delivery log insert failed", e);
     }
   };
 
-  // Minor-safety curfew. The in-app notification row already exists (the
-  // caller writes it first), so suppressing a push here never hides an alert
-  // from the member — it only delays the interruption.
+  if (expiredAt(data, Date.now())) {
+    await log("skipped", { error: EXPIRED, detail: { expires_at: data.expiresAt } });
+    return { ok: false as const, reason: EXPIRED };
+  }
+
+  // Minor-safety curfew and the guardian's off switch. The in-app notification
+  // row already exists (the caller writes it first), so holding a push here
+  // never hides an alert from the member; it only delays the interruption.
+  // Fails CLOSED: when the settings cannot be read, the push is held for the
+  // flush job, which reads them again before it sends; it is never sent on a
+  // guess.
+  let gate: CurfewGate | null = null;
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { curfewGateFor } = await import("@/lib/push-curfew.server");
-    const gate = await curfewGateFor(supabaseAdmin as any, data.userId);
-    if (gate.action === "blocked") {
-      await log("skipped", { error: gate.reason });
-      return { ok: false as const, reason: gate.reason };
-    }
-    if (gate.action === "queue") {
-      await supabaseAdmin.from("scheduled_notifications" as any).insert({
-        user_id: data.userId,
-        title: data.title,
-        body: data.body ?? null,
-        url: data.url ?? null,
-        channel: "push",
-        reason: "minor_notification_curfew",
-        deliver_after: gate.deliverAfter,
-      } as any);
-      await log("skipped", {
-        error: "minor_notification_curfew",
-        detail: { deliver_after: gate.deliverAfter },
-      });
-      return { ok: true as const, queued: true as const, deliverAfter: gate.deliverAfter };
-    }
+    gate = await curfewGateFor(supabaseAdmin as any, data.userId);
   } catch (e) {
-    // A curfew lookup failure must not turn into a silent drop; log and send.
-    console.warn("[push] curfew check failed", e);
+    console.warn("[push] curfew check failed; holding the push", e);
   }
+  if (!gate) return hold(data, log, HELD_CHECK_FAILED, new Date().toISOString());
+  if (gate.action === "blocked") {
+    await log("skipped", { error: gate.reason });
+    return { ok: false as const, reason: gate.reason };
+  }
+  if (gate.action === "queue") return hold(data, log, HELD_FOR_CURFEW, gate.deliverAfter);
 
   const restKey = process.env.ONESIGNAL_REST_API_KEY;
   if (!restKey) {

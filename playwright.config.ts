@@ -59,6 +59,15 @@ export default defineConfig({
   globalSetup: "./e2e/global-setup.ts",
   timeout: 60_000,
   fullyParallel: false,
+  // One worker in CI, as e2e.yml has always said it runs. Without this Playwright
+  // uses half the runner's cores (2 on GitHub's runners), so two specs share the
+  // same few fixture accounts at once and the shared E2E sandbox takes twice the
+  // load. On 2026-11-11 and 2026-11-12 that load drove its db/auth/rest health to
+  // UNHEALTHY mid-run (smoke 4-6 of 30 with ~185 skipped), and the test beside a
+  // timed-out pay spec ran 2.7-5x slower than its median. A full run takes about
+  // twice as long (~40 min), inside the job's 75-minute ceiling. Local runs keep
+  // Playwright's default.
+  workers: process.env.CI ? 1 : undefined,
   retries: 0,
   // The list reporter writes its tally to stdout at the very end, and twice now
   // that tally has not survived: runs 70 and 71 both stop after the last

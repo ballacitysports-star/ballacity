@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { listMyConversations } from "@/lib/messages";
+import { withoutGuardianOnly } from "@/lib/payments";
 import { buildNeedsAction, type NeedsActionItem, type TodayGame } from "@/lib/needs-action";
 
 const STALE_MS = 60_000;
@@ -48,12 +49,15 @@ export function useNeedsAction(): { items: NeedsActionItem[]; isLoading: boolean
     queryFn: async () => {
       const { data } = await supabase
         .from("join_requests")
-        .select("game_id, created_at")
+        .select("game_id, created_at, idempotency_key")
         .eq("host_id", uid!)
         .eq("status", "pending")
         .order("created_at", { ascending: true })
         .limit(100);
-      const rows = (data ?? []) as { game_id: string; created_at: string }[];
+      // A guarded minor's request on an open game is for their guardian, not the host.
+      const rows = await withoutGuardianOnly(
+        (data ?? []) as { game_id: string; created_at: string; idempotency_key: string | null }[],
+      );
       const ids = [...new Set(rows.map((r) => r.game_id))];
       if (ids.length === 0) return { count: 0, oldestGameId: null, oldestGameTitle: null };
       // A request on a game that is over or cancelled needs no answer.

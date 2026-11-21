@@ -26,7 +26,7 @@ export function FamilyCard() {
           <h2 className="section-eyebrow text-foreground">Family</h2>
         </div>
         {pending.total > 0 ? (
-          <span className="rounded-full bg-coral px-2.5 py-1 text-[11px] font-bold text-white">
+          <span className="rounded-full bg-coral-strong px-2.5 py-1 text-[11px] font-bold text-white">
             {pending.total} waiting on you
           </span>
         ) : null}

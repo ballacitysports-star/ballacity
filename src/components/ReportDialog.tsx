@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
+import { errorText, userErrorMessage } from "@/lib/user-error";
+
 import { Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -18,6 +20,12 @@ import {
   type ReportReason,
   type ReportSubjectType,
 } from "@/lib/moderation";
+
+/** submitReport's own sentences (moderation.ts). */
+const REPORT_OWN_MESSAGES: ReadonlySet<string> = new Set([
+  "Sign in to report",
+  "You cannot report yourself",
+]);
 
 type Props = {
   open: boolean;
@@ -75,8 +83,14 @@ export function ReportDialog({
       onOpenChange(false);
       setReason(null);
       setDetails("");
-    } catch (e: any) {
-      toast.error(e?.message ?? "Couldn't submit report");
+    } catch (e: unknown) {
+      // submitReport's own sentences show as they are; anything else never shows raw (WP 4.0).
+      const text = errorText(e);
+      toast.error(
+        text && REPORT_OWN_MESSAGES.has(text)
+          ? text
+          : userErrorMessage(e, "Couldn't submit your report. Please try again."),
+      );
     } finally {
       setSubmitting(false);
     }

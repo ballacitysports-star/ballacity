@@ -30,6 +30,7 @@ import { ORG_CATEGORIES } from "@/lib/org-listing";
 import { SPORTS } from "@/lib/sample-data";
 import { SportHubsPanel } from "@/components/superadmin/SportHubsPanel";
 import { ConfirmAction } from "./ConfirmAction";
+import { errorCode, errorText, userErrorMessage } from "@/lib/user-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -83,8 +84,33 @@ function confidenceLabel(c: number): {
   return { text: "Low confidence", variant: "outline" };
 }
 
-const asMessage = (e: unknown, fallback = "Something went wrong") =>
-  e instanceof Error ? e.message : fallback;
+/** Sentences the discovery engine and review steps word themselves for staff; shown as they are. */
+const DISCOVERY_SENTENCES: readonly RegExp[] = [
+  /^Unknown area\.$/,
+  /^Pick at least one type to look for\.$/,
+  /^A discovery run is already in progress\./,
+  /^That run no longer exists\.$/,
+  /^This run's area is no longer configured\.$/,
+  /^That find no longer exists\.$/,
+  /^This find was already (?:reviewed|changed)\.$/,
+  /^This may repeat ".*"\. Confirm to add it anyway\.$/,
+  /^This find is not an approved listing\.$/,
+  /^Every lookup failed, so there was nothing to read\./,
+  /^The map servers could not be reached and web search is off/,
+  /^(?:Firecrawl is not connected|Web search is not configured) \(FIRECRAWL_API_KEY\)\.$/,
+  /^(?:Web search|OpenStreetMap lookup) failed \(HTTP \d+\)\.$/,
+];
+
+/**
+ * What staff see for a failure: our own sentence, else the catalog or a generic sentence with the code for support,
+ * never raw database text (WP 4.0). Takes the error or a stored error string (a run's `error`).
+ */
+const asMessage = (e: unknown, fallback = "Something went wrong. Please try again.") => {
+  const text = errorText(e) ?? "";
+  if (DISCOVERY_SENTENCES.some((r) => r.test(text))) return text;
+  const code = errorCode(e);
+  return `${userErrorMessage(e, fallback)}${code ? ` (${code})` : ""}`;
+};
 
 export function DiscoveryTab() {
   const qc = useQueryClient();
@@ -133,7 +159,8 @@ export function DiscoveryTab() {
       setDriving(true);
       toast.success("Discovery started. Keep this tab open while it runs.");
     },
-    onError: (e: unknown) => toast.error(asMessage(e, "Could not start")),
+    onError: (e: unknown) =>
+      toast.error(asMessage(e, "Couldn't start discovery. Please try again.")),
   });
 
   const step = useMutation({
@@ -146,14 +173,17 @@ export function DiscoveryTab() {
         setDriving(false);
         if (r.status === "done")
           toast.success(`Discovery finished: ${r.stats.candidates} new finds`);
-        if (r.status === "failed") toast.error(r.error ?? "Discovery stopped");
+        if (r.status === "failed")
+          toast.error(asMessage(r.error, "Discovery stopped. Resume to try again."));
       }
     },
     onError: (e: unknown) => {
       const message = asMessage(e, "A step failed. Resume to try again.");
+      // Read the raw text for a dropped connection; the sentence shown never carries it.
+      const drop = isNetworkDrop(errorText(e));
       // A step that outlived the server drops the connection; the run is saved
       // after every step, so carry on a few times before giving up.
-      if (isNetworkDrop(message) && dropped.current < MAX_DROPPED_STEPS) {
+      if (drop && dropped.current < MAX_DROPPED_STEPS) {
         dropped.current += 1;
         toast.message("A step took too long and the connection dropped. Retrying…");
         return;
@@ -161,7 +191,7 @@ export function DiscoveryTab() {
       dropped.current = 0;
       setDriving(false);
       toast.error(
-        isNetworkDrop(message)
+        drop
           ? "Steps keep taking too long and dropping the connection. Press Resume to try again."
           : message,
       );
@@ -314,7 +344,11 @@ export function DiscoveryTab() {
                   ? ` · ${run.tasksLeft} lookups and ${run.pagesLeft} pages to go`
                   : ""}
               </p>
-              {run.error && <p className="text-xs text-destructive">{run.error}</p>}
+              {run.error && (
+                <p className="text-xs text-destructive">
+                  {asMessage(run.error, "The run stopped unexpectedly.")}
+                </p>
+              )}
               {run.log.length > 0 && (
                 <ul className="max-h-32 space-y-0.5 overflow-y-auto text-[11px] text-muted-foreground">
                   {run.log.map((l, i) => (
@@ -427,7 +461,8 @@ function ReviewQueue({
             : "") +
           (r.failed.length ? `, ${r.failed.length} failed` : ""),
       );
-      if (r.failed[0]) toast.error(`${r.failed[0].name}: ${r.failed[0].error}`);
+      if (r.failed[0])
+        toast.error(`${r.failed[0].name}: ${asMessage(r.failed[0].error, "Couldn't be updated.")}`);
       setPicked([]);
       onChanged();
     },
@@ -596,7 +631,7 @@ function ReviewQueue({
 
         {list.isError && (
           <p className="text-sm text-destructive">
-            {asMessage(list.error, "Could not load finds")}
+            {asMessage(list.error, "Couldn't load finds. Please try again.")}
           </p>
         )}
 

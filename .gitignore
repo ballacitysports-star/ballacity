@@ -43,3 +43,6 @@ playwright-report/
 
 # Personal Claude Code permission overrides (not shared)
 .claude/settings.local.json
+
+# Local E2E Supabase stack: per-run secrets and keys (e2e/local-stack/stack.mjs)
+e2e/local-stack/.state/

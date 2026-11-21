@@ -4,7 +4,17 @@ import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { formatSportLevel } from "@/lib/sport-levels";
 
-import { Settings, Clock, Star, Crown, Users, Clapperboard, Loader2 } from "lucide-react";
+import {
+  Settings,
+  Clock,
+  Star,
+  Crown,
+  Users,
+  Clapperboard,
+  Loader2,
+  CalendarCheck,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import { GameRecapPanel, ReelManageRow } from "@/components/GameRecapPanel";
 import { InlineVideoPlayer } from "@/components/InlineVideoPlayer";
 import { RECAP_COLUMNS, type RecapSummary } from "@/lib/recaps";
@@ -28,6 +38,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { getCurrentUser, useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
+import { errorText, userErrorMessage } from "@/lib/user-error";
 import { useJoinedGameIds } from "@/lib/games-store";
 import { useQuery } from "@tanstack/react-query";
 import { fetchMyHiddenGames, useHostedGames } from "@/lib/hosted-games-store";
@@ -78,10 +89,13 @@ import { ProfileVisibilityRow } from "@/components/profile/ProfileVisibilityRow"
 import { MyWaitlistCard } from "@/components/MyWaitlistCard";
 import { useIsGuardianAccount } from "@/components/child/GuardianProfileCard";
 import { PreviewGate } from "@/components/public/PreviewGate";
+import { useAuthSearchHere } from "@/lib/auth-return";
 import { useParentMode } from "@/hooks/use-parent-mode";
 import { useMyChildStatus } from "@/lib/child-safety";
 import { meQuickLinks } from "@/lib/me-quick-links";
 import { FamilyCard } from "@/components/child/FamilyCard";
+import { isGuardianOnlyRequest, listablePlayerRequests } from "@/lib/guarded-open-join";
+import { pluralize } from "@/lib/pluralize";
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () =>
@@ -138,6 +152,7 @@ function ProfileRoute() {
 }
 
 function PlayerProfile() {
+  const authSearch = useAuthSearchHere();
   const myReviews = useReviewsFor("me");
   const myRep = useMemo(() => computeReputation(myReviews, "player"), [myReviews]);
   // Reviews and reputation are shown only for a confirmed adult; never for a person under 18.
@@ -257,7 +272,12 @@ function PlayerProfile() {
           filter: `host_id=eq.${profileUser.id}`,
         },
         (payload) => {
-          applyPayload(payload as any, "host");
+          // A guarded minor's request to their guardian on an open game is not the host's to answer: the refresh
+          // below decides whether it shows, so it does not flash into the list first.
+          if (
+            !isGuardianOnlyRequest((payload as { new?: { idempotency_key?: string | null } }).new)
+          )
+            applyPayload(payload as any, "host");
           refreshRequests({ silent: true });
         },
       )
@@ -276,12 +296,17 @@ function PlayerProfile() {
     return m;
   }, [hosted]);
 
-  const allRequests = useMemo(() => [...myRequests, ...hostRequests], [myRequests, hostRequests]);
+  // A request to the parent on an open game stays pending once the child is in; leave it out then.
+  const listedMine = useMemo(
+    () => listablePlayerRequests(myRequests, joinedGameIds),
+    [myRequests, joinedGameIds],
+  );
+  const allRequests = useMemo(() => [...listedMine, ...hostRequests], [listedMine, hostRequests]);
   const filteredRequests = useMemo(() => {
     if (requestFilter === "all") return allRequests;
     if (requestFilter === "host") return hostRequests;
-    return myRequests;
-  }, [requestFilter, allRequests, hostRequests, myRequests]);
+    return listedMine;
+  }, [requestFilter, allRequests, hostRequests, listedMine]);
   const pendingRequests = filteredRequests.filter((r) => r.status === "pending");
   const recentlyReviewed = filteredRequests.filter((r) => r.status !== "pending").slice(0, 3);
   const pendingWithGame = pendingRequests.filter((r) => gameLookup.has(r.game_id));
@@ -425,6 +450,7 @@ function PlayerProfile() {
         </p>
         <Link
           to="/auth"
+          search={authSearch}
           className="mt-6 inline-flex rounded-full bg-lime-gradient px-6 py-3 text-sm font-bold text-primary-foreground"
         >
           Sign in
@@ -473,7 +499,7 @@ function PlayerProfile() {
             onClick={() => setFollowList("followers")}
             className="underline-offset-2 hover:underline"
           >
-            {follow.followers} followers
+            {pluralize(follow.followers, "follower")}
           </button>,
           <button
             key="following"
@@ -506,6 +532,11 @@ function PlayerProfile() {
                   className={channelPillClass()}
                 >
                   {l.label}
+                </Link>
+              ) : l.to === "/availability" ? (
+                // WP 4.1: posts, game invitations and requests on one screen; a full 44px tap target.
+                <Link key={l.to} to="/availability" className={cn(channelPillClass(), "min-h-11")}>
+                  <CalendarCheck className="h-3.5 w-3.5" aria-hidden /> {l.label}
                 </Link>
               ) : (
                 <Link key={l.to} to={l.to} className={channelPillClass()}>
@@ -669,7 +700,12 @@ function PlayerProfile() {
                                 toast("Request canceled.");
                               } catch (e: any) {
                                 setMyRequests(prev);
-                                toast.error(e.message ?? "Could not cancel.");
+                                toast.error(
+                                  userErrorMessage(
+                                    e,
+                                    "Couldn't cancel your request. Please try again.",
+                                  ),
+                                );
                               }
                             }
                       }
@@ -685,7 +721,12 @@ function PlayerProfile() {
                                 toast("Player approved.");
                               } catch (e: any) {
                                 setHostRequests(prev);
-                                toast.error(e.message ?? "Could not approve.");
+                                toast.error(
+                                  userErrorMessage(
+                                    e,
+                                    "Couldn't approve this player. Please try again.",
+                                  ),
+                                );
                               }
                             }
                           : undefined
@@ -702,7 +743,12 @@ function PlayerProfile() {
                                 toast("Player declined.");
                               } catch (e: any) {
                                 setHostRequests(prev);
-                                toast.error(e.message ?? "Could not decline.");
+                                toast.error(
+                                  userErrorMessage(
+                                    e,
+                                    "Couldn't decline this player. Please try again.",
+                                  ),
+                                );
                               }
                             }
                           : undefined
@@ -727,7 +773,12 @@ function PlayerProfile() {
                               toast("You withdrew from the game.");
                             } catch (e: any) {
                               setMyRequests(prev);
-                              toast.error(e.message ?? "Could not withdraw.");
+                              toast.error(
+                                userErrorMessage(
+                                  e,
+                                  "Couldn't withdraw from this game. Please try again.",
+                                ),
+                              );
                             }
                           }
                     }
@@ -824,7 +875,7 @@ function PlayerProfile() {
               className="block rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center transition-colors hover:border-lime/40"
             >
               <div className="font-display text-base font-bold">No pickup games</div>
-              <p className="text-xs text-muted-foreground mt-1">Join a run to see it here.</p>
+              <p className="text-xs text-muted-foreground mt-1">Join a game to see it here.</p>
             </Link>
           )}
         </section>
@@ -995,6 +1046,17 @@ function PlayerProfile() {
 }
 
 /** A single reel on the profile: playable when completed, with manage controls. */
+/**
+ * A failed reel's stored `error_message` can be the worker's raw catch text (AI, ffmpeg, storage), so only the
+ * sentences we write there ourselves are shown: the plan's clip-length refusal and the AI-off notice (WP 4.0).
+ */
+function reelFailureMessage(stored: string | null | undefined): string {
+  const text = stored?.trim() ?? "";
+  if (/^This clip is [\d:]+ long\. Your plan allows clips up to [\d:]+\.$/.test(text)) return text;
+  if (text.startsWith("AI analysis is turned off for this account")) return text;
+  return "Processing didn't finish";
+}
+
 function ProfileReelItem({
   reel,
   onChanged,
@@ -1055,9 +1117,7 @@ function ProfileReelItem({
             <Clapperboard className="h-3.5 w-3.5 text-amber-300" />
           )}
           <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-            {reel.status === "processing"
-              ? "Processing…"
-              : (reel.error_message ?? "Processing didn't finish")}
+            {reel.status === "processing" ? "Processing…" : reelFailureMessage(reel.error_message)}
           </p>
         </div>
       )}
@@ -1125,7 +1185,12 @@ function AttachReelDialog({
       onChanged?.();
       onClose();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't update the reel");
+      // attachReelToGame's own refusal when the picked game was deleted meanwhile.
+      toast.error(
+        errorText(e) === "That game is no longer available"
+          ? "That game is no longer available."
+          : userErrorMessage(e, "Couldn't update the reel. Please try again."),
+      );
     } finally {
       setBusy(false);
     }
@@ -1258,7 +1323,7 @@ function ProfileReelsSection({
       setSelecting(false);
       onChanged?.();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Bulk action failed");
+      toast.error(userErrorMessage(e, "Couldn't update the selected reels. Please try again."));
     } finally {
       setBusy(false);
     }

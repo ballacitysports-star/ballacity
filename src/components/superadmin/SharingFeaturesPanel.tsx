@@ -14,6 +14,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { superadminListSettings, superadminSetSetting } from "@/lib/superadmin.functions";
+import { errorCode, userErrorMessage } from "@/lib/user-error";
 
 type Feature = { key: string; label: string; description: string; needs?: string };
 
@@ -82,7 +83,10 @@ export function SharingFeaturesPanel() {
       await qc.invalidateQueries({ queryKey: ["superadmin-settings"] });
       toast.success(`${f.label} ${next ? "is on" : "is off"}`);
     } catch (e: any) {
-      toast.error(e?.message ?? "Could not save this setting");
+      const code = errorCode(e);
+      toast.error(
+        `${userErrorMessage(e, "Couldn't save this setting.")}${code ? ` (${code})` : ""}`,
+      );
     } finally {
       setBusy(null);
     }
@@ -102,11 +106,16 @@ export function SharingFeaturesPanel() {
             const on = isOn(settings, f.key);
             const blocked = !!f.needs && !isOn(settings, f.needs);
             return (
-              <li key={f.key} className="flex items-start justify-between gap-3 rounded-xl border border-border bg-surface p-3">
+              <li
+                key={f.key}
+                className="flex items-start justify-between gap-3 rounded-xl border border-border bg-surface p-3"
+              >
                 <div className="min-w-0">
                   <div className="text-sm font-semibold">
                     {f.label}
-                    <span className={`ml-2 text-[10px] font-bold uppercase ${on ? "text-lime" : "text-muted-foreground"}`}>
+                    <span
+                      className={`ml-2 text-[10px] font-bold uppercase ${on ? "text-lime" : "text-muted-foreground"}`}
+                    >
                       {on ? "On" : "Off"}
                     </span>
                   </div>

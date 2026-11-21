@@ -15,6 +15,7 @@ import {
   type Jurisdiction,
 } from "@/lib/child-policy";
 import { LEGAL_REVIEW_REQUIRED } from "@/lib/age-policy";
+import { errorCode, userErrorMessage } from "@/lib/user-error";
 
 type BoolKey = {
   [K in keyof AgePolicyConfig]: AgePolicyConfig[K] extends boolean ? K : never;
@@ -134,7 +135,10 @@ export function AgePolicyPanel() {
       void refetch();
     } catch (e) {
       setLocal(prev);
-      toast.error(e instanceof Error ? e.message : "Could not save setting");
+      const code = errorCode(e);
+      toast.error(
+        `${userErrorMessage(e, "Couldn't save this setting.")}${code ? ` (${code})` : ""}`,
+      );
     } finally {
       setSaving(false);
     }

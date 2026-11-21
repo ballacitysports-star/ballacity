@@ -38,6 +38,7 @@ import { createTeamPost, deleteTeamPost, updateTeamPost } from "@/lib/team-posts
 import { getTeamRosterOverview } from "@/lib/tryouts.functions";
 import { TeamEventsCalendar, EventWaiverStatus } from "@/components/team/TeamEventsCalendar";
 import { EventAvailabilitySummary } from "@/components/team/EventAvailabilitySummary";
+import { pluralize } from "@/lib/pluralize";
 
 export const Route = createFileRoute("/teams/$teamId/events")({
   head: () =>
@@ -211,7 +212,7 @@ function TeamEventsPage() {
           )}
           <p className="flex items-center gap-2">
             <Users className="h-4 w-4" />
-            {going} going{e.spots_max ? ` · ${left} spots left` : ""} ·{" "}
+            {going} going{e.spots_max ? ` · ${pluralize(left ?? 0, "spot")} left` : ""} ·{" "}
             {e.price ? `$${e.price}` : "Free"}
           </p>
           <EventWaiverStatus
@@ -394,7 +395,9 @@ function EventDialog({
     if (!f.title.trim() || !f.date) return toast.error("Title and date are required.");
     const spotsMax = f.spots ? Number(f.spots) : null;
     if (initial && spotsMax != null && spotsMax < (initial.spots_taken ?? 0))
-      return toast.error(`${initial.spots_taken} people are already going — spots can't be lower.`);
+      return toast.error(
+        `${pluralize(initial.spots_taken ?? 0, "person", "people")} ${initial.spots_taken === 1 ? "is" : "are"} already going — spots can't be lower.`,
+      );
     const payload = {
       kind: f.kind,
       title: f.title.trim(),

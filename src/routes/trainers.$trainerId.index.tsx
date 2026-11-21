@@ -56,6 +56,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { hideFinishedGames } from "@/lib/game-time";
 import { ageGroupLabel, normalizeAgeGroups } from "@/lib/age-groups";
 import { ProfileShareCard } from "@/components/ProfileShareCard";
+import { clearOfHelpLauncher } from "@/lib/support/launcher-clearance";
 
 export const Route = createFileRoute("/trainers/$trainerId/")({
   validateSearch: zodValidator(
@@ -690,7 +691,6 @@ function TrainerPage({ org }: { org: Org }) {
                       setBookPrefill({
                         date: s.dateKey,
                         startTime: s.trainerStart ?? s.start,
-                        venue: s.venue ?? null,
                       });
                       setBookOpen(true);
                     }}
@@ -749,7 +749,10 @@ function TrainerPage({ org }: { org: Org }) {
 
       {/* Sticky CTA bar */}
       {!canEdit && (
-        <div className="fixed inset-x-0 bottom-16 z-30 pointer-events-none px-4">
+        <div
+          ref={clearOfHelpLauncher}
+          className="fixed inset-x-0 bottom-16 z-30 pointer-events-none px-4"
+        >
           <div className="page-shell-flush">
             <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border bg-background/85 backdrop-blur-xl p-2 shadow-2xl">
               <Link
@@ -760,12 +763,7 @@ function TrainerPage({ org }: { org: Org }) {
               </Link>
               <button
                 onClick={() => {
-                  const venueOffered =
-                    !!selectedVenue &&
-                    (org.venueAddresses ?? []).some(
-                      (a) => a.trim().toLowerCase() === selectedVenue.trim().toLowerCase(),
-                    );
-                  setBookPrefill(venueOffered ? { venue: selectedVenue } : null);
+                  setBookPrefill(null);
                   setBookOpen(true);
                 }}
                 className="flex-1 inline-flex items-center justify-center gap-2 rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground glow-lime"

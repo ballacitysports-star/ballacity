@@ -34,10 +34,17 @@ SELECT t.lives(format('SELECT public.team_invite_player(%L, %L, %L::public.team_
   'a manager can invite');
 SELECT t.reset();
 INSERT INTO public.user_blocks (blocker_id, blocked_id) VALUES (t.id('stranger'), t.id('manager'));
+-- A block is not revealed to the manager (20261111120000): the answer is the same, but the invitation never reaches
+-- the person who blocked them (more in 780_minor_safety_gates).
 SELECT t.as_user(t.id('manager'));
-SELECT t.throws(format('SELECT public.team_invite_player(%L, %L, %L::public.team_role, NULL)', 'squad', t.id('stranger'), 'player'),
-  'BLOCKED', 'but not someone who has blocked them');
+SELECT t.lives(format('SELECT public.team_invite_player(%L, %L, %L::public.team_role, NULL)', 'squad', t.id('stranger'), 'player'),
+  'inviting someone who has blocked them answers as for anyone else');
+SELECT t.as_user(t.id('stranger'));
+SELECT t.eq(t.count($$SELECT 1 FROM public.team_invites WHERE team_id = 'squad'$$), 0,
+  'but the invitation does not reach them');
 SELECT t.reset();
+SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE user_id = t.id('stranger') AND type = 'team_invite'), 0,
+  'and they are not notified');
 
 -- ---- team_remove_member ---------------------------------------------------
 SELECT t.as_user(t.id('stranger'));

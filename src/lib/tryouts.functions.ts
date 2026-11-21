@@ -6,6 +6,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import { normalizeCutoff } from "@/lib/cancel-window";
 import { fetchPostVenues } from "@/lib/post-venues";
+import { guardianLinksInForce } from "@/lib/guardian-links-in-force.server";
 import { getTryoutFromEvents, isEventsV2Enabled, type EventsClient } from "@/lib/events-read";
 import {
   cancelThroughEvents,
@@ -13,6 +14,7 @@ import {
   signUpThroughEvents,
 } from "@/lib/events-write";
 import type { AvailabilityAnswer, AvailabilityStatus } from "@/lib/team-availability";
+import { FEATURE_ERROR_MESSAGES, errorCode, knownErrorMessage } from "@/lib/user-error";
 
 function publicClient() {
   const url = process.env.SUPABASE_URL!;
@@ -246,22 +248,14 @@ export const listMyTryoutSignups = createServerFn({ method: "GET" })
       .sort((a, b) => +new Date(a.eventDate ?? 0) - +new Date(b.eventDate ?? 0));
   });
 
-const ERRORS: Record<string, string> = {
-  TRYOUT_FULL: "This event is full.",
-  ALREADY_REGISTERED: "Already registered.",
-  WAIVER_REQUIRED: "Please read and accept the waiver first.",
-  TRYOUT_PASSED: "This event has already happened.",
-  NOT_YOUR_GUARDIAN_LINK: "You can only register your own linked children.",
-  TRYOUT_NOT_FOUND: "This event is no longer available.",
-  // The same situations through events (P2-1 stage 4a).
-  EVENT_FULL: "This event is full.",
-  EVENT_STARTED: "This event has already happened.",
-  EVENT_NOT_FOUND: "This event is no longer available.",
-  NOT_ALLOWED: "You can only change your own or your linked children's sign-ups.",
-};
+/**
+ * The catalog words for the events codes, and for the TRYOUT_* codes older tryout functions raised. A bare NOT_ALLOWED
+ * says whose sign-ups the member may change, which the catalog's general sentence cannot.
+ */
 const friendly = (m: string) =>
-  ERRORS[Object.keys(ERRORS).find((k) => m.includes(k)) ?? ""] ??
-  "Something went wrong. Please try again.";
+  errorCode(m) === "NOT_ALLOWED"
+    ? FEATURE_ERROR_MESSAGES.signupNotAllowed
+    : (knownErrorMessage(m) ?? "Something went wrong. Please try again.");
 
 export const rsvpTryout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -520,11 +514,7 @@ export const getTeamInviteTracker = createServerFn({ method: "GET" })
             .in("signer_user_id", ids)
         : Promise.resolve({ data: [] as any[] }),
       ids.length
-        ? supabaseAdmin
-            .from("guardian_links")
-            .select("child_user_id")
-            .eq("status", "active")
-            .in("child_user_id", ids)
+        ? guardianLinksInForce(supabaseAdmin, ids)
         : Promise.resolve({ data: [] as any[] }),
     ]);
     const p = new Map((profiles.data ?? []).map((x: any) => [x.id, x]));
@@ -852,13 +842,10 @@ export const emailRosterPrintout = createServerFn({ method: "POST" })
     const rows = members ?? [];
     if (!rows.length) return { sent: 0, skipped: 0, failed: 0 };
     const ids = rows.map((m) => m.user_id);
+    // The recipient is the guardian only while a link is in force: a player who has turned 18 hears for themself.
     const [{ data: profs }, { data: links }] = await Promise.all([
       supabaseAdmin.from("profiles").select("id,display_name,username").in("id", ids),
-      supabaseAdmin
-        .from("guardian_links")
-        .select("parent_user_id,child_user_id")
-        .in("child_user_id", ids)
-        .in("status", ["active", "verified"]),
+      guardianLinksInForce(supabaseAdmin, ids),
     ]);
     const names = new Map(
       (profs ?? []).map((p: any) => [p.id, p.display_name ?? p.username ?? "Player"]),

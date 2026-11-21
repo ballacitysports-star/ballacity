@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { CalendarDays, Users } from "lucide-react";
 import { toast } from "sonner";
+import { userErrorMessage } from "@/lib/user-error";
 import { useAuth } from "@/hooks/use-auth";
 import {
   cancelChildGame,
@@ -59,7 +60,14 @@ function GameRow({
       setConfirming(false);
       onCancelled?.();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not cancel.");
+      toast.error(
+        userErrorMessage(
+          e,
+          holds
+            ? "Couldn't cancel your child's spot. Please try again."
+            : "Couldn't withdraw the request. Please try again.",
+        ),
+      );
     } finally {
       setBusy(false);
     }
@@ -113,7 +121,7 @@ function GameRow({
         description={
           holds
             ? `${g.title} will open up for someone else and the host will be told. If a fee was paid, the host's refund policy decides what comes back; any refund is sent by the host directly.`
-            : `The request to join ${g.title} will be withdrawn.`
+            : `The request for a spot in ${g.title} will be withdrawn.`
         }
         lateWarning={
           holds && isLateCancel(g.date, g.cancelCutoffMin)

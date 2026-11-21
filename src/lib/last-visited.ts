@@ -3,7 +3,7 @@
  * bookmark/OAuth returns to `/` can restore that page instead of the
  * marketing landing.
  */
-import { sanitizeNextPath } from "@/routes/__root";
+import { sanitizeNextPath } from "@/lib/safe-next-path";
 
 export const LAST_VISITED_KEY = "openrun:last-visited";
 

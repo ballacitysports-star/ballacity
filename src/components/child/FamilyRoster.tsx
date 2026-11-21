@@ -7,10 +7,13 @@ import type { RosterEntry } from "@/lib/family-roster";
 /**
  * The guardian's at-a-glance roster.
  *
- * Replaces FamilyChildSwitcher: it keeps that component's tab semantics (so
- * the detail panel below stays keyboard-reachable and correctly labelled) and
- * adds what a guardian actually needs on arrival — who is blocked, who is
- * playing, and each child's profile — instead of one child at a time.
+ * Replaces FamilyChildSwitcher, adding what a guardian actually needs on arrival — who is blocked,
+ * who is playing, and each child's profile — instead of one child at a time.
+ *
+ * Each card's main button picks whose settings show in the panel below (aria-current marks the one
+ * shown; the panel is labelled by that child's name). These are plain buttons in a list, not tabs: a
+ * tablist may contain only tabs, and these cards also hold headings, details and links (axe:
+ * aria-required-children, aria-required-parent).
  */
 
 const TONE: Record<RosterEntry["status"], string> = {
@@ -37,12 +40,10 @@ function ChildCard({
   entry,
   selected,
   onSelect,
-  onArrow,
 }: {
   entry: RosterEntry;
   selected: boolean;
   onSelect: () => void;
-  onArrow: (dir: 1 | -1) => void;
 }) {
   const { child } = entry;
   return (
@@ -54,17 +55,10 @@ function ChildCard({
       >
         <button
           type="button"
-          role="tab"
+          // Kept from the tab days: E2E specs find a child's card by this id.
           id={`child-tab-${child.childUserId}`}
-          aria-selected={selected}
-          aria-controls={`child-panel-${child.childUserId}`}
-          tabIndex={selected ? 0 : -1}
+          aria-current={selected ? "true" : undefined}
           onClick={onSelect}
-          onKeyDown={(e) => {
-            if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-            e.preventDefault();
-            onArrow(e.key === "ArrowRight" ? 1 : -1);
-          }}
           className="flex w-full items-center gap-3 text-left"
         >
           <Avatar url={child.avatarUrl} name={child.displayName} />
@@ -155,16 +149,7 @@ export function FamilyRoster({
   selected: string | null;
   onSelect: (childUserId: string) => void;
 }) {
-  const ordered = [...needsAction, ...approved];
-  if (ordered.length === 0) return null;
-
-  const move = (from: string, dir: 1 | -1) => {
-    const i = ordered.findIndex((e) => e.child.childUserId === from);
-    const next = ordered[(i + dir + ordered.length) % ordered.length];
-    if (!next) return;
-    onSelect(next.child.childUserId);
-    document.getElementById(`child-tab-${next.child.childUserId}`)?.focus();
-  };
+  if (needsAction.length + approved.length === 0) return null;
 
   const section = (title: string, hint: string, entries: RosterEntry[]) =>
     entries.length === 0 ? null : (
@@ -180,7 +165,6 @@ export function FamilyRoster({
               entry={entry}
               selected={entry.child.childUserId === selected}
               onSelect={() => onSelect(entry.child.childUserId)}
-              onArrow={(dir) => move(entry.child.childUserId, dir)}
             />
           ))}
         </ul>
@@ -188,9 +172,9 @@ export function FamilyRoster({
     );
 
   return (
-    <div role="tablist" aria-label="Your linked children">
+    <section aria-label="Your linked children">
       {section("Needs your approval", "These accounts stay limited until you act.", needsAction)}
       {section("Approved players", "Active accounts you manage.", approved)}
-    </div>
+    </section>
   );
 }

@@ -2,9 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, Clock, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { withManagedProfileNames } from "@/lib/managed-profile-names";
 import { UserAvatar } from "@/components/UserAvatar";
 import { createNotification } from "@/lib/notifications";
 import { reviewWaitlistEntry, type WaitlistEntry, type WaitlistStatus } from "@/lib/waitlist-store";
+import { errorText, userErrorMessage } from "@/lib/user-error";
+
+/** reviewWaitlistEntry's own sentence when the session is gone; shown as it is (WP 4.0). */
+const SIGN_IN_TO_REVIEW = "Sign in to review the waitlist.";
 
 type Profile = {
   id: string;
@@ -24,13 +29,16 @@ function useWaitlistProfiles(userIds: string[]) {
     }
     let cancelled = false;
     void (async () => {
-      const { data } = await supabase
+      const { data: read } = await supabase
         .from("profiles")
         .select("id, display_name, avatar_initials, avatar_url")
         .in("id", ids);
-      if (cancelled || !data) return;
+      if (cancelled || !read) return;
+      // A block or suspension hides the row; the host still needs the name.
+      const data = await withManagedProfileNames(supabase, ids, read as Profile[]);
+      if (cancelled) return;
       const next: Record<string, Profile> = {};
-      for (const p of data as Profile[]) next[p.id] = p;
+      for (const p of data) next[p.id] = p;
       setMap(next);
     })();
     return () => {
@@ -105,7 +113,11 @@ export function WaitlistManager({
         link: `/games/${gameId}`,
       }).catch(() => {});
     } catch (e: any) {
-      toast.error(e?.message ?? "Could not update the waitlist.");
+      toast.error(
+        errorText(e) === SIGN_IN_TO_REVIEW
+          ? SIGN_IN_TO_REVIEW
+          : userErrorMessage(e, "Couldn't update the waitlist. Please try again."),
+      );
     } finally {
       setBusy(null);
     }

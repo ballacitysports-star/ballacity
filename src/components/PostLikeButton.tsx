@@ -10,6 +10,7 @@ import {
   toggleReaction,
   type EngagementSubjectType,
 } from "@/lib/post-engagement.functions";
+import { useAuthSearchHere } from "@/lib/auth-return";
 
 /** The reaction a feed heart stands for. The full picker lives in the post's details. */
 export const LIKE_EMOJI = "❤️" as const;
@@ -24,6 +25,7 @@ type Props = { subjectType: EngagementSubjectType; subjectId: string };
  */
 export function PostLikeButton({ subjectType, subjectId }: Props) {
   const { user } = useAuth();
+  const authSearch = useAuthSearchHere();
   const qc = useQueryClient();
   const listFn = useServerFn(listReactions);
   const mineFn = useServerFn(listMyReactions);
@@ -69,6 +71,7 @@ export function PostLikeButton({ subjectType, subjectId }: Props) {
     return (
       <Link
         to="/auth"
+        search={authSearch}
         aria-label="Sign in to like"
         className={base}
         onClick={(e) => e.stopPropagation()}

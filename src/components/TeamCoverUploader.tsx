@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Upload, Check, Loader2, X } from "lucide-react";
 import { imageFor, type Sport } from "@/lib/sample-data";
 import { uploadTeamCover, TeamCoverUploadError } from "@/lib/team-covers";
+import { userErrorMessage } from "@/lib/user-error";
 
 type Props = {
   cover: string;
@@ -45,12 +46,11 @@ export function TeamCoverUploader({
       onCoverChange(url);
       onCustomChange(true);
     } catch (e) {
+      // TeamCoverUploadError carries team-covers.ts's own sentence; anything else is never shown raw (WP 4.0).
       const message =
         e instanceof TeamCoverUploadError
           ? e.message
-          : e instanceof Error
-            ? e.message
-            : "Upload failed.";
+          : userErrorMessage(e, "Couldn't upload that photo. Please try again.");
       setError(message);
     } finally {
       setUploading(false);
@@ -128,9 +128,7 @@ export function TeamCoverUploader({
       </div>
 
       <div>
-        <div className="mb-2 micro-label text-muted-foreground">
-          Or pick a preset
-        </div>
+        <div className="mb-2 micro-label text-muted-foreground">Or pick a preset</div>
         <div className="grid grid-cols-3 gap-2">
           {presets.map((s) => {
             const src = imageFor(s);

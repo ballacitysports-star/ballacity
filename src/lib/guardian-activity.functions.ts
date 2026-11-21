@@ -119,8 +119,20 @@ export const listChildrenActivity = createServerFn({ method: "GET" })
       .in("invitee_id", ids)
       .order("created_at", { ascending: false })
       .limit(50);
+    // An invitation written while a block stood between the manager and the child does not exist
+    // for the child or their guardians (team_invite_suppressions); this read bypasses the policy
+    // that hides it, so it leaves it out here.
+    const invIds = (inv.data ?? []).map((r) => r.id);
+    const held = invIds.length
+      ? await supabaseAdmin
+          .from("team_invite_suppressions")
+          .select("invite_id")
+          .in("invite_id", invIds)
+      : { data: [] as { invite_id: string }[] };
+    const heldIds = new Set((held.data ?? []).map((r) => r.invite_id));
+    const invites = (inv.data ?? []).filter((r) => !heldIds.has(r.id));
     const memberTeamIds = [...new Set((tm.data ?? []).map((r) => r.team_id))];
-    const teamIds = [...new Set([...memberTeamIds, ...(inv.data ?? []).map((r) => r.team_id)])];
+    const teamIds = [...new Set([...memberTeamIds, ...invites.map((r) => r.team_id)])];
     const [wv, sg, posts] = await Promise.all([
       teamIds.length
         ? supabaseAdmin
@@ -278,7 +290,7 @@ export const listChildrenActivity = createServerFn({ method: "GET" })
           })),
         upcoming,
         recent,
-        invites: (inv.data ?? [])
+        invites: invites
           .filter((r) => r.invitee_id === k.child_user_id)
           .map((r) => ({
             id: r.id,

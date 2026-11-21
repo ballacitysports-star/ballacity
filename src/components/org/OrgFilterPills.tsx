@@ -24,7 +24,7 @@ export function OrgFilterPills({
     <div
       role="group"
       aria-label="Filter facilities"
-      className="flex snap-x gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1"
+      className="flex snap-x gap-2 overflow-x-auto scrollbar-hide bleed-x-gutter pb-1"
     >
       <button
         type="button"

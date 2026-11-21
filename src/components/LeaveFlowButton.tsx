@@ -18,6 +18,7 @@ import { leaveGame } from "@/lib/games-store";
 import { clearPendingSubmissions, notifyHostOfLeave } from "@/lib/leave-game";
 import { supabase } from "@/integrations/supabase/client";
 import { isLateCancel, lateCancelWarning } from "@/lib/cancel-window";
+import { userErrorMessage } from "@/lib/user-error";
 
 export type LeaveFlowVariant = "link" | "danger";
 
@@ -54,7 +55,7 @@ const COPY: Record<
   cancel: {
     button: "Cancel request",
     title: "Cancel your request?",
-    description: (t) => `Cancel your request to join ${t}? You can request again later.`,
+    description: (t) => `Cancel your request for a spot in ${t}? You can request again later.`,
     confirm: "Cancel request",
     success: "Request canceled.",
     error: "Could not cancel request.",
@@ -131,10 +132,14 @@ export function LeaveFlowButton({
       } else if (action === "withdraw") {
         await clearPendingSubmissions(gameId);
         await withdrawMyApprovedJoinRequest(gameId);
+        // On an open game a request to the parent stays pending through payment; it goes too, as the game page's own
+        // leave does, so a later join asks the parent again.
+        await cancelMyJoinRequest(gameId).catch(() => {});
         leaveGame(gameId);
         void notifyHostOfLeave(gameId, gameTitle);
       } else {
         await withdrawMyApprovedJoinRequest(gameId).catch(() => {});
+        await cancelMyJoinRequest(gameId).catch(() => {});
         leaveGame(gameId);
         void notifyHostOfLeave(gameId, gameTitle);
       }
@@ -145,7 +150,7 @@ export function LeaveFlowButton({
         void navigate({ to: navigateTo });
       }
     } catch (e: any) {
-      toast.error(e?.message ?? copy.error);
+      toast.error(userErrorMessage(e, copy.error));
     } finally {
       setBusy(false);
     }

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { errorCode, userErrorMessage } from "@/lib/user-error";
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -84,7 +85,9 @@ export function YouthOversightCard() {
         {isLoading ? <p className="text-sm text-muted-foreground">Loading youth metrics…</p> : null}
         {isError ? (
           <p className="text-sm text-destructive">
-            Could not load youth metrics: {(error as Error).message}
+            {/* Admin screen: the code for support, never the raw database text (WP 4.0). */}
+            {userErrorMessage(error, "Could not load youth metrics.")}
+            {errorCode(error) ? ` (${errorCode(error)})` : ""}
           </p>
         ) : null}
 

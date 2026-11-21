@@ -1,4 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
+import { answerSessionChecks } from "./helpers/signed-in";
 
 /**
  * E2E: opening an invite deeplink directly (as if tapped from email/SMS)
@@ -24,6 +26,11 @@ const FAKE_HOST_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
 const ENTRY_FEE = 15;
 
 async function restoreSession(page: Page) {
+  // Answer the session checks every load starts (GET /auth/v1/user and the root gate's
+  // age, onboarding and child-status server functions) from the injected session, as the
+  // pay specs do. They are not what this spec is about, and each signed-in load
+  // otherwise sends the shared sandbox 8-13 requests for them. See helpers/signed-in.ts.
+  await answerSessionChecks(page);
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(
     ([key, value]) => window.localStorage.setItem(key!, value!),
@@ -93,6 +100,9 @@ test("opening an invite deeplink lands on the game and the pay CTA routes to che
     },
   );
 
+  // Not a spec about "Before you join": the viewer has acknowledged it, so the pay page (which asks it
+  // before any payment option, docs/paid-path-gates.md section 7) goes straight to the options.
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
 
   // Open the invite deeplink directly.
@@ -117,7 +127,8 @@ test("opening an invite deeplink lands on the game and the pay CTA routes to che
     .filter({ hasText: /you're invited to this game/i })
     .first();
   await expect(banner).toBeVisible({ timeout: 10_000 });
-  await expect(banner).toContainText(/Pay & join/i);
+  // The banner names the paid CTA by its label, "Pay Host".
+  await expect(banner).toContainText(/tap\s+[“"']?Pay Host[”"']?\s+below/i);
 
   // Paid CTA — variant shows "Pay host · $X" (rendered as a link on paid games).
   const cta = page.getByRole("link", { name: /pay host/i }).first();

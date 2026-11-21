@@ -46,6 +46,8 @@ SELECT t.eq(
       'private_sec.reel_publicly_visible(_reel_id uuid)',
       'private_sec.review_is_publishable(_review_id uuid)',
       'private_sec.insight_is_publishable(_kind text, _reviewee_id text)',
+      -- whether a public, unflagged, publishable review of a subject exists (the summary read rule, 20261120100000)
+      'private_sec.insight_has_public_review(_kind text, _reviewee_id text)',
       'private_sec.roster_row_visible(_team_id text, _member_user_id uuid)',
       'private_sec.viewer_manages_team(_team text)',
       'private_sec.visible_avatars(_ids uuid[])',

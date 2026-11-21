@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { SPORTS } from "./sample-data";
 import {
   SPORT_HUBS,
+  basketballFirstPriority,
   clearSportContext,
   hubBySlug,
   isSportHubPath,
@@ -96,6 +97,33 @@ describe("orderSportsForViewer", () => {
       "Tennis",
     ]);
     expect(orderSportsForViewer(all, [])).toEqual(all);
+  });
+});
+
+describe("basketballFirstPriority", () => {
+  it("puts Basketball first, then the member's sports in their order", () => {
+    expect(basketballFirstPriority(["Tennis", "Soccer"])).toEqual([
+      "Basketball",
+      "Tennis",
+      "Soccer",
+    ]);
+  });
+
+  it("does not repeat Basketball when the member plays it", () => {
+    expect(basketballFirstPriority(["Soccer", "Basketball"])).toEqual(["Basketball", "Soccer"]);
+    expect(basketballFirstPriority([])).toEqual(["Basketball"]);
+  });
+
+  it("orders the full sport list: Basketball, own sports, then the rest unchanged", () => {
+    const out = orderSportsForViewer(SPORTS, basketballFirstPriority(["Tennis", "Baseball"])).map(
+      (s) => s.name,
+    );
+    expect(out.slice(0, 3)).toEqual(["Basketball", "Tennis", "Baseball"]);
+    const rest = SPORTS.map((s) => s.name).filter(
+      (n) => !["Basketball", "Tennis", "Baseball"].includes(n),
+    );
+    expect(out.slice(3)).toEqual(rest);
+    expect(out).toHaveLength(SPORTS.length);
   });
 });
 

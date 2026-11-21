@@ -35,9 +35,9 @@ export function CityListingsView({
         </h1>
         <p className="mt-2 page-subtitle">
           {sport
-            ? `Upcoming ${sport.name.toLowerCase()} runs, teams and trainers around ${city.name}. `
-            : `Upcoming runs, teams, trainers and gyms around ${city.name}. `}
-          Pick a game, check the skill level and spots left, then request to join. Pictures are
+            ? `Upcoming ${sport.name.toLowerCase()} games, teams and trainers around ${city.name}. `
+            : `Upcoming games, teams, trainers and gyms around ${city.name}. `}
+          Pick a game, check the skill level and spots left, then request a spot. Pictures are
           sample images for each sport, not photos of the listing.
         </p>
 

@@ -7,6 +7,18 @@ import { pickLatestRecap, recapAttempt, recapStepLabel, type RecapSummary } from
 import { deleteReel, setReelHidden } from "@/lib/reels.functions";
 import { InlineVideoPlayer } from "@/components/InlineVideoPlayer";
 import { useParentMode } from "@/hooks/use-parent-mode";
+import { userErrorMessage } from "@/lib/user-error";
+
+/**
+ * A failed recap's stored `error_message` can be the worker's raw catch text (AI, ffmpeg, storage), so only the
+ * sentences we write there ourselves are shown: the plan's clip-length refusal and the AI-off notice (WP 4.0).
+ */
+function recapFailureMessage(stored: string | null | undefined): string {
+  const text = stored?.trim() ?? "";
+  if (/^This clip is [\d:]+ long\. Your plan allows clips up to [\d:]+\.$/.test(text)) return text;
+  if (text.startsWith("AI analysis is turned off for this account")) return text;
+  return "Processing didn't finish";
+}
 
 /**
  * Per-reel manage controls for the profile card: hide/show and delete.
@@ -26,7 +38,7 @@ export function ReelManageRow({ reel, onChanged }: { reel: RecapSummary; onChang
       );
       onChanged?.();
     } catch (e: any) {
-      toast.error(e?.message ?? "Could not update this reel");
+      toast.error(userErrorMessage(e, "Couldn't update this reel. Please try again."));
     } finally {
       setBusy(null);
     }
@@ -40,7 +52,7 @@ export function ReelManageRow({ reel, onChanged }: { reel: RecapSummary; onChang
       setConfirmingDelete(false);
       onChanged?.();
     } catch (e: any) {
-      toast.error(e?.message ?? "Could not delete this reel");
+      toast.error(userErrorMessage(e, "Couldn't delete this reel. Please try again."));
     } finally {
       setBusy(null);
     }
@@ -68,7 +80,7 @@ export function ReelManageRow({ reel, onChanged }: { reel: RecapSummary; onChang
           <button
             onClick={handleDelete}
             disabled={busy !== null}
-            className="inline-flex items-center gap-1 rounded-full bg-destructive px-2.5 py-1 text-[10px] font-bold text-destructive-foreground disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded-full bg-destructive-strong px-2.5 py-1 text-[10px] font-bold text-destructive-foreground disabled:opacity-50"
           >
             {busy === "delete" ? (
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -191,7 +203,7 @@ export function GameRecapPanel({
                 <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
                   {r.status === "processing"
                     ? `Processing: ${recapStepLabel(r)}`
-                    : (r.error_message ?? "Processing didn't finish")}
+                    : recapFailureMessage(r.error_message)}
                   {attempt && attempt > 1 ? ` · retry ${attempt} of 3` : ""}
                 </p>
               </div>

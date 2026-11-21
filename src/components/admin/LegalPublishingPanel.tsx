@@ -31,6 +31,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { LegalReviewBanner } from "@/components/legal/LegalDocumentBody";
+import { errorCode, userErrorMessage } from "@/lib/user-error";
+
+/** Staff screen: the readable sentence, with the error code (when there is one) for support. */
+function staffErrorMessage(e: unknown, fallback: string): string {
+  const code = errorCode(e);
+  return `${userErrorMessage(e, fallback)}${code ? ` (${code})` : ""}`;
+}
 
 type DraftForm = {
   document_type: ManagedLegalType;
@@ -100,7 +107,13 @@ export function LegalPublishingPanel({ embedded = false }: { embedded?: boolean 
       setDraft(null);
       invalidate();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: unknown) =>
+      toast.error(
+        staffErrorMessage(
+          e,
+          "Couldn't save this draft. Check that every field is filled in, then try again.",
+        ),
+      ),
   });
 
   const publishMutation = useMutation({
@@ -111,7 +124,8 @@ export function LegalPublishingPanel({ embedded = false }: { embedded?: boolean 
       setAffected(null);
       invalidate();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: unknown) =>
+      toast.error(staffErrorMessage(e, "Couldn't publish this legal document.")),
   });
 
   const unpublishMutation = useMutation({
@@ -120,7 +134,8 @@ export function LegalPublishingPanel({ embedded = false }: { embedded?: boolean 
       toast.success("Unpublished — users now see no live version of this document");
       invalidate();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: unknown) =>
+      toast.error(staffErrorMessage(e, "Couldn't unpublish this legal document.")),
   });
 
   const deleteMutation = useMutation({
@@ -129,7 +144,7 @@ export function LegalPublishingPanel({ embedded = false }: { embedded?: boolean 
       toast.success("Draft deleted");
       invalidate();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: unknown) => toast.error(staffErrorMessage(e, "Couldn't delete this draft.")),
   });
 
   const openConfirm = async (doc: AdminLegalDocument) => {

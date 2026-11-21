@@ -1,4 +1,6 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
+import { restoreSession } from "./helpers/signed-in";
+import { stubRiskAcknowledged } from "./helpers/risk-ack";
 
 /**
  * E2E: loading the pay screen for a game hosted by HOST_A must never
@@ -39,14 +41,6 @@ const ENTRY_FEE = 12;
 
 function urlIncludes(url: string | URL, needle: string) {
   return String(url).includes(needle);
-}
-
-async function restoreSession(page: Page) {
-  await page.goto("/", { waitUntil: "domcontentloaded" });
-  await page.evaluate(
-    ([key, value]) => window.localStorage.setItem(key!, value!),
-    [STORAGE_KEY!, SESSION_JSON!],
-  );
 }
 
 async function mockEmptyLists(page: Page) {
@@ -164,6 +158,9 @@ test("Pay screen for HOST_A never renders or requests HOST_B's payment methods",
 
   await mockPaidSettings(page);
   await mockEmptyLists(page);
+  // Not a spec about "Before you join": the viewer has acknowledged it, so the pay page (which asks it
+  // before any payment option, docs/paid-path-gates.md section 7) goes straight to the options.
+  await stubRiskAcknowledged(page);
   await restoreSession(page);
 
   await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });

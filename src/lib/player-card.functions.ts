@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { PublicXp } from "@/lib/athlete-xp";
 import { FEED_GAME_COLUMNS, publicFeedGame, type FeedGameRow } from "@/lib/highlight-feed-game";
+import { isConfirmedMinorCohort, keepsMinorPrivacyFloor } from "@/lib/minor-privacy-floor";
 
 export type PlayerCardGame = {
   id: string;
@@ -106,13 +107,15 @@ export const getPlayerCard = createServerFn({ method: "GET" })
     const prof = profRes.data as any | null;
     if (!prof || prof.suspended_at) return empty;
 
-    const { data: cohortRaw } = await supabaseAdmin.rpc(
+    const { data: cohortRaw, error: cohortError } = await supabaseAdmin.rpc(
       "age_cohort_of" as never,
       { _user: data.userId } as never,
     );
-    const isMinor = ["child_under_13", "teen_13_15", "teen_16_17"].includes(
-      cohortRaw as unknown as string,
-    );
+    // A confirmed minor: the guardian badge, contact through the guardian, opt-in public XP.
+    const isMinor = isConfirmedMinorCohort(cohortRaw);
+    // Where they will be is hidden for anyone not confirmed adult: an unknown age (no birthday) or a
+    // failed lookup keeps the floor too (src/lib/minor-privacy-floor.ts).
+    const hideSchedule = keepsMinorPrivacyFloor(cohortRaw, Boolean(cohortError));
 
     // Only games that pass the shared public-game rule are listed. A failed lookup lists none.
     const publicGames = (rows: unknown, error: unknown, role: "host" | "player") =>
@@ -153,9 +156,9 @@ export const getPlayerCard = createServerFn({ method: "GET" })
         location: (g.location as string) ?? null,
         role: g.role as "host" | "player",
       }))
-      // Minors: never publish where they will be — past games only, no venue.
-      .filter((g) => !isMinor || new Date(g.date ?? 0).getTime() <= Date.now())
-      .map((g) => (isMinor ? { ...g, location: null } : g))
+      // Minors, and anyone not confirmed adult: never publish where they will be — past games only, no venue.
+      .filter((g) => !hideSchedule || new Date(g.date ?? 0).getTime() <= Date.now())
+      .map((g) => (hideSchedule ? { ...g, location: null } : g))
       .sort((a, b) => new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime())
       .slice(0, 30);
 
