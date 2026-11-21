@@ -50,6 +50,8 @@ const STRUCTURED_KEY_TABS: Record<string, string> = {
   ai_features: "AI controls",
   ai_limits: "AI controls",
   ai_provider: "AI controls",
+  // The under-18 funnel switch: changed only from the Funnel card, which records who and why (WP 5.2).
+  funnel_minor_counts: "Overview",
 };
 const STRUCTURED_KEYS = new Set(Object.keys(STRUCTURED_KEY_TABS));
 
