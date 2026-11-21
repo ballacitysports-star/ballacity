@@ -79,7 +79,7 @@ test.describe("the Parent Center and the database, on the real stack", () => {
   test("a guardian with no managed adult is offered no handover", async ({ page }) => {
     await signInAs(page, "host");
     await page.goto("/parent", { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: /parent center/i }).first()).toBeVisible({
+    await expect(page.getByRole("heading", { name: /your family/i }).first()).toBeVisible({
       timeout: 20_000,
     });
     await expect(page.getByText(/hand over/i)).toHaveCount(0);
