@@ -940,14 +940,19 @@ function RootComponent() {
       // INITIAL_SESSION only records who is signed in, without reloading.
       const step = trackIdentity(seenIdentity, event, session);
       seenIdentity = step.seen;
-      if (!step.changed) return;
-      router.invalidate();
-      if (event !== "SIGNED_OUT") {
-        queryClient.invalidateQueries();
-      } else {
-        // Don't leak the previous user's history into the next session.
-        clearLastVisited();
+      if (step.changed) {
+        router.invalidate();
+        if (event !== "SIGNED_OUT") {
+          queryClient.invalidateQueries();
+        } else {
+          // Don't leak the previous user's history into the next session.
+          clearLastVisited();
+        }
       }
+      // The sign-in follow-up below runs on every SIGNED_IN, as before, not
+      // only on an identity change: an OAuth return can arrive as a SIGNED_IN
+      // for the member this tab already knows (from INITIAL_SESSION), and it
+      // must still reach the account-type check and the saved `next`.
       if ((event === "SIGNED_IN" || event === "USER_UPDATED") && session?.user) {
         runLegacyHostMigration(session.user.id);
         // Consume the OAuth `next` stashed by the sign-in button (kept out

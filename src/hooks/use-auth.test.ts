@@ -304,6 +304,22 @@ describe("useAuth on repeated auth events", () => {
     expect(result.current.user).toBe(newer.user);
   });
 
+  it("replaces the user when the same member's metadata changed with the same updated_at", async () => {
+    // An OAuth return (and the onboarding specs) bring a SIGNED_IN whose
+    // app_metadata.provider is new while updated_at is unchanged.
+    const { result, stored } = await signedIn();
+    const withProvider = makeSession("member", stored.access_token);
+    withProvider.user.app_metadata = { provider: "google" };
+    fire("SIGNED_IN", withProvider);
+    expect(result.current.user).toBe(withProvider.user);
+
+    const withAccountType = makeSession("member", stored.access_token);
+    withAccountType.user.app_metadata = { provider: "google" };
+    withAccountType.user.user_metadata = { account_type: "player" };
+    fire("SIGNED_IN", withAccountType);
+    expect(result.current.user).toBe(withAccountType.user);
+  });
+
   it("replaces the user on USER_UPDATED and on a different member", async () => {
     const { result, stored } = await signedIn();
     const updated = makeSession("member", stored.access_token);

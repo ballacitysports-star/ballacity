@@ -20,11 +20,30 @@ function isInvalidSessionError(message: string | undefined): boolean {
   );
 }
 
-/** True when `next` is a later version of the user record than `current`. */
-function isNewerUser(next: User, current: User): boolean {
+/** A JSON form of `value` with object keys sorted, so equal metadata compares equal. */
+function stableJson(value: unknown): string {
+  return JSON.stringify(value ?? null, (_key, v: unknown) =>
+    v && typeof v === "object" && !Array.isArray(v)
+      ? Object.fromEntries(
+          Object.entries(v as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : 1)),
+        )
+      : v,
+  );
+}
+
+/**
+ * True when `next` is a different version of the user record than `current`: a later
+ * `updated_at`, or changed app or user metadata. An OAuth return can bring a new
+ * `app_metadata.provider` (and onboarding reads it) with the same `updated_at`.
+ */
+function isChangedUser(next: User, current: User): boolean {
   const a = Date.parse(next.updated_at ?? "");
   const b = Date.parse(current.updated_at ?? "");
-  return Number.isFinite(a) && Number.isFinite(b) && a > b;
+  if (Number.isFinite(a) && Number.isFinite(b) && a > b) return true;
+  return (
+    stableJson(next.app_metadata) !== stableJson(current.app_metadata) ||
+    stableJson(next.user_metadata) !== stableJson(current.user_metadata)
+  );
 }
 
 function clearInvalidLocalSession() {
@@ -59,14 +78,14 @@ function initAuthStore() {
     // member already published, keep the same user object (every [user]
     // effect would run again otherwise) and publish nothing unless the token
     // changed. USER_UPDATED carries a changed user, so it replaces it, and so
-    // does a session whose user record is newer than the one held.
+    // does a session whose user record is newer or whose metadata changed.
     const current = authState.user;
     if (
       (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") &&
       !authState.loading &&
       current &&
       session?.user?.id === current.id &&
-      !isNewerUser(session.user, current)
+      !isChangedUser(session.user, current)
     ) {
       if (session.access_token !== authState.session?.access_token) setAuthState({ session });
       return;
