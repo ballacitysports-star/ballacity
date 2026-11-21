@@ -247,6 +247,11 @@ export type ViewerPolicySource = {
   requiresApproval: boolean | null;
   /** Refund terms: the settings row when readable, otherwise the public terms. */
   refundTerms: RefundTerms | null;
+  /**
+   * The payment terms a viewer who cannot read the row may know (payTermsView: get_game_payment_terms): the entry fee
+   * PayPal charges, which wins over the game's price. Omitted or null when the row is readable or nothing was told.
+   */
+  paymentTerms?: { entryFee: number } | null;
 };
 
 /**
@@ -260,6 +265,7 @@ export function viewerGamePolicy({
   settings,
   requiresApproval,
   refundTerms,
+  paymentTerms,
 }: ViewerPolicySource): GamePolicy {
   return normalizeGamePolicy({
     cancellationPolicy: (game?.cancellationPolicy ?? undefined) as GamePolicy["cancellationPolicy"],
@@ -267,7 +273,7 @@ export function viewerGamePolicy({
     minPlayers: game?.minPlayers ?? 0,
     maxPlayers: game?.maxPlayers ?? 10,
     allowWaitlist: game?.allowWaitlist ?? true,
-    entryFee: Number(settings?.entry_fee ?? game?.price ?? 0) || 0,
+    entryFee: Number(settings?.entry_fee ?? paymentTerms?.entryFee ?? game?.price ?? 0) || 0,
     requiresApproval: requiresApproval ?? true,
     refundRule: (refundTerms?.refund_rule ?? undefined) as GamePolicy["refundRule"],
     lateRefundPct: refundTerms?.late_refund_pct ?? 0,
@@ -315,7 +321,11 @@ export type PolicyLine = {
  * The policy lines a player must be able to read BEFORE joining. Ordered so the
  * critical ones (payment, approval, cancellation) come first.
  */
-export function gamePolicyLines(policy: GamePolicy): PolicyLine[] {
+export function gamePolicyLines(
+  policy: GamePolicy,
+  /** What a viewer who cannot read the settings row may know of the payment (payTermsView), shown on the Payment line. */
+  paymentTerms?: { deadline: string | null; methodNames: string[] } | null,
+): PolicyLine[] {
   const lines: PolicyLine[] = [];
 
   lines.push({
@@ -324,7 +334,10 @@ export function gamePolicyLines(policy: GamePolicy): PolicyLine[] {
     critical: true,
     value:
       policy.entryFee > 0
-        ? `$${formatMoney(policy.entryFee)} per player, paid directly to the host. BallaCity doesn't process payments.`
+        ? [
+            `$${formatMoney(policy.entryFee)} per player, paid directly to the host. BallaCity doesn't process payments.`,
+            ...paymentTermsSentences(paymentTerms),
+          ].join(" ")
         : "Free to join — the host isn't collecting an entry fee here.",
   });
 
@@ -387,6 +400,23 @@ export function gamePolicyLines(policy: GamePolicy): PolicyLine[] {
   }
 
   return lines;
+}
+
+/** The deadline and the accepted payment apps, as two calm sentences (none when there is nothing to say). */
+export function paymentTermsSentences(
+  terms: { deadline: string | null; methodNames: string[] } | null | undefined,
+): string[] {
+  if (!terms) return [];
+  const out: string[] = [];
+  const when = terms.deadline ? new Date(terms.deadline) : null;
+  if (when && !Number.isNaN(when.getTime())) out.push(`Pay by ${when.toLocaleString()}.`);
+  const names = terms.methodNames;
+  if (names.length > 0) {
+    out.push(
+      `The host accepts ${names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`}.`,
+    );
+  }
+  return out;
 }
 
 /** One-line teaser used on cards and above the join button. */

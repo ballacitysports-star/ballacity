@@ -136,6 +136,8 @@ import { joinWait, playerWaitCopy } from "@/lib/join-guardian-status";
 import { refundTermsDisplay } from "@/lib/refund-policy";
 import { useGameJoinPolicy } from "@/hooks/use-game-join-policy";
 import { useGameRefundTerms } from "@/hooks/use-game-refund-terms";
+import { useGamePaymentTerms } from "@/hooks/use-game-payment-terms";
+import { payTermsView } from "@/lib/pay-entry-gate";
 import {
   CANCEL_CUTOFF_PRESETS,
   cancelPolicyNote,
@@ -386,6 +388,9 @@ function GameDetail() {
   // The full settings row is host-and-linked-only, so a prospective viewer reads
   // the host's approval setting from the public join-policy RPC instead.
   const publicRequiresApproval = useGameJoinPolicy(gameId, settings);
+  // The entry fee, deadline and accepted apps a viewer may know before approval or payment (get_game_payment_terms;
+  // payTermsView, in pay-entry-gate.ts, decides whether they are shown). Null for a viewer who reads the row.
+  const paymentTerms = useGamePaymentTerms(gameId, settings, { enabled: !!user });
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
   // A status read that answers after the page wrote the viewer's own rows (the
@@ -526,6 +531,10 @@ function GameDetail() {
   // Policy players must be able to read before joining. Joining and refunds use
   // the same reads as the join button and the payment terms, so a visitor who
   // cannot read the settings row sees the host's real terms, not defaults.
+  const termsView = useMemo(
+    () => payTermsView({ terms: paymentTerms, settingsReadable: !!settings, isHost }),
+    [paymentTerms, settings, isHost],
+  );
   const viewerPolicy = useMemo<GamePolicy>(
     () =>
       viewerGamePolicy({
@@ -533,8 +542,9 @@ function GameDetail() {
         settings,
         requiresApproval: publicRequiresApproval,
         refundTerms,
+        paymentTerms: termsView,
       }),
-    [game, settings, publicRequiresApproval, refundTerms],
+    [game, settings, publicRequiresApproval, refundTerms, termsView],
   );
 
   // Host trust: only real signals. Verification comes from the hosting team
@@ -950,7 +960,7 @@ function GameDetail() {
     );
   }
 
-  const fee = Number(settings?.entry_fee ?? game.price);
+  const fee = Number(settings?.entry_fee ?? termsView?.entryFee ?? game.price);
   const isPaid = fee > 0;
   const myHoldExpiresAt = holdExpiresAt({
     approvedAt: myReq?.status === "approved" ? myReq.reviewed_at : null,
@@ -2024,7 +2034,9 @@ function GameDetail() {
           })()}
 
         {/* Policies + host trust — visible before any join action */}
-        {!isHost && <GamePolicySummary policy={viewerPolicy} defaultOpen />}
+        {!isHost && (
+          <GamePolicySummary policy={viewerPolicy} defaultOpen paymentTerms={termsView} />
+        )}
         <HostTrustPanel trust={hostTrust} hostName={game.host.name} />
 
         {/* Meta */}
@@ -2151,6 +2163,7 @@ function GameDetail() {
           isPaid={isPaid}
           refundTerms={refundTerms}
           settings={settings}
+          paymentTerms={termsView}
         />
 
         {/* Positions needed */}

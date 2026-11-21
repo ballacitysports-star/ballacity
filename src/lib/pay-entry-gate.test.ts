@@ -19,10 +19,13 @@ import {
   paySetupFrom,
   payEntryFlow,
   payMethodsHeldForApproval,
+  payTermsMethodsLine,
+  payTermsView,
   rosterIsFull,
   ROSTER_FULL_MESSAGE,
   type PayEntryInput,
 } from "./pay-entry-gate";
+import type { GamePaymentTerms } from "./payments";
 import { ageGateMessage, ageGateState, type AgeRequirement } from "./game-age";
 import { riskAckReadFrom } from "./risk-ack-tap";
 import { SAFETY_ACK_VERSION } from "./safety";
@@ -1503,3 +1506,89 @@ function resolveJoinGateFullReason(): string {
   } as unknown as Game;
   return resolveJoinGate(game, now, { spotsLeft: 0 }).reason;
 }
+
+describe("payTermsView (docs/paid-path-gates.md section 6 (c): terms before approval or payment)", () => {
+  const terms: GamePaymentTerms = {
+    entryFee: 12.5,
+    currency: "USD",
+    paymentDeadline: "2026-12-01T18:00:00.000Z",
+    methods: [
+      { type: "venmo", name: "Venmo" },
+      { type: "cashapp", name: "Cash App" },
+    ],
+    requiresApproval: true,
+  };
+  const base = { terms, settingsReadable: false, isHost: false };
+
+  it("tells a viewer the page lets through the fee, the deadline, the apps by name and the approval", () => {
+    expect(payTermsView({ ...base, entry: "clear" })).toEqual({
+      entryFee: 12.5,
+      deadline: "2026-12-01T18:00:00.000Z",
+      methodNames: ["Venmo", "Cash App"],
+      approvalFirst: true,
+    });
+  });
+
+  it("is the same on the game page, which has no entry check", () => {
+    expect(payTermsView(base)).toEqual(payTermsView({ ...base, entry: "clear" }));
+  });
+
+  it("shows nothing to a viewer the page checks, blocks or fails to check", () => {
+    for (const entry of ["checking", "check_failed", "blocked"] as const) {
+      expect(payTermsView({ ...base, entry })).toBeNull();
+    }
+  });
+
+  it("shows nothing when the read told nothing or failed: never invented terms", () => {
+    expect(payTermsView({ ...base, terms: null, entry: "clear" })).toBeNull();
+  });
+
+  it("shows nothing to a viewer who reads the settings row (the row's own values are shown) or to the host", () => {
+    expect(payTermsView({ ...base, settingsReadable: true, entry: "clear" })).toBeNull();
+    expect(payTermsView({ ...base, isHost: true, entry: "clear" })).toBeNull();
+  });
+
+  it("drops a row with no usable fee", () => {
+    expect(payTermsView({ ...base, terms: { ...terms, entryFee: 0 } })).toBeNull();
+    expect(payTermsView({ ...base, terms: { ...terms, entryFee: Number.NaN } })).toBeNull();
+  });
+
+  it("carries no deadline and no apps when the host set none", () => {
+    expect(
+      payTermsView({ ...base, terms: { ...terms, paymentDeadline: null, methods: [] } }),
+    ).toMatchObject({ deadline: null, methodNames: [] });
+  });
+
+  it("is a decision on what is shown, never on who may pay: a blocked viewer stays blocked", () => {
+    const view = payEntryView({
+      ...fresh,
+      flow: "ready",
+      gate: { locked: true, reason: "This game was cancelled.", joinState: "cancelled" },
+      child: {
+        state: "ready",
+        value: { participation: allowed, payments: allowed, ageUnknown: false },
+      },
+      guardian: { state: "ready", value: true },
+      paymentStarted: false,
+      roster: { state: "ready", value: { count: 0, maxPlayers: 10 } },
+    });
+    expect(view.kind).toBe("blocked");
+    expect(payTermsView({ ...base, entry: view.kind })).toBeNull();
+  });
+});
+
+describe("payTermsMethodsLine", () => {
+  it("names one, two or more apps in plain words", () => {
+    expect(payTermsMethodsLine({ methodNames: ["Venmo"] })).toBe("This host accepts Venmo.");
+    expect(payTermsMethodsLine({ methodNames: ["Venmo", "Cash App"] })).toBe(
+      "This host accepts Venmo and Cash App.",
+    );
+    expect(payTermsMethodsLine({ methodNames: ["Venmo", "Cash App", "Zelle"] })).toBe(
+      "This host accepts Venmo, Cash App and Zelle.",
+    );
+  });
+
+  it("says nothing when there is no app to name", () => {
+    expect(payTermsMethodsLine({ methodNames: [] })).toBeNull();
+  });
+});

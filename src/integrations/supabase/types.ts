@@ -5461,6 +5461,16 @@ export type Database = {
           requires_approval: boolean
         }[]
       }
+      get_game_payment_terms: {
+        Args: { _game_id: string }
+        Returns: {
+          accepted_methods: string[]
+          currency: string
+          entry_fee: number
+          payment_deadline: string | null
+          requires_approval: boolean
+        }[]
+      }
       get_game_refund_terms: {
         Args: { _game_id: string }
         Returns: {

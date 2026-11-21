@@ -27,12 +27,14 @@ import { useParentMode } from "@/hooks/use-parent-mode";
 import { supabase } from "@/integrations/supabase/client";
 import {
   type GamePaymentSettings,
+  type GamePaymentTerms,
   type PaymentMethod,
   type PaymentSubmission,
   type JoinRequest,
   paymentTypeMeta,
   resolvePaymentDeepLink,
   getGamePaymentSettings,
+  getGamePaymentTerms,
   getGameJoinPolicy,
   listPaymentMethodsForHost,
   uploadProofScreenshot,
@@ -90,6 +92,9 @@ import {
   payEntryFlow,
   payMethodsHeldForApproval,
   paySetupFrom,
+  payTermsView,
+  payTermsMethodsLine,
+  PAY_TERMS_APPROVAL_LINE,
   type CheckState,
   type PayEntryView,
   type PaySetup,
@@ -282,6 +287,10 @@ function PayPage() {
   // the public join policy and the game's host (paySetupFrom, docs/paid-path-gates.md section 6 (c)). Null when the
   // host has no payment settings for this game: nothing is offered.
   const [setup, setSetup] = useState<PaySetup | null>(null);
+  // What a viewer who cannot read the settings row may know before approval or payment: the entry fee, the deadline and
+  // the accepted payment apps by name (get_game_payment_terms; payTermsView decides whether to show it). Null when the
+  // viewer reads the row, or the read told nothing or failed: the page then shows what it showed before.
+  const [terms, setTerms] = useState<GamePaymentTerms | null>(null);
   // The host's methods were not asked for: a viewer the host has not approved yet, on a game whose host reviews every
   // player (payMethodsHeldForApproval). Read again once the host approves them.
   const [methodsHeld, setMethodsHeld] = useState(false);
@@ -427,14 +436,15 @@ function PayPage() {
     setFetchTimedOut(false);
     setSettings(null);
     setSetup(null);
+    setTerms(null);
     setMethodsHeld(false);
     setMethods([]);
     setPicked(null);
-    const withTimeout = <T,>(p: Promise<T>, label: string): Promise<T> =>
+    const withTimeout = <T,>(p: Promise<T>, label: string, ms = 6000): Promise<T> =>
       Promise.race([
         p,
         new Promise<T>((_, reject) =>
-          window.setTimeout(() => reject(new Error(`[pay] ${label} timed out after 6s`)), 6000),
+          window.setTimeout(() => reject(new Error(`[pay] ${label} timed out after ${ms}ms`)), ms),
         ),
       ]);
     (async () => {
@@ -442,8 +452,18 @@ function PayPage() {
         const s = await withTimeout(getGamePaymentSettings(gameId), "getGamePaymentSettings");
         if (cancelled) return;
         // RLS hides the row from a viewer who is not yet the payee, an approved requester, a payer or a participant:
-        // ask the public join policy for that viewer (a failure is the Retry below, never "no approval needed").
-        const policy = s ? null : await withTimeout(getGameJoinPolicy(gameId), "getGameJoinPolicy");
+        // ask the public join policy for that viewer (a failure is the Retry below, never "no approval needed"), and
+        // the payment terms they may read (fee, deadline, accepted apps by name). The terms are best effort: a read
+        // that fails (the function not there yet, an error, a timeout) is no terms, never a Retry and never an error
+        // on screen, and the page shows what it showed before.
+        const [policy, nextTerms] = s
+          ? [null, null]
+          : await Promise.all([
+              withTimeout(getGameJoinPolicy(gameId), "getGameJoinPolicy"),
+              withTimeout(getGamePaymentTerms(gameId), "getGamePaymentTerms", 4000).catch(
+                () => null,
+              ),
+            ]);
         if (cancelled) return;
         const nextSetup = paySetupFrom({ settings: s, policy, gameHostId });
         const held = payMethodsHeldForApproval({
@@ -460,6 +480,7 @@ function PayPage() {
         if (cancelled) return;
         setSettings(s);
         setSetup(nextSetup);
+        setTerms(nextTerms);
         setMethodsHeld(held);
         setMethods(all);
 
@@ -780,7 +801,18 @@ function PayPage() {
   }
   if (!user) return null;
 
-  const fee = settings?.entry_fee ?? game.price;
+  // Before the viewer reads the settings row the terms tell the fee PayPal will charge (the row's entry_fee, which wins
+  // over the game's price), the deadline and the accepted apps by name. payTermsView shows them only to a viewer the
+  // page itself lets through (entryView 'clear'); with no terms the page is what it was.
+  const termsView = payTermsView({
+    terms,
+    settingsReadable: !!settings,
+    isHost,
+    entry: entryView.kind,
+  });
+  const payFee = settings?.entry_fee ?? termsView?.entryFee ?? game.price;
+  const payDeadline = settings?.payment_deadline ?? termsView?.deadline ?? null;
+  const fee = payFee;
   // PayPal counts as an option only with a payment setup: the button pays the game's payee, and with no settings row
   // at all PayPal's precondition refuses a player the host has not approved (HOST_APPROVAL_REQUIRED). Without this a
   // PayPal config alone made the page draw an empty "How do you want to pay?" list.
@@ -886,10 +918,9 @@ function PayPage() {
             </div>
           )}
         </div>
-        {settings?.payment_deadline && (
+        {payDeadline && (
           <div className="mt-3 inline-flex items-center gap-1 text-xs text-coral">
-            <Clock className="h-3 w-3" /> Pay by{" "}
-            {new Date(settings.payment_deadline).toLocaleString()}
+            <Clock className="h-3 w-3" /> Pay by {new Date(payDeadline).toLocaleString()}
           </div>
         )}
       </div>
@@ -985,6 +1016,14 @@ function PayPage() {
                 ? "The host declined your request. You can't submit payment for this game."
                 : "This host reviews every player before payment. Request a spot first."}
           </p>
+          {termsView && myReq?.status !== "rejected" && (
+            <p
+              className="text-xs text-muted-foreground mt-1"
+              data-testid="pay-terms-before-approval"
+            >
+              {[payTermsMethodsLine(termsView), PAY_TERMS_APPROVAL_LINE].filter(Boolean).join(" ")}
+            </p>
+          )}
           <div className="mt-3 flex items-center gap-3 flex-wrap">
             <Link
               to="/games/$gameId"
@@ -1092,7 +1131,7 @@ function PayPage() {
                   gameId={game.id}
                   clientId={paypalCfg.clientId}
                   merchantId={paypalCfg.merchantId}
-                  feeLabel={feeLabel(settings?.entry_fee ?? game.price)}
+                  feeLabel={feeLabel(payFee)}
                   onPaid={async () => {
                     // The capture may have put the viewer on the roster, and filled its last place: the count can
                     // reach this page before their own place does (another channel), or their place may never
@@ -1144,8 +1183,7 @@ function PayPage() {
               <div className="space-y-2">
                 {methods.map((m) => {
                   const meta = paymentTypeMeta(m.payment_type);
-                  const fee = settings?.entry_fee ?? game.price;
-                  const link = resolvePaymentDeepLink(m, fee, game.title);
+                  const link = resolvePaymentDeepLink(m, payFee, game.title);
                   return (
                     <div
                       key={m.id}
@@ -1175,9 +1213,9 @@ function PayPage() {
                           }}
                           className="inline-flex items-center gap-1 rounded-full bg-lime-gradient px-3 py-1.5 text-xs font-bold text-primary-foreground"
                           title={`Pay in ${meta.name}`}
-                          aria-label={`Pay ${feeLabel(fee)} in ${meta.name}`}
+                          aria-label={`Pay ${feeLabel(payFee)} in ${meta.name}`}
                         >
-                          <ExternalLink className="h-3.5 w-3.5" /> Pay {feeLabel(fee)}
+                          <ExternalLink className="h-3.5 w-3.5" /> Pay {feeLabel(payFee)}
                         </button>
                       ) : (
                         <button
@@ -1203,7 +1241,7 @@ function PayPage() {
           <PaymentInstructionsAndProof
             game_id={game.id}
             game_title={game.title}
-            fee={settings?.entry_fee ?? game.price}
+            fee={payFee}
             host_id={setup!.hostId}
             method={picked}
             extraInstructions={settings?.payment_instructions ?? null}

@@ -17,13 +17,16 @@ export function GamePolicySummary({
   policy,
   className = "",
   defaultOpen = false,
+  paymentTerms = null,
 }: {
   policy: GamePolicy;
   className?: string;
   defaultOpen?: boolean;
+  /** The deadline and accepted apps a viewer who cannot read the host's settings may know (payTermsView). */
+  paymentTerms?: { deadline: string | null; methodNames: string[] } | null;
 }) {
   const [open, setOpen] = useState(defaultOpen);
-  const lines = gamePolicyLines(policy);
+  const lines = gamePolicyLines(policy, paymentTerms);
   const critical = lines.filter((l) => l.critical);
   const rest = lines.filter((l) => !l.critical);
 
@@ -68,9 +71,7 @@ export function GamePolicySummary({
             <dl className="mt-2 space-y-2">
               {rest.map((l) => (
                 <div key={l.id} className="rounded-xl bg-background/60 px-3 py-2">
-                  <dt className="micro-label text-muted-foreground">
-                    {l.label}
-                  </dt>
+                  <dt className="micro-label text-muted-foreground">{l.label}</dt>
                   <dd className="mt-0.5 whitespace-pre-line text-[12px] leading-relaxed">
                     {l.value}
                   </dd>
