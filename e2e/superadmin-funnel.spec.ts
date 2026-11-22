@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { HAS_BACKEND, signInAs } from "./helpers/fixture-auth";
+import { serverFnId } from "./helpers/server-fn";
 
 /**
  * E2E: WP 5.2 Funnel card (docs/product/phase-5-validation-plan.md).
@@ -29,19 +30,14 @@ test.describe("superadmin funnel card", () => {
   test("a member gets no access", async ({ page }) => {
     test.skip(!HAS_BACKEND, "Requires the seeded fixture accounts.");
     await signInAs(page, "player");
+    // The card renders only after superadminCheck answers that this account is a superadmin. Wait for that answer
+    // (when the page asks), so the card's absence is not just read on the loading screen. A member is then sent
+    // home, or shown "We couldn't verify your access" if the check fails; neither renders the tabs.
+    const answered = page
+      .waitForResponse((r) => serverFnId(r.url()).includes("superadminCheck"), { timeout: 30_000 })
+      .catch(() => null);
     await page.goto("/superadmin", { waitUntil: "domcontentloaded" });
-
-    // The page sends a member home once the access check answers, or shows "We couldn't verify your access" if the
-    // check fails. Either way it never renders the superadmin tabs. Wait for one of the two outcomes first, so the
-    // card's absence is not just read on the loading screen.
-    await expect
-      .poll(
-        async () =>
-          !/\/superadmin/.test(new URL(page.url()).pathname) ||
-          (await page.getByText(/couldn't verify your access/i).count()) > 0,
-        { timeout: 30_000, message: "the page should refuse a member" },
-      )
-      .toBe(true);
+    await answered;
     await expect(page.getByText("Pilot funnel")).toHaveCount(0);
   });
 });
