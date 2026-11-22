@@ -11,10 +11,17 @@ const FIXTURE_ADULT_BIRTHDAY = "1990-06-15";
  * a sample hosted game for the host. Safe to re-run.
  *
  * Admin-only. Intended for setting up multi-user notification E2E flows.
+ * Refuses to run anywhere but a local Supabase or the E2E sandbox, so it can
+ * never create known-password accounts in production (see seed-target.ts).
  */
 export const seedTestAccounts = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    // Target gate first, so a production call touches nothing.
+    const { seedTargetRefusal } = await import("./seed-target");
+    const refusal = seedTargetRefusal(process.env.SUPABASE_URL);
+    if (refusal) throw new Error(refusal);
+
     // Admin gate
     const { data: isAdmin, error: roleErr } = await context.supabase.rpc("has_role", {
       _user_id: context.userId,

@@ -930,18 +930,6 @@ export function isPubliclyVisibleForMinor(field: string): boolean {
   return !(MINOR_NEVER_PUBLIC_FIELDS as readonly string[]).includes(field);
 }
 
-/** Child accounts must never be used for targeted advertising or ad tracking. */
-export function trackingAllowed(cohort: AgeCohort): {
-  analytics: boolean;
-  targetedAds: boolean;
-  sessionReplay: boolean;
-} {
-  if (isMinorCohort(cohort) || cohort === "unknown") {
-    return { analytics: cohort === "teen_16_17", targetedAds: false, sessionReplay: false };
-  }
-  return { analytics: true, targetedAds: true, sessionReplay: true };
-}
-
 /* ------------------------------------------------------------------ */
 /* Username safety for children                                        */
 /* ------------------------------------------------------------------ */
