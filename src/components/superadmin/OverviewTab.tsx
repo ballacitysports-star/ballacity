@@ -5,6 +5,7 @@ import { superadminOverview } from "@/lib/superadmin.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { FunnelCard } from "./FunnelCard";
 
 function Stat({ label, value, hint }: { label: string; value: number | string; hint?: string }) {
   return (
@@ -54,6 +55,8 @@ export function OverviewTab() {
       </div>
 
       <div className="grid gap-3 lg:grid-cols-2">
+        <FunnelCard />
+
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Accounts by profile type</CardTitle>

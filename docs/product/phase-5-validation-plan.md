@@ -68,6 +68,8 @@ Sources: the analytics, feedback, pilot and privacy maps and the critique, all a
 | Build order     | WP 5.0 to 5.6 now, through the usual route (PR, green CI, sandbox, then production). WP 5.7 and 5.8 wait for counsel.                                                                                                                                                                                                                                                    |
 | Everything else | The recommended defaults below, unless the owner says otherwise.                                                                                                                                                                                                                                                                                                         |
 
+The under-18 "legal-review flag" is built in WP 5.2 as the server-side `funnel_minor_counts` switch: off by default, turned on only by a superadmin through a recorded act. See WP 5.2, "As built", and checklist row B1.
+
 ## Owner decisions needed
 
 Each item gives a recommended default and why.
@@ -234,8 +236,51 @@ Rules for every WP:
     - a deleted post does not break the count
   - Unit: the card renders the masked values and the "marked" coverage.
   - e2e: a superadmin opens the card. A member gets no access.
-- **Migration:** yes, the function only. Rollback: `DROP FUNCTION IF EXISTS`.
+- **Migration:** yes: `20261127100000_superadmin_funnel.sql` (functions, two `app_settings` rows, one guard trigger on `app_settings`). Rollback: `docs/rollbacks/20261127100000_superadmin_funnel.down.sql`, guarded (confirmation setting; refuses if any object changed since, or while WP 5.3 is applied).
 - **Acceptance:** the card shows weekly counts for steps 1-10 against the sandbox seed, and the numbers match a hand-run SQL query in the release record.
+
+**As built (2026-11-21)**
+
+- `public.superadmin_funnel(_from date, _to date)`: SECURITY DEFINER, `search_path = ''`, STABLE (it cannot write). It checks `private_sec.is_superadmin(auth.uid())` itself. Default window is the last 8 weeks, at most 26, never past today. Weeks run Monday to Sunday in `America/New_York`. The helpers are in `private_sec` and no API role can call them.
+- Whole weeks only. `_from` moves back to its Monday and `_to` moves on to its Sunday. Only the current week stops at today, and it grows only as time passes. Otherwise two answers whose `_to` differ by one day could be subtracted to give that day's exact count, including a 1 to 4 the masking hides. The same holds for frozen history days and for the under-18 column. The card asks for a number of weeks and computes `_from` from the New York date (`funnelWindowFrom`), not the UTC date, so "4w" is four columns on a Sunday evening too.
+- Who is counted: every account except `auth.users.email` ending `@lovable.test` and anyone with a `user_roles` row (admin, moderator, superadmin). Adults are `profiles.age_cohort = 'adult'` with no age review pending, the same gate as `AnalyticsHost.tsx`. "Adult" is judged when a day is computed, not when the row was written. An adult found later to be a minor also leaves the stored history (WP 5.3, "As built").
+- One host rule for every step that reads a game: a game whose host is a test or staff account counts nowhere. It adds no invite, join or self-join, and it is not held. Before this, a staff-hosted game added invites, joins and show-ups but never a game held, and a self-join into a test account's game counted. SQL test 970 checks that a staff-hosted game and a test-hosted self-join change no adult number.
+- Nothing a minor or an unknown-age account does moves an adult number. Adult invites and self-joins count only in games whose host is a confirmed adult: a minor may host under a team (`20261121100000`). Only a player of the same group makes a series copy "held". SQL test 970 adds and removes a minor's roster row and a minor's invite and checks that no adult number changes.
+- How each step is counted (a post counts on the person's first post day in the week; an invite on the day it was created; a game on its start day):
+  1. Posters: distinct `player_availabilities.user_id` with `hidden_at IS NULL` and a post created in the week.
+  2. Posters invited: those posters with a `game_invites` row (`invitee_id`) created from their first post of the week to 7 days after their last. The plan named no time window; without one, an invite months later would count.
+  - Secondary line: those posters who got a place in the same window on their own: a `game_participants` row, or an approved `join_requests` row whose `idempotency_key` is not `invite:…`, in a game they did not host and had not accepted an invite to.
+  3. Invites sent: `game_invites.created_at` in the week, from 2026-11-18 03:34 UTC. Invites to games with `hosted_games.hidden_at` set, or hosted by a test account, are left out. For adults, so are invites to games whose host is not a confirmed adult.
+  4. Seen: the invitee's `game_invite` notification whose `link` carries `inv=<invite id>` has `read_at` set, **or** the invite was answered. Answering from the game page leaves the notification unread, so `read_at` alone undercounts.
+  5. Answered: `responded_at` is set (accepted, declined, or an accept that found the game closed). Accepted: `status = 'accepted'`.
+  6. Joined: a `game_participants` row for the invitee in that game (never the host's own row), or an approved `join_requests` row.
+     - One place is credited to one invite. A person can have several invites to one game: a host can cancel and invite again at once, or invite again after a decline. Only one pending invite at a time is enforced. Of those invites, only the deciding one is credited with steps 6 to 10: the accepted one, or else the latest. It is credited only while it is pending or accepted, so a declined invite is not "joined" when the player later joins on their own. The other invites still count as sent, seen and answered.
+  7. Game started and not cancelled: joined, `hosted_games.date` has passed, and neither `cancelled_at` nor `status = 'cancelled'`. `status` is NULL on most games, so the check is NULL-safe.
+  8. Attendance marked: `game_participants.attended IS NOT NULL`.
+  9. Showed up: `attended = true`.
+  10. Late leaves: a `late_cancellations` row with `kind = 'game'`, `ref_id` = the game, `user_id` = the invitee.
+  - Also returned: joined then the game was cancelled; invites to series games; games held (empty series copies left out), of which series games; games cancelled; empty series games left out. An "empty" series game has no player other than the host. A player is someone in the same group with a roster row or an approved request, as for step 6. A free game's roster row is written later by the browser.
+  - Rates: marked coverage = marked / game started; show-up rate = showed up / marked. Both come from the raw counts and are returned only when both counts are 0 or at least 5.
+- The window must be real dates. `-infinity` or `infinity` is refused with `INVALID_WINDOW`: `-infinity` passed every clamp, and the day series over it never ended (SQL test 970).
+- Cost: every step is a join or a keyed lookup. Posters invited was an `EXISTS` over the materialized invites for each poster, which grows as posters times invites. On a scratch replay with 20k users, 40k posts over 26 weeks, 10k games, 30k invites, 20k roster rows, 20k approved requests and 200k notifications, the default 8 weeks took 18.7 s, and 26 weeks with the under-18 column took 51 s. The API cancels calls at 8 s. Now these take 1.3 to 1.6 s and 1.5 to 2.2 s (JIT off and on). The nightly snapshot runs the same query over about 4 weeks.
+- Masking: every count from 1 to 4 leaves the database as the string `"<5"`; 0 stays 0. The card masks again with `maskSmallCount`'s threshold (`src/lib/funnel.ts`).
+- Pilot start date: `app_settings` key `funnel_pilot_start`, `{"date": "YYYY-MM-DD"}`, set in Ops & config. Days before it are left out. Use a Monday. A date that is not a Monday counts from the next Monday, so the first week is whole and no day before the start is counted.
+- **The under-18 switch (owner decision 2026-11-21, checklist B1).** `app_settings` key `funnel_minor_counts`, `{"enabled": false}`, never public.
+  - Off (the default): the funnel neither computes nor returns any number about accounts that are not confirmed adults. SQL test 970 proves the non-adult counting query never runs.
+  - On: each week also carries one combined column, `not_confirmed_adult` (under 18, unknown age, review pending), with the same steps, masked the same way, always computed live. The card shows it only then.
+  - Only `public.superadmin_set_funnel_minor_counts(_enabled, _reason)` changes it. It needs a superadmin and a reason: at least 20 characters to turn it on, naming counsel's sign-off and its date. It writes an `admin_audit_log` row (`feature_flag.update`, who, why, before, after).
+  - A trigger on `app_settings` refuses any other write that would turn it on: the Ops raw editor, server code, the SQL editor. The Ops editor also refuses the key and points at the card. Turning it off from anywhere is allowed.
+  - In the app: the Funnel card's "Turn on…" asks for the reason and the typed word COUNSEL.
+- App: `superadminFunnel` and `superadminSetFunnelMinorCounts` in `src/lib/superadmin.functions.ts`, both run as the signed-in user. The Funnel card is on the Overview tab (`src/components/superadmin/FunnelCard.tsx`). When the function is missing (PGRST202/42883) the card shows "Not available yet", so the app can ship before or after the migration. Errors are worded through `src/lib/user-error.ts`.
+- What the plan got wrong or left open, checked against the code:
+  - `maskSmallCount` masks 0 as well (`n < 5`). The plan's rule is 1 to 4, so the funnel shows 0 as 0.
+  - Nothing adds the host to `game_participants`. A host has a roster row only if they joined their own game, so the host-row rule is a guard, not a common case.
+  - `hosted_games.hidden_at` is the combined moderator-or-owner hide (`sync_listing_hidden`). `org_hidden_at` is separate and not used here.
+  - `game_invites` rows are deleted with their game (ON DELETE CASCADE), not only when posts are deleted. WP 5.3 matters for that too.
+  - Production had no `game_invites` rows before 2026-11-18 03:34 UTC (the table did not exist), so that filter only matters on the sandbox.
+  - Tables read also include `user_roles` (the staff filter) and `app_settings` (the switch and the pilot start).
+  - The rollback cannot be only `DROP FUNCTION`: it also removes the trigger and the two settings rows.
+  - e2e: `e2e/superadmin-funnel.spec.ts` (the superadmin test needs `E2E_SUPERADMIN_ACCOUNT`, like `free-mode-superadmin.spec.ts`). It was not run here.
 
 ### WP 5.3 Keep funnel history (must be live before pilot day 1)
 
@@ -254,6 +299,29 @@ Rules for every WP:
   - SQL: the cron job is created only when pg_cron is present.
 - **Migration:** yes (table, function, cron). Rollback unschedules the job and drops the function. Dropping the table is refused if it has rows unless the export flag is set.
 - **Acceptance:** a nightly row appears in the sandbox. Deleting a seeded post does not change a frozen day.
+
+**As built (2026-11-21)**
+
+- Migration `20261127110000_funnel_daily_history.sql`. Rollback `docs/rollbacks/20261127110000_funnel_daily_history.down.sql`. It needs `app.confirm_funnel_daily_history_rollback=yes`, and `app.funnel_daily_exported=yes` while the table has rows (it always has them: the migration takes the first snapshot at once). It refuses if anything changed since.
+- `private_sec.funnel_daily(day, metrics, computed_at)` is in `private_sec`, not `public`, so the API never exposes it. RLS is on with no policies and no API role has a privilege. A CHECK allows only an object of whole, non-negative counts, so no identifier can be stored. Adults only: the under-18 column is never stored, even with the switch on.
+- Stored counts are raw, not masked. Daily values masked at 1-4 could not be added into weekly totals. They never leave the database unmasked: `superadmin_funnel` masks every weekly total it returns.
+- `private_sec.snapshot_funnel_daily(_now)` (scheduler only) works by whole weeks:
+  - It rewrites every day from the frozen line to yesterday. The frozen line is the Monday of the week holding today minus 21 days.
+  - A day of a complete frozen week is never rewritten.
+  - A frozen week the table holds only part of is recomputed and written whole, all seven days in one run, from what exists then. This happens on the first run, or when the job missed enough nights that the line passed a week it had begun. Filling only the missing days would count a person again on a later day of the week if their earlier post was deleted in between.
+  - The first run covers 2026-11-16 onward.
+- Job `snapshot-funnel-daily`, 08:47 UTC (after the New York day ends), through `private_sec.schedule_funnel_snapshot()`. It schedules only where `cron.schedule` exists, which means pg_cron is installed.
+- `superadmin_funnel` reads a frozen week from the table only when the table holds all seven of its days. It computes every other week live and whole. A week is never part history and part live, so nobody is counted twice in it. Each week says `history` or `live`.
+- **An adult found later to be a minor leaves the history (checklist B1).** "Adult" is judged when a day is computed, and a frozen day is never rewritten. Without a fix, an account counted as an adult and later found to be a minor would stay in the adults' numbers of every frozen week. Its birthday can be corrected, which lowers the cohort at once (`sync_age_category_from_birthdays` holds only raised ranks for review), or an admin can correct its age. That would put a minor's activity in a product metric while the switch is off.
+  - The stored days hold no identifiers, so the account cannot be taken out of them. Trigger `funnel_forget_lowered_adult_trg` on `profiles` (AFTER UPDATE OF `age_cohort`, `age_review_required`) fires only when a confirmed adult stops being one. It deletes every stored day from the Monday of the week the account was created. Nothing the account did can be older.
+  - Those weeks are then computed live, without the account, and the next night writes them whole again.
+  - The cost: in those weeks the history no longer keeps rows deleted since.
+  - Test and staff accounts were never counted, so their age changing deletes nothing.
+  - The snapshot locks `funnel_daily` (SHARE ROW EXCLUSIVE) first. A lowering that commits while a snapshot runs waits for it, then deletes what it wrote.
+  - A staff role or a test address given later does not change the history: the account was a pilot user when the day was counted.
+  - SQL test 975 freezes a week, lowers one counted adult's cohort, and checks that the week comes back live without that adult and with no under-18 number, then is stored whole again without them.
+  - The rollback also drops the trigger. That takes ACCESS EXCLUSIVE on `profiles`, so it is the last change before COMMIT and waits at most 200 ms. If `profiles` is busy, it fails cleanly and can be run again.
+- Correction to the note above: the history protects only frozen days. A post deleted, a leave, or a game deleted while its day is still inside the window (up to about 4 weeks) is lost, because those days are recomputed each night. The plan said only same-day deletes are lost. Outcomes after a day froze (a game more than about 3 weeks after its invite) are not added to that day.
 
 ### WP 5.4 Invites reach people
 
