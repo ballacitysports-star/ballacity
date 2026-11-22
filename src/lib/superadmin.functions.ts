@@ -17,6 +17,7 @@ import {
 } from "@/lib/monetization/settings.server";
 import { SPORTS } from "@/lib/sample-data";
 import { maskSmallCount } from "@/lib/sport-activity";
+import { OPEN_REPORT_STATUSES } from "@/lib/report-status";
 import { AI_SETTING_KEYS, invalidateAiConfigCache } from "@/lib/ai/settings.server";
 
 export const superadminCheck = createServerFn({ method: "GET" })
@@ -43,6 +44,7 @@ export const superadminOverview = createServerFn({ method: "GET" })
       teams,
       gyms,
       availability,
+      openAvailability,
       reviews,
       flaggedReviews,
       reports,
@@ -63,10 +65,15 @@ export const superadminOverview = createServerFn({ method: "GET" })
       countRows(admin, "teams"),
       countRows(admin, "trainer_orgs"),
       countRows(admin, "player_availabilities"),
+      // Open: status "open" and not hidden by moderation. The hourly sweep moves run-out posts to "expired", so a post
+      // can count here for up to an hour after it runs out.
+      countRows(admin, "player_availabilities", (q) =>
+        q.eq("status", "open").is("hidden_at", null),
+      ),
       countRows(admin, "reviews"),
       countRows(admin, "reviews", (q) => q.eq("flagged", true)),
       countRows(admin, "user_reports"),
-      countRows(admin, "user_reports", (q) => q.eq("status", "open")),
+      countRows(admin, "user_reports", (q) => q.in("status", OPEN_REPORT_STATUSES)),
       countRows(admin, "messages"),
       countRows(admin, "purchases"),
       countRows(admin, "subscriptions"),
@@ -112,6 +119,7 @@ export const superadminOverview = createServerFn({ method: "GET" })
         teams,
         gyms,
         availability,
+        openAvailability,
         reviews,
         flaggedReviews,
         reports,

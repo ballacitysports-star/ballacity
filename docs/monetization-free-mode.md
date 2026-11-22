@@ -184,10 +184,11 @@ reservation.
   latter throws when the build has no publishable key — which would strand a
   subscriber with no way to cancel.
 - `createCheckoutSession` refuses server-side while Free Mode is on.
-- **Stripe status in this build:** `VITE_PAYMENTS_CLIENT_TOKEN` is commented out
-  in `.env.production`, so checkout cannot open at all. That is an environment
-  fact, not a product guarantee — Free Mode is the authoritative switch and does
-  not depend on it.
+- **Stripe status in this build:** `VITE_PAYMENTS_CLIENT_TOKEN` is set in
+  `.env.production` (line 4) to a live publishable key (`pk_live_…`). So the
+  build can open live checkout. Free Mode is what stops it:
+  `createCheckoutSession` refuses on the server while Free Mode is on
+  (`canCheckoutPrice` in `src/lib/monetization/access.ts`).
 
 ---
 
@@ -201,8 +202,9 @@ it changes no behaviour, only what they are told.
 to **Premium**, switch on `subscriptionsEnabled`, `paymentsEnabled`,
 `premiumFeaturesEnabled`, `checkoutEnabled`, then turn **Free Mode off** — which
 requires typing `MONETIZE` and giving a reason, and the dialog lists exactly
-which features are about to start being enforced. Set
-`VITE_PAYMENTS_CLIENT_TOKEN` if this build still has no Stripe key.
+which features are about to start being enforced. The build already has a live
+Stripe publishable key (§6). Live checkout also needs the server secret
+`STRIPE_LIVE_API_KEY` (`src/lib/stripe.server.ts`).
 
 **Stage 3 — other models.** Not built, but the architecture takes them without
 restructuring: `FeatureAccessMode` is a union (a new mode is one member plus one
@@ -256,7 +258,9 @@ nothing.
 `maintenance_mode`, `signups_enabled`, `games_creation_enabled`, `reels_enabled`
 and `announcement_banner` are seeded in `app_settings` and editable in
 SuperAdmin → Ops, but a full-text search of `src/` finds **no readers**. Nothing
-obeys them. Out of scope for this work; worth a follow-up.
+obeys them. Ops now marks each one "not enforced"
+(`src/lib/not-enforced-settings.ts`). The real maintenance switch is the
+`maintenance` row, edited in the Maintenance card.
 
 ### Why there is no `platform_settings` table
 

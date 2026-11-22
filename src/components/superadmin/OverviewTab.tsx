@@ -34,9 +34,13 @@ export function OverviewTab() {
         <Stat label="Games" value={c.games} hint={`${c.upcoming} upcoming`} />
         <Stat label="Teams / trainers" value={c.teams} />
         <Stat label="Gyms / orgs" value={c.gyms} />
-        <Stat label="Availability posts" value={c.availability} />
+        <Stat
+          label="Availability posts"
+          value={c.availability}
+          hint={`${c.openAvailability} open`}
+        />
         <Stat label="Reviews" value={c.reviews} hint={`${c.flaggedReviews} hidden`} />
-        <Stat label="Reports" value={c.reports} hint={`${c.openReports} open`} />
+        <Stat label="Reports" value={c.reports} hint={`${c.openReports} new`} />
         <Stat label="Messages" value={c.messages} />
         <Stat label="Join requests" value={c.joinRequests} hint={`${c.pendingJoins} pending`} />
         <Stat

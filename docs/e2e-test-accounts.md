@@ -19,6 +19,10 @@ creates the auth users, enriches their profiles, and inserts one sample
 player availability per player account. It is **admin-only** and **idempotent**
 — re-running it resets passwords and refreshes the sample availability.
 
+It refuses to run unless the server's `SUPABASE_URL` is a local Supabase or
+the E2E sandbox listed in `e2e/safety/target-guard.ts`. In production it
+throws before it reads or writes anything (`src/lib/seed-target.ts`).
+
 Trigger it from an admin session, e.g. via a temporary button or:
 
 ```ts

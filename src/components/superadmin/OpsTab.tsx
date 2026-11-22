@@ -28,6 +28,7 @@ import { MaintenancePanel } from "./MaintenancePanel";
 import { sendTestPushToSelf } from "@/lib/push.functions";
 import { PushOptInButton } from "./PushOptInButton";
 import { errorCode, userErrorMessage } from "@/lib/user-error";
+import { notEnforcedNote } from "@/lib/not-enforced-settings";
 
 /** Staff screen: the readable sentence, with the error code (when there is one) for support. */
 function staffErrorMessage(e: unknown, fallback: string): string {
@@ -288,7 +289,7 @@ function parseValue(raw: string): unknown {
   }
 }
 
-function SettingRow({
+export function SettingRow({
   setting,
   pending,
   onSave,
@@ -300,6 +301,7 @@ function SettingRow({
   const isBool = typeof setting.value === "boolean";
   const [text, setText] = useState(isBool ? "" : JSON.stringify(setting.value));
   const [isPublic, setIsPublic] = useState(!!setting.is_public);
+  const notEnforced = notEnforcedNote(setting.key);
 
   return (
     <div className="rounded-lg border p-3 space-y-2">
@@ -309,8 +311,14 @@ function SettingRow({
           {setting.description ? (
             <div className="text-[11px] text-muted-foreground">{setting.description}</div>
           ) : null}
+          {notEnforced ? (
+            <div className="text-[11px] font-medium text-destructive">{notEnforced}</div>
+          ) : null}
         </div>
-        {setting.is_public ? <Badge variant="secondary">public</Badge> : null}
+        <div className="flex shrink-0 gap-1">
+          {notEnforced ? <Badge variant="outline">not enforced</Badge> : null}
+          {setting.is_public ? <Badge variant="secondary">public</Badge> : null}
+        </div>
       </div>
       {isBool ? (
         <label className="flex items-center gap-2 text-xs">
