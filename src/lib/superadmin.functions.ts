@@ -19,6 +19,13 @@ import { SPORTS } from "@/lib/sample-data";
 import { maskSmallCount } from "@/lib/sport-activity";
 import { OPEN_REPORT_STATUSES } from "@/lib/report-status";
 import { AI_SETTING_KEYS, invalidateAiConfigCache } from "@/lib/ai/settings.server";
+import {
+  FUNNEL_MINOR_COUNTS_KEY,
+  funnelWindowFrom,
+  parseFunnelReport,
+  type FunnelResult,
+} from "@/lib/funnel";
+import { isMissingFunctionError } from "@/lib/managed-profile-names";
 
 export const superadminCheck = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -661,6 +668,57 @@ export const superadminPaymentHealth = createServerFn({ method: "POST" })
     return health as import("@/lib/payment-health").PaymentHealth;
   });
 
+/** The funnel functions (20261127100000) are not in the generated client types yet. */
+type UntypedRpc = (
+  fn: string,
+  args?: Record<string, unknown>,
+) => PromiseLike<{ data: unknown; error: { code?: string; message?: string } | null }>;
+
+/**
+ * WP 5.2: the weekly pilot funnel for the Funnel card. Runs as the signed-in user, so superadmin_funnel's own superadmin
+ * check applies on top of the one here. The database masks every count from 1 to 4; parseFunnelReport masks again.
+ * `available: false` when the function is not on this database yet (the card can ship before the migration).
+ */
+export const superadminFunnel = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { weeks?: number } | undefined) =>
+    z.object({ weeks: z.number().int().min(1).max(26).optional() }).parse(d ?? {}),
+  )
+  .handler(async ({ context, data }): Promise<FunnelResult> => {
+    await assertSuperadmin(context);
+    const args = data.weeks ? { _from: funnelWindowFrom(data.weeks) } : {};
+    const { data: raw, error } = await (context.supabase.rpc as unknown as UntypedRpc)(
+      "superadmin_funnel",
+      args,
+    );
+    if (error) {
+      if (isMissingFunctionError(error)) return { available: false };
+      throw new Error(error.message || "Couldn't load the funnel.");
+    }
+    const report = parseFunnelReport(raw);
+    if (!report) throw new Error("Couldn't load the funnel.");
+    return { available: true, report };
+  });
+
+/**
+ * WP 5.2: turn the funnel's under-18 / unknown-age column on or off. Only after counsel's sign-off (pilot checklist
+ * B1). Runs as the signed-in superadmin: the database checks the role, requires the reason and writes the audit row.
+ */
+export const superadminSetFunnelMinorCounts = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { enabled: boolean; reason: string }) =>
+    z.object({ enabled: z.boolean(), reason: z.string().max(500) }).parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    await assertSuperadmin(context);
+    const { data: out, error } = await (context.supabase.rpc as unknown as UntypedRpc)(
+      "superadmin_set_funnel_minor_counts",
+      { _enabled: data.enabled, _reason: data.reason },
+    );
+    if (error) throw new Error(error.message || "Couldn't change the under-18 column.");
+    return out as { enabled: boolean };
+  });
+
 export const superadminListPayments = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { limit?: number } | undefined) =>
@@ -833,6 +891,11 @@ export const superadminSetSetting = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }) => {
     await assertSuperadmin(context);
+    // The under-18 funnel switch changes only through superadmin_set_funnel_minor_counts, which records who and why
+    // (the database refuses a write that turns it on from anywhere else).
+    if (data.key === FUNNEL_MINOR_COUNTS_KEY) {
+      throw new Error("FUNNEL_MINOR_COUNTS_LOCKED: change it from the Funnel card.");
+    }
     const admin = await getAdmin();
     const { data: before } = await admin
       .from("app_settings")

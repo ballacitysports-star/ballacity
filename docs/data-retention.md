@@ -62,6 +62,7 @@ These tables are not in `RETENTION_RULES`, so `/account/data` does not show them
 | `session_activity` | Session start, last heartbeat and time zone. No pages or content. | No expiry. | Deleted (`src/lib/account-purge.server.ts`). |
 | `game_invites` | Host invites to a game: status and an optional note (up to 500 characters). | No expiry. Deleted with the game. | The invitee's invites are deleted (foreign key to `auth.users`). Invites a deleted host sent stay with the game: `host_id` has no foreign key. |
 | `late_cancellations` | Late leaves from games, tryouts and sessions: who, which event, how late. | No expiry. | **Kept, with the user id.** `user_id` has no foreign key, and the account purge does not delete these rows. |
+| `private_sec.funnel_daily` | The pilot funnel's adult totals per New York day (WP 5.3). Counts only: no user, game or invite id (a check refuses anything else), no under-18 numbers. Not readable by any API role. | No expiry yet. Written nightly by `snapshot-funnel-daily` (08:47 UTC); a day is rewritten until it is three to four weeks old, then frozen. Stored days are deleted (and counted again live) when an adult counted in them is found to be a minor. Dropping it needs an export first (`docs/rollbacks/20261127110000_funnel_daily_history.down.sql`). | Nothing to remove: rows carry no account link. |
 
 ## Security properties
 
