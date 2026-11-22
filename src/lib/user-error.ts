@@ -143,6 +143,11 @@ export const USER_ERROR_MESSAGES = {
   FOLLOW_LOCKED: "A parent or guardian needs to approve your account first.",
   FOLLOW_NOT_ALLOWED: "You can't change this account's followers.",
   FORBIDDEN: "You don't have access to that.",
+  // Superadmin only (20261127100000): the funnel's under-18 column changes only through the Funnel card, with a reason.
+  FUNNEL_MINOR_COUNTS_LOCKED:
+    "The under-18 funnel column changes only from the Funnel card on the Overview tab, which records who changed it and why.",
+  FUNNEL_MINOR_COUNTS_REASON_REQUIRED:
+    "Say why. To turn the under-18 column on, name counsel's sign-off and its date (at least 20 characters).",
   GAME_APPROVAL_REQUIRED: "The host has to approve your request before you can join.",
   GAME_CANCELLED: "This game was cancelled by the host.",
   // A host reopening a game that is over or called off (20261125100000).
