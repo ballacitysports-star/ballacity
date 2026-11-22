@@ -34,6 +34,9 @@ SELECT t.eq(
     WHERE sig NOT IN (
       -- private_sec is not exposed by the API; row level security policies call these.
       'private_sec.can_comment_on_minor_content(_commenter uuid, _content_owner uuid)',
+      -- The comment and reaction read policies (granted to anon) call this: it is can_comment_on_minor_content plus the
+      -- age-cohort hold, so it can only answer no where that function answers yes (20261128110000, test 992).
+      'private_sec.can_read_engagement(_viewer uuid, _owner uuid, _written_at timestamp with time zone)',
       'private_sec.comment_subject_owner(_subject_type text, _subject_id text)',
       'private_sec.event_is_listed(_event uuid)',
       'private_sec.guardian_public_profile(_user uuid)',
