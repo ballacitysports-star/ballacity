@@ -18,7 +18,7 @@ policy decision.
 | Parent access / correction / deletion | GREEN | `/parent` Parent Center + `parent_requests` workflow |
 | Consent revocation applies restrictions | GREEN | `revoke_parental_consent` flips state; `child_features_locked` gates messaging, reels, hosting, availability server-side |
 | No conditioning participation on excess data | GREEN | Optional fields remain optional |
-| No targeted ads / behavioral tracking for minors | GREEN | `trackingAllowed()` returns all-false for every minor cohort |
+| No targeted ads / behavioral tracking for minors | GREEN | No ads. GA4 loads only for confirmed adults with no age review pending (`src/components/AnalyticsHost.tsx`, `src/lib/analytics.ts`). The old `trackingAllowed()` helper allowed analytics for 16-17s and was removed. |
 | No child data for AI training | YELLOW | Opt-in defaults off and disclosed; vendor contract terms require counsel review |
 | Retention schedule | YELLOW | `docs/data-retention.md` exists; child-specific retention periods need policy sign-off |
 
