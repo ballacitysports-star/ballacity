@@ -11,6 +11,8 @@ const SKIP_EXACT = new Set(["/", "/auth", "/reset-password"]);
 const SKIP_PREFIXES = [
   "/auth/",
   "/reset-password/",
+  // An emailed handover link carries a one-time token in its path: never remembered.
+  "/handover/",
   "/api/",
   "/.well-known/",
   "/.mcp/",

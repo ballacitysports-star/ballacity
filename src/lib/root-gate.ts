@@ -15,6 +15,8 @@ export const PUBLIC_ROUTES: readonly string[] = [
   // Staff entry: signed-out visitors see the single sign-in button.
   "/staff",
   "/reset-password",
+  // The emailed link of a managed-account handover: the adult opens it signed out. The token is the credential.
+  "/handover",
   "/.lovable/oauth/consent",
   // Legal documents must be readable before/without signing in.
   "/terms",

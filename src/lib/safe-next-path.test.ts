@@ -116,6 +116,7 @@ describe("sanitizeNextPath: pages on this site", () => {
     "/x/../auth",
     "/reset-password",
     "/reset-password/abc",
+    "/handover/abc",
   ])("refuses %j, which would loop back through sign-in", (path) => {
     expect(sanitizeNextPath(path)).toBeUndefined();
   });

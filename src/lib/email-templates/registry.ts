@@ -1,17 +1,18 @@
-import type { ComponentType } from 'react'
-import { template as guardianApprovalTemplate } from './guardian-approval'
-import { template as tryoutInviteTemplate } from './tryout-invite'
-import { template as tryoutParentInviteTemplate } from './tryout-parent-invite'
-import { template as teamRosterPrintTemplate } from './team-roster-print'
-import { template as paymentSubmittedTemplate } from './payment-submitted'
+import type { ComponentType } from "react";
+import { template as guardianApprovalTemplate } from "./guardian-approval";
+import { template as tryoutInviteTemplate } from "./tryout-invite";
+import { template as tryoutParentInviteTemplate } from "./tryout-parent-invite";
+import { template as teamRosterPrintTemplate } from "./team-roster-print";
+import { template as paymentSubmittedTemplate } from "./payment-submitted";
+import { template as managedHandoverTemplate } from "./managed-handover";
 
 export interface TemplateEntry {
-  component: ComponentType<any>
-  subject: string | ((data: Record<string, any>) => string)
-  displayName?: string
-  previewData?: Record<string, any>
+  component: ComponentType<any>;
+  subject: string | ((data: Record<string, any>) => string);
+  displayName?: string;
+  previewData?: Record<string, any>;
   /** Fixed recipient — overrides caller-provided recipientEmail when set. */
-  to?: string
+  to?: string;
 }
 
 /**
@@ -23,9 +24,10 @@ export interface TemplateEntry {
  *   // then add to TEMPLATES: 'welcome': welcomeTemplate
  */
 export const TEMPLATES: Record<string, TemplateEntry> = {
-  'guardian-approval': guardianApprovalTemplate,
-  'tryout-invite': tryoutInviteTemplate,
-  'tryout-parent-invite': tryoutParentInviteTemplate,
-  'team-roster-print': teamRosterPrintTemplate,
-  'payment-submitted': paymentSubmittedTemplate,
-}
+  "guardian-approval": guardianApprovalTemplate,
+  "tryout-invite": tryoutInviteTemplate,
+  "tryout-parent-invite": tryoutParentInviteTemplate,
+  "team-roster-print": teamRosterPrintTemplate,
+  "payment-submitted": paymentSubmittedTemplate,
+  "managed-handover": managedHandoverTemplate,
+};
