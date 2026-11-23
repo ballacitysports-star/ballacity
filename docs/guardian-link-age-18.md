@@ -185,6 +185,9 @@ nobody's switch is involved and the guardian's authority is not what holds the p
 and when to age the stored cohort (a person-visible change: reels, profile visibility). Until then they behave exactly as
 they did for an 18-year-old before this change; a guardian link ending neither causes nor worsens them.
 
+**Followed up (owner delegated the recommended option, 2026-11-21): the stored cohort now ages to `adult` at 18, only upward, only
+for a known, unmanaged adult, by a separate daily sweep. See `docs/age-cohort-at-18.md`.**
+
 ## 3. Managed accounts: decided 2026-11-21 (handover, option 1), built in 20261128100000
 
 > **Update 2026-11-21.** The owner delegated this to the recommended option, and it is built as a guardian-started,
