@@ -36,7 +36,7 @@ import { POST_BLOCKED_MESSAGE } from "@/lib/post-moderation";
  *
  * Vocabulary: game, spot, host, venue (facilities and gyms), listing (claimable team and gym pages), invite, clip,
  * date of birth, parent or guardian. Codes that only mean an app bug or a cron failure with no better words than
- * "something went wrong" (UNKNOWN_LISTING_KIND, INVALID_WINDOW, INVALID_WORKER_PATH), and codes only superadmin tools
+ * "something went wrong" (UNKNOWN_LISTING_KIND, INVALID_WINDOW, INVALID_LIMIT, INVALID_WORKER_PATH), and codes only superadmin tools
  * or no screen at all can meet (Content Studio, device pairing, hotfix guards), are left out on purpose, so the
  * caller's own fallback names what failed. user-error.test.ts reads every code both migration folders raise and fails
  * on one that is in neither place.
