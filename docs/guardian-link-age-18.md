@@ -202,7 +202,10 @@ strand it, so:
   page's manual-claim hold (#440) still applies to it (its manual claim needs the guardian's approval for the game).
 - Visible: the sweep reports `managed_waiting` (a count) and tells the managing guardian once, in the app: "A managed
   account has turned 18 ... stays linked to you for now. Contact support to plan handing it over." (once, recorded in
-  `guardian_link_age_events` with kind `managed_notice`). The preview query counts them.
+  `guardian_link_age_events` with kind `managed_notice`). The preview query counts them. Since migration
+  `20261130100000_managed_notice_points_to_handover` the sentence reads "... so you still manage it until they complete a
+  handover. You can start one from your Parent Center: open their page and choose "Start handover"." (the same notice,
+  once, to the same guardian; notices sent before keep the old words).
 - The Parent Center page says a managed account stays linked.
 
 Handover options, for the owner to choose (nothing here is built):

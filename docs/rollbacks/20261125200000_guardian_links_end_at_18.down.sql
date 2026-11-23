@@ -27,6 +27,10 @@
 -- not wanted.
 -- It stops, changing nothing, if any function the migration touched no longer has the definition the migration gave it
 -- (a later migration changed it): a person needs to look first.
+-- ORDER: if 20261130100000_managed_notice_points_to_handover is applied (it redefines private_sec.end_adult_guardian_links
+-- with new notice text), roll THAT back first: docs/rollbacks/20261130100000_managed_notice_points_to_handover.down.sql.
+-- This script checks that function's definition below and refuses, changing nothing, while the new one is in place (its
+-- md5 is not the one listed). The check is unchanged on purpose: do not edit the md5 to get past it.
 -- It refuses to run unless the session sets the confirmation first:
 --     SET app.confirm_guardian_links_end_at_18_rollback = 'yes';
 --     (or PGOPTIONS="-c app.confirm_guardian_links_end_at_18_rollback=yes")
