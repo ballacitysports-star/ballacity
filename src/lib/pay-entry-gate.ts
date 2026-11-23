@@ -39,6 +39,7 @@
  * payRiskAckView (below) decides "Before you join" on the pay page (docs/paid-path-gates.md section 7, Option B).
  */
 import type { FeatureDecision } from "@/lib/child-policy";
+import type { GamePaymentTerms } from "@/lib/payments";
 import type { JoinState } from "@/lib/live-status";
 import {
   ageGateMessage,
@@ -692,3 +693,66 @@ export function payEntryFlow(input: {
   if (input.flow === "error") return "error";
   return input.rosterReloading ? "loading" : input.flow;
 }
+
+/**
+ * The payment terms a viewer who has not been cleared to pay may read (docs/paid-path-gates.md section 6 (c), owner
+ * instruction 2026-11-21): the entry fee PayPal will charge, the deadline, the accepted payment apps by name and whether
+ * the host approves players first. They come from public.get_game_payment_terms, which answers only a signed-in caller who
+ * may see the game and passes the rules the pay page applies (no block, suspension, age range, full roster, guardian
+ * rule: private_sec.payment_claim_block), and which never carries a handle or the host's free text. The handles and
+ * the host's general instructions keep their own entitlement (the settings row and get_game_host_payment_methods).
+ *
+ * This is the one place the app decides whether to show them. It only ever shows LESS than the server answered:
+ *   - null when the viewer reads the settings row themselves (the payee, an approved requester, a payer or a participant:
+ *     the row's own fee, deadline and methods are shown, unchanged), and for the host;
+ *   - null while the page's own entry check has not answered or blocks the viewer (payEntryView 'checking',
+ *     'check_failed' or 'blocked'), so a viewer the page refuses is told nothing about how to pay (the server refuses the
+ *     same viewers for the rules it knows; the page also holds back a game in progress);
+ *   - null when the read did not answer (no function yet, an error, a timeout: the caller passes null), so a failed read is
+ *     never shown as terms and never as "no payment"; the page shows what it showed before.
+ * The terms are for display only. They never decide who may pay: payEntryView, payAwaitsApproval and the server do.
+ */
+export type PayTermsView = {
+  /** The entry fee, USD, > 0. */
+  entryFee: number;
+  /** ISO timestamp, or null when the host set no deadline. */
+  deadline: string | null;
+  /** The accepted payment apps by name; empty when the host lists none that is shown (PayPal checkout is not a listed method). */
+  methodNames: string[];
+  /** The host approves players before they pay. */
+  approvalFirst: boolean;
+};
+
+export function payTermsView(input: {
+  /** get_game_payment_terms for this viewer, or null when it told nothing or failed. */
+  terms: GamePaymentTerms | null;
+  /** The viewer reads the game's settings row (getGamePaymentSettings returned it). */
+  settingsReadable: boolean;
+  isHost: boolean;
+  /**
+   * The pay page's own entry answer (payEntryView().kind). Omitted on the game page, which has no entry check: it shows
+   * the policy block to every viewer who is not the host.
+   */
+  entry?: PayEntryView["kind"];
+}): PayTermsView | null {
+  const { terms } = input;
+  if (!terms || input.settingsReadable || input.isHost) return null;
+  if (input.entry !== undefined && input.entry !== "clear") return null;
+  if (!Number.isFinite(terms.entryFee) || terms.entryFee <= 0) return null;
+  return {
+    entryFee: terms.entryFee,
+    deadline: terms.paymentDeadline,
+    methodNames: terms.methods.map((m) => m.name),
+    approvalFirst: terms.requiresApproval,
+  };
+}
+
+/** The calm line under the amount: how the host takes payment, before the viewer is cleared to pay. */
+export function payTermsMethodsLine(view: Pick<PayTermsView, "methodNames">): string | null {
+  const names = view.methodNames;
+  if (names.length === 0) return null;
+  return `This host accepts ${names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`}.`;
+}
+
+/** Said under the terms of a game whose host approves players before they pay (the handles come after approval). */
+export const PAY_TERMS_APPROVAL_LINE = "The payment details appear once the host approves you.";
