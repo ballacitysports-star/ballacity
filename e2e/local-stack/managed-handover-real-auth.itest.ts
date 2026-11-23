@@ -27,7 +27,9 @@
  */
 import { type Session, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { failureBehind } from "@/lib/error-report";
 import { isManagedEmail, isManagedUser } from "@/lib/managed-children";
+import { handoverErrorMessage } from "@/lib/managed-handover";
 import {
   createSeed,
   hashToken,
@@ -64,7 +66,7 @@ describe("the local stack is the real thing", () => {
     const body = (await health.json()) as { name?: string; version?: string };
     expect(body.name).toBe("GoTrue");
     seen["gotrue"] = body.version;
-    // The twelve functions of 20261128100000 exist (a signed-out call is refused, not "not found").
+    // Migration 20261128100000 is applied: one of its functions answers a signed-out call with a refusal, not "not found".
     const probe = await client().rpc("guardian_managed_handovers" as never);
     expect(probe.error?.code, "migration 20261128100000 is not applied").not.toBe("PGRST202");
   });
@@ -183,6 +185,47 @@ describe("(2) app_metadata.managed = false clears the claim in the signed JWT af
     expect(afterMeta["managed"]).not.toBe(true);
     expect(afterMeta["managed_by"] ?? null).toBeNull();
     expect(isManagedUser({ app_metadata: afterMeta })).toBe(false);
+  });
+});
+
+describe("GoTrue drops outstanding magic links when the email or phone changes through the Admin API", () => {
+  // plant() below makes its magic link LAST because of this, and the doc (section 6) states it, so it is kept as a test.
+  async function linkThen(change: Record<string, unknown>) {
+    const placeholder = placeholderEmail();
+    const u = must(
+      await admin.auth.admin.createUser({
+        email: placeholder,
+        email_confirm: true,
+        app_metadata: { managed: true, managed_by: globalThis.crypto.randomUUID() },
+      }),
+      "create",
+    ).user;
+    const hash = must(
+      await admin.auth.admin.generateLink({ type: "magiclink", email: placeholder }),
+      "magic link",
+    ).properties.hashed_token;
+    expect((await admin.auth.admin.updateUserById(u.id, change)).error).toBeNull();
+    return client().auth.verifyOtp({ token_hash: hash, type: "magiclink" });
+  }
+
+  it("an email change ends the link", async () => {
+    const v = await linkThen({ email: `realauth-ml-${rand()}@example.test`, email_confirm: true });
+    seen["magic_link_after_email_change"] = v.error?.message ?? "VERIFIED";
+    expect(v.error).not.toBeNull();
+  });
+
+  it("a phone change ends the link", async () => {
+    const v = await linkThen({
+      phone: `+1555${Math.floor(1000000 + Math.random() * 8999999)}`,
+      phone_confirm: true,
+    });
+    seen["magic_link_after_phone_change"] = v.error?.message ?? "VERIFIED";
+    expect(v.error).not.toBeNull();
+  });
+
+  it("control: a metadata-only update leaves the link working", async () => {
+    const v = await linkThen({ user_metadata: { display_name: "Renamed" } });
+    expect(v.error, `a link survives a metadata-only update: ${v.error?.message}`).toBeNull();
   });
 });
 
@@ -306,8 +349,8 @@ describe("the whole handover, with the real server code", () => {
       headers: { apikey: stack.publishableKey, "Content-Type": "application/json" },
       body: JSON.stringify({ refresh_token: switched.session.refresh_token }),
     });
-    expect(raw.ok).toBe(false);
     seen["4_raw_refresh_status"] = raw.status;
+    expect(raw.status).toBe(400);
     // The access token the guardian still holds (valid for its hour as a signature, but its session is gone).
     const me = await fetch(`${stack.url}/auth/v1/user`, {
       headers: {
@@ -316,6 +359,7 @@ describe("the whole handover, with the real server code", () => {
       },
     });
     seen["4_old_access_token_on_user_endpoint"] = me.status;
+    expect(me.status).toBe(403);
     const upd = await fetch(`${stack.url}/auth/v1/user`, {
       method: "PUT",
       headers: {
@@ -326,8 +370,21 @@ describe("the whole handover, with the real server code", () => {
       body: JSON.stringify({ password: "Guardian-Takes-Back-1!" }),
     });
     seen["4_old_access_token_updateUser_status"] = upd.status;
-    expect(upd.ok).toBe(false);
+    expect(upd.status).toBe(403);
     expect((await signInResult(s.adultEmail, "Guardian-Takes-Back-1!")).ok).toBe(false);
+    // The data API (PostgREST) checks only the token's signature and expiry, not the session, so the same access token still
+    // authenticates there for the rest of its hour (JWT_EXP). Recorded, not asserted: it is a known limit of access tokens
+    // (docs/managed-account-handover.md, "Sessions already issued"), not something this handover can change.
+    const rest = await fetch(`${stack.url}/rest/v1/profiles?select=id&id=eq.${s.childId}`, {
+      headers: {
+        apikey: stack.publishableKey,
+        Authorization: `Bearer ${switched.session.access_token}`,
+      },
+    });
+    seen["4_old_access_token_on_postgrest"] = {
+      status: rest.status,
+      rows_returned: rest.ok ? ((await rest.json()) as unknown[]).length : null,
+    };
   });
 
   it("(4) a magic link the guardian made earlier no longer verifies", async () => {
@@ -476,7 +533,7 @@ describe("finish_managed_handover clears what a guardian planted, on the real au
     ).toBeNull();
   });
 
-  it("database on its own: finish_managed_handover replaces the late password, removes the extra identity, second factor and phone, and ends every session", async () => {
+  it("database on its own: finish_managed_handover replaces the late password, removes the extra identity, second factor, phone and pending tokens, and ends every session", async () => {
     const mod = await import("@/lib/managed-handover.server");
     const p = await plant(mod);
     const late = await claimUpdateThenGuardianPlantsLate(p, false);
@@ -501,12 +558,41 @@ describe("finish_managed_handover clears what a guardian planted, on the real au
         `SELECT count(*) FROM auth.identities WHERE user_id = '${p.s.childId}' AND provider <> 'email'`,
       ),
     ).not.toBe("0");
+    // GoTrue's own Admin update already dropped its one-time tokens, so what finish step 2b deletes would never be seen working.
+    // Plant, by SQL (the real columns of the real auth schema), what a switched-in guardian could leave: a recovery one-time
+    // token, and a pending email change with its tokens, a pending phone change, a confirmation and a reauthentication token.
+    const TOKEN_COLUMNS = [
+      "confirmation_token",
+      "recovery_token",
+      "email_change_token_new",
+      "email_change_token_current",
+      "phone_change_token",
+      "reauthentication_token",
+      "email_change",
+      "phone_change",
+    ];
+    const tag = rand(); // some of these columns are unique-indexed
+    localSql(
+      `INSERT INTO auth.one_time_tokens (id, user_id, token_type, token_hash, relates_to)
+         VALUES (gen_random_uuid(), '${p.s.childId}', 'recovery_token', 'realauth-${rand()}', '${p.s.adultEmail}');
+       UPDATE auth.users SET ${TOKEN_COLUMNS.map((c) => `${c} = 'planted-${c}-${tag}'`).join(", ")} WHERE id = '${p.s.childId}';`,
+    );
+    const filled = () =>
+      Number(
+        localSql(
+          `SELECT count(*) FROM auth.users u, jsonb_each_text(to_jsonb(u)) kv WHERE u.id = '${p.s.childId}' AND kv.key IN (${TOKEN_COLUMNS.map((c) => `'${c}'`).join(", ")}) AND kv.value <> ''`,
+        ),
+      );
+    // Control: it is all there before finish (so "gone afterwards" means finish removed it, and the column names are real).
+    expect(count("one_time_tokens"), "planted one-time token").toBe(1);
+    expect(filled(), "planted token columns of auth.users").toBe(TOKEN_COLUMNS.length);
     const fin = await admin.rpc(
       "finish_managed_handover" as never,
       { _token_hash: p.hash } as never,
     );
     expect(fin.error, `finish_managed_handover: ${fin.error?.message}`).toBeNull();
     expect((fin.data as { ok?: boolean }).ok, JSON.stringify(fin.data)).toBe(true);
+    expect(filled(), "token columns of auth.users after finish").toBe(0);
 
     expect((await signInResult(p.s.adultEmail, LATE)).ok, "late password").toBe(false);
     expect((await signInResult(p.s.adultEmail, EARLY)).ok, "early password").toBe(false);
@@ -554,8 +640,12 @@ describe("a handover that does not finish leaves the account managed, and can be
       `CREATE FUNCTION public.${fn}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected failure for the real-auth test'; END $$;
        CREATE TRIGGER ${fn} BEFORE INSERT ON public.notifications FOR EACH ROW WHEN (NEW.user_id = '${s.guardianId}') EXECUTE FUNCTION public.${fn}();`,
     );
+    let failed: unknown = null;
     try {
-      await expect(mod.completeHandover(token)).rejects.toThrow();
+      failed = await mod.completeHandover(token).then(
+        () => null,
+        (e: unknown) => e,
+      );
     } finally {
       localSql(`DROP TRIGGER ${fn} ON public.notifications; DROP FUNCTION public.${fn}();`);
     }
@@ -575,8 +665,31 @@ describe("a handover that does not finish leaves the account managed, and can be
         )?.["email"] as string,
       ),
     };
+    // It failed at the finish step, because of the injected trigger: not earlier (the claim and the Admin update had run, which
+    // is why the record had to be put back) and not for another reason.
+    expect(failed, "completeHandover should have thrown").toBeInstanceOf(Error);
+    // What the member reads is the HANDOVER_FAILED sentence; the database's own error (the injected one) is what it stands for.
+    expect((failed as Error).message).toBe(handoverErrorMessage("HANDOVER_FAILED"));
+    const behind = failureBehind(failed) as { message?: string };
+    seen["failed_finish_cause"] = behind.message;
+    expect(behind.message).toContain("injected failure for the real-auth test");
     expect(isManagedUser(rec)).toBe(true);
     expect(isManagedEmail(rec.email)).toBe(true);
+    // The same placeholder as before, on the user and on the email identity (not a new one, not the adult's address).
+    expect(rec.email).toBe(s.placeholder);
+    expect(seen["failed_finish_record"]).toMatchObject({
+      managed_by_is_guardian: true,
+      address_is_new_placeholder: false,
+      identity_email_is_placeholder: true,
+    });
+    expect(
+      (
+        rec.identities?.find((i) => i.provider === "email")?.identity_data as Record<
+          string,
+          unknown
+        >
+      )?.["email"],
+    ).toBe(s.placeholder);
     const { count } = await admin
       .from("managed_accounts")
       .select("child_user_id", { count: "exact", head: true })

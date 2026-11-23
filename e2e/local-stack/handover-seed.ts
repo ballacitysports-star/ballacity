@@ -79,6 +79,14 @@ export function createSeed(stack: LocalStack) {
     const password = /^LOCAL_DB_PASSWORD=(.*)$/m.exec(env)?.[1]?.trim();
     const port = /^LOCAL_DB_PORT=(.*)$/m.exec(env)?.[1]?.trim() || "54322";
     if (!password) throw new Error("no LOCAL_DB_PASSWORD in e2e/local-stack/.state/compose.env");
+    // The database is the one the state file names (loopback, below), so the API the test talks to must be that stack's too:
+    // a SUPABASE_URL from some other local stack would otherwise be paired with this stack's database.
+    const stateApi = /^LOCAL_API_URL=(.*)$/m.exec(env)?.[1]?.trim();
+    if (!stateApi || new URL(stateApi).port !== new URL(stack.url).port) {
+      throw new Error(
+        "SUPABASE_URL is not the stack in e2e/local-stack/.state (source .state/env.sh of the stack that is up).",
+      );
+    }
     const r = spawnSync("psql", ["-X", "-q", "-t", "-A", "-v", "ON_ERROR_STOP=1"], {
       input: sql,
       encoding: "utf8",
