@@ -54,6 +54,8 @@ describe("categoryFor", () => {
     ["team_announcement", "gameUpdates"],
     ["nearby_game", "nearbyGames"],
     ["game_invite", "invitations"],
+    ["game_invite_accepted", "gameUpdates"],
+    ["game_attendance_prompt", "gameReminders"],
     ["org_membership", "invitations"],
     ["payment_received", "payments"],
     ["moderation", "safety"],

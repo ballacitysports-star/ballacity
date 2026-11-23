@@ -28,10 +28,15 @@ export async function getMyGameReminderOffsets(gameId: string): Promise<number[]
   return Array.isArray(offsets) ? offsets.map(Number).filter(Number.isFinite) : null;
 }
 
-/** Upsert the viewer's reminder lead times for a game (empty array = none). */
+/**
+ * Upsert the viewer's reminder lead times for a game (empty array = none). With `keepExisting`, only a game with no saved
+ * choice gets them: the database keeps a row that is already there (ON CONFLICT DO NOTHING), so neither a choice saved
+ * earlier nor one saved at the same moment is replaced.
+ */
 export async function saveMyGameReminderOffsets(
   gameId: string,
   offsets: number[],
+  opts: { keepExisting?: boolean } = {},
 ): Promise<boolean> {
   const uid = await getCurrentUserId();
   if (!uid) return false;
@@ -46,7 +51,7 @@ export async function saveMyGameReminderOffsets(
       // Re-arm delivery whenever the player changes their choices.
       last_sent_offset: null,
     } as any,
-    { onConflict: "game_id,user_id" },
+    { onConflict: "game_id,user_id", ignoreDuplicates: !!opts.keepExisting },
   );
   if (error) {
     console.warn("game reminder save failed", error.message);

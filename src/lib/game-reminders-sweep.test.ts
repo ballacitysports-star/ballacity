@@ -831,7 +831,10 @@ describe("wiring", () => {
   it("the scheduled endpoint is worker-only and the app's flush uses the same sweep", () => {
     const route = readFileSync("src/routes/api/public/reminders/run.ts", "utf8");
     expect(route).toMatch(/authorizeWorker\(request\)\) !== "ok"/);
-    expect(route).toMatch(/sendDueGameReminders\(supabaseAdmin as never\)/);
+    // The scheduled run goes through runScheduledSweeps (WP 5.4 / 5.6), whose first job is the reminders.
+    expect(route).toMatch(/runScheduledSweeps\(\s*supabaseAdmin as never,?\s*\)/);
+    const sweeps = readFileSync("src/lib/game-reminders.server.ts", "utf8");
+    expect(sweeps).toMatch(/sendDueGameReminders\(admin, \{ clock, budgetMs: left\(\) \}\)/);
     const fn = readFileSync("src/lib/game-reminders.functions.ts", "utf8");
     expect(fn).toMatch(
       /sendDueGameReminders\(supabaseAdmin as never, \{\s*userId: context\.userId/,

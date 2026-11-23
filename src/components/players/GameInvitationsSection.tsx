@@ -7,6 +7,7 @@ import {
   gameInviteErrorMessage,
   listMyPendingGameInvites,
   respondToGameInvite,
+  saveDefaultRemindersOnAccept,
   type GameInviteWithGame,
 } from "@/lib/game-invites";
 
@@ -55,6 +56,8 @@ export function GameInvitationsSection({
       const res = await respondToGameInvite(row.id, accept);
       if (res.status === "accepted") {
         setAccepted((a) => ({ ...a, [row.id]: row.game_id }));
+        // Reminders as if they had joined from the game page; not awaited, and a failure never reaches the catch below.
+        void saveDefaultRemindersOnAccept(row.game_id).catch(() => {});
         // A free game with no guardian step puts the player on the roster as they accept (20261127120000); otherwise a
         // payment or a guardian's approval is still to come on the game page.
         toast.success(res.on_roster ? "You're in." : "You're in. Open the game to finish joining.");

@@ -9,12 +9,15 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 const env = vi.hoisted(() => ({
   invite: null as Record<string, unknown> | null,
   respond: vi.fn(),
+  saveReminders: vi.fn(),
+  toast: { error: vi.fn(), success: vi.fn() },
 }));
 
-vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: env.toast }));
 vi.mock("@/lib/game-invites", () => ({
   getGameInvite: async () => env.invite,
   respondToGameInvite: env.respond,
+  saveDefaultRemindersOnAccept: env.saveReminders,
   gameInviteErrorMessage: () => "nope",
 }));
 
@@ -37,6 +40,10 @@ const pending = (over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   env.invite = pending();
   env.respond.mockReset();
+  env.saveReminders.mockReset();
+  env.saveReminders.mockResolvedValue(undefined);
+  env.toast.error.mockReset();
+  env.toast.success.mockReset();
 });
 afterEach(() => cleanup());
 
@@ -89,5 +96,55 @@ describe("GameInviteBanner", () => {
     env.invite = pending({ status: "cancelled" });
     render(<GameInviteBanner inviteId="inv1" viewerId="me" onAnswered={() => {}} />);
     expect(await screen.findByText("The host withdrew this invitation.")).toBeTruthy();
+  });
+});
+
+describe("GameInviteBanner reminders (WP 5.4)", () => {
+  it("saves the default reminders for the game once the invitee accepts", async () => {
+    env.respond.mockResolvedValue({ status: "accepted", join_request_id: "jr", on_roster: true });
+    const onAnswered = vi.fn();
+    render(<GameInviteBanner inviteId="inv1" viewerId="me" onAnswered={onAnswered} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
+    await waitFor(() => expect(onAnswered).toHaveBeenCalled());
+    expect(env.saveReminders).toHaveBeenCalledTimes(1);
+    expect(env.saveReminders).toHaveBeenCalledWith("g1");
+  });
+
+  it.each([["declined"], ["full"], ["expired"], ["cancelled"]])(
+    "saves no reminders when the answer is %s",
+    async (status) => {
+      env.respond.mockResolvedValue({ status });
+      render(<GameInviteBanner inviteId="inv1" viewerId="me" onAnswered={() => {}} />);
+      fireEvent.click(
+        await screen.findByRole("button", { name: status === "declined" ? "Decline" : "Accept" }),
+      );
+      await waitFor(() => expect(env.respond).toHaveBeenCalledTimes(1));
+      await new Promise((r) => setTimeout(r, 0));
+      expect(env.saveReminders).not.toHaveBeenCalled();
+    },
+  );
+
+  it("a failed reminder save leaves the accept a success", async () => {
+    env.respond.mockResolvedValue({ status: "accepted", join_request_id: "jr", on_roster: true });
+    env.saveReminders.mockRejectedValue(new Error("save failed"));
+    const onAnswered = vi.fn();
+    render(<GameInviteBanner inviteId="inv1" viewerId="me" onAnswered={onAnswered} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
+    await waitFor(() => expect(onAnswered).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 0));
+    expect(env.saveReminders).toHaveBeenCalledWith("g1");
+    expect(env.toast.success).toHaveBeenCalledWith("You're in. The host has been told.");
+    expect(env.toast.error).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("game-invite-banner")).toBeNull();
+  });
+
+  it("does not wait for the reminder save before telling the invitee they are in", async () => {
+    env.respond.mockResolvedValue({ status: "accepted", join_request_id: "jr", on_roster: true });
+    env.saveReminders.mockReturnValue(new Promise(() => {}));
+    const onAnswered = vi.fn();
+    render(<GameInviteBanner inviteId="inv1" viewerId="me" onAnswered={onAnswered} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
+    await waitFor(() => expect(onAnswered).toHaveBeenCalled());
+    expect(env.toast.success).toHaveBeenCalledWith("You're in. The host has been told.");
   });
 });

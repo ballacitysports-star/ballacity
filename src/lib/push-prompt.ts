@@ -7,8 +7,11 @@
 export type PushPermission = "granted" | "denied" | "default" | "unsupported";
 export type DevicePushSubscription = "subscribed" | "not_subscribed" | "unknown";
 
-/** "enable": offer "Turn on push notifications". "blocked": explain how to allow them. null: say nothing. */
-export type MemberPushPrompt = "enable" | "blocked" | null;
+/**
+ * "enable": offer "Turn on push notifications". "blocked": explain how to allow them. "home_screen" (WP 5.4): an iPhone or
+ * iPad browser tab, where push does not exist until BallaCity is added to the Home Screen; explain how. null: say nothing.
+ */
+export type MemberPushPrompt = "enable" | "blocked" | "home_screen" | null;
 
 export function memberPushPrompt(input: {
   permission: PushPermission;
@@ -16,12 +19,16 @@ export function memberPushPrompt(input: {
   dismissed: boolean;
   /** A managed child acts on the guardian's device, which must stay subscribed as the guardian. */
   managed: boolean;
+  /** An iPhone or iPad browser tab, not the app opened from the Home Screen (isIosBrowserTab). */
+  iosBrowserTab?: boolean;
 }): MemberPushPrompt {
-  const { permission, device, dismissed, managed } = input;
+  const { permission, device, dismissed, managed, iosBrowserTab = false } = input;
   // A managed child is on the guardian's device: whatever the browser permission, turning push on here would
   // opt that device in outside the guardian's own sign-in, so the child is never asked (nor told it is blocked).
-  if (managed) return null;
-  if (permission === "unsupported" || dismissed) return null;
+  if (managed || dismissed) return null;
+  // iOS offers web push only to a site added to the Home Screen; in a Safari (or other iOS browser) tab the
+  // Notification API is missing. Elsewhere "unsupported" has no fix we can offer, so say nothing.
+  if (permission === "unsupported") return iosBrowserTab ? "home_screen" : null;
   if (permission === "denied") return "blocked";
   if (permission === "default") return "enable";
   // Allowed in the browser, but this device has no push subscription, so closed-app alerts can't arrive.
@@ -43,4 +50,23 @@ export const MEMBER_PUSH_COPY = {
   blockedToast:
     "Notifications are blocked. Allow them for BallaCity in your browser or phone settings.",
   failed: "Couldn't turn on push notifications on this device. Please try again.",
+  homeScreenTitle: "Get alerts on your iPhone",
+  homeScreenBody:
+    "On iPhone and iPad, alerts work once BallaCity is on your Home Screen. Tap Share, choose Add to Home Screen, then open BallaCity from your Home Screen and turn on notifications.",
 } as const;
+
+/**
+ * Whether this is an iPhone or iPad browser tab rather than BallaCity opened from the Home Screen. iPadOS reports itself
+ * as a Mac, so a Mac with a touch screen counts as an iPad (the rule PwaInstallPrompt uses).
+ */
+export function isIosBrowserTab(env: {
+  userAgent: string;
+  maxTouchPoints: number;
+  /** display-mode: standalone, or navigator.standalone: opened from the Home Screen. */
+  standalone: boolean;
+}): boolean {
+  const ios =
+    /iPhone|iPad|iPod/.test(env.userAgent) ||
+    (env.userAgent.includes("Macintosh") && env.maxTouchPoints > 1);
+  return ios && !env.standalone;
+}

@@ -224,6 +224,7 @@ import {
   guardianOnlyRequestKey,
 } from "@/lib/guarded-open-join";
 import { clearOfHelpLauncher } from "@/lib/support/launcher-clearance";
+import { HashScrollTarget } from "@/components/game-detail/HashScrollTarget";
 
 const emojiBySport: Record<string, string> = Object.fromEntries(
   SPORTS.map((s) => [s.name, s.emoji]),
@@ -2802,12 +2803,16 @@ function GameDetail() {
                   </h2>
 
                   {/* Attendance: host-only, opens at start time. Feeds the
-                      host's real attendance rate on the trust panel. */}
+                      host's real attendance rate on the trust panel. The host's
+                      attendance prompt (WP 5.6) links here: #attendance. */}
                   {isHost &&
                   !game.cancelledAt &&
                   liveRoster.length > 0 &&
                   Date.now() >= new Date(game.date).getTime() ? (
-                    <div className="mb-3 rounded-2xl border border-border bg-surface p-3">
+                    <HashScrollTarget
+                      id="attendance"
+                      className="mb-3 scroll-mt-24 rounded-2xl border border-border bg-surface p-3"
+                    >
                       <div className="section-eyebrow text-muted-foreground">Attendance</div>
                       <p className="mt-0.5 text-[11px] text-muted-foreground">
                         Mark who showed up. This builds your host reliability score.
@@ -2849,7 +2854,7 @@ function GameDetail() {
                           </div>
                         ))}
                       </div>
-                    </div>
+                    </HashScrollTarget>
                   ) : null}
                   <div className="space-y-2">
                     {totalConfirmed === 0 ? (

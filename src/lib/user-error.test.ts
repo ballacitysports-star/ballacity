@@ -353,13 +353,15 @@ const LEFT_TO_FALLBACK = new Set(["INVALID_WINDOW", "INVALID_WORKER_PATH", "UNKN
 
 /**
  * Codes deliberately not in the catalog because no member meets them: Content Studio, which only superadmins use and
- * which words its own refusals (drizzle 0023); device pairing, which has no screen (drizzle 0002); and the hotfix guard
- * that stops a write path outright.
+ * which words its own refusals (drizzle 0023); device pairing, which has no screen (drizzle 0002); the hotfix guard
+ * that stops a write path outright; and the server-only sweep stamps (WP 5.4 push_sent_at, WP 5.6
+ * attendance_prompted_at), which no screen writes.
  */
 const NOT_FOR_MEMBERS = new Set([
   "ALREADY_PUBLISHED",
   "APPROVAL_IMMUTABLE",
   "APPROVAL_STALE",
+  "ATTENDANCE_PROMPT_SERVER_ONLY",
   "ATTEMPT_FINISHED",
   "ATTEMPT_NOT_FOUND",
   "CONNECTION_NOT_ACTIVE",
@@ -381,6 +383,7 @@ const NOT_FOR_MEMBERS = new Set([
   "PAIRING_INVALID",
   "PAIRING_NOT_FOUND",
   "PUBLISH_IN_PROGRESS",
+  "PUSH_SENT_AT_SERVER_ONLY",
 ]);
 
 /**
