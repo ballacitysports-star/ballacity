@@ -172,6 +172,28 @@ export const USER_ERROR_MESSAGES = {
   // set_child_controls (drizzle 0011): a moderator, not the child's guardian, tried to make the profile public.
   GUARDIAN_REQUIRED: "Only a verified parent or guardian can make a child's profile public.",
   HANDLE_TAKEN: "That handle is already taken.",
+  HANDOVER_ALREADY_PENDING:
+    "A handover is already waiting for this account. Cancel it first if you want to start a new one.",
+  HANDOVER_BUSY: "This handover is being finished right now. Try again in a minute.",
+  HANDOVER_EMAIL_FAILED:
+    "We couldn't send the email, so nothing was changed. Check the address and try again.",
+  HANDOVER_EMAIL_INVALID: "Enter a full email address, like name@example.com.",
+  HANDOVER_EMAIL_IS_OWN:
+    "Use the adult's own email address, not yours. They need to be the one who receives it.",
+  HANDOVER_EMAIL_UNUSABLE:
+    "That email address can't be used. Try a different address, or ask the adult which one to use.",
+  HANDOVER_EXPIRED:
+    "This link has expired. Ask the person who manages this account to start again.",
+  HANDOVER_FAILED: "Something went wrong and nothing was changed. Please try again.",
+  HANDOVER_INVALID:
+    "This link isn't valid any more. If you already finished, sign in with your email address.",
+  HANDOVER_LIMIT: "Too many handover attempts for now. Please try again tomorrow.",
+  HANDOVER_NOT_ADULT: "An account can be handed over once the person is 18 or over.",
+  HANDOVER_NOT_ALLOWED: "Only the adult who manages this account can hand it over.",
+  HANDOVER_UNAVAILABLE: "Handing over an account isn't available yet. Please try again later.",
+  // The outcome could not be confirmed (the database did not answer): nothing is put back until it can be read.
+  HANDOVER_UNSURE:
+    "That did not finish cleanly. Wait two minutes, then open the link again. If it still does not work, ask the person who started it to cancel and start again.",
   HOST_AS_SELF_ADULTS_ONLY:
     "Only adults can host a game without a team profile. Host it under your team instead.",
   ID_TAKEN: "A listing with that handle already exists.",

@@ -78,6 +78,7 @@ import { Route as FamilyShareTokenRouteImport } from './routes/family-share.$tok
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
 import { Route as GuideIndexRouteImport } from './routes/guide.index'
 import { Route as GuideSportRouteImport } from './routes/guide.$sport'
+import { Route as HandoverTokenRouteImport } from './routes/handover.$token'
 import { Route as MessagesIndexRouteImport } from './routes/messages.index'
 import { Route as MessagesConversationIdRouteImport } from './routes/messages.$conversationId'
 import { Route as OnboardingAccountTypeRouteImport } from './routes/onboarding.account-type'
@@ -479,6 +480,11 @@ const GuideSportRoute = GuideSportRouteImport.update({
   path: '/guide/$sport',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HandoverTokenRoute = HandoverTokenRouteImport.update({
+  id: '/handover/$token',
+  path: '/handover/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MessagesIndexRoute = MessagesIndexRouteImport.update({
   id: '/messages/',
   path: '/messages/',
@@ -817,6 +823,7 @@ export interface FileRoutesByFullPath {
   '/family-share/$token': typeof FamilyShareTokenRoute
   '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/guide/$sport': typeof GuideSportRoute
+  '/handover/$token': typeof HandoverTokenRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/onboarding/age': typeof OnboardingAgeRoute
@@ -939,6 +946,7 @@ export interface FileRoutesByTo {
   '/dev/route-doctor': typeof DevRouteDoctorRoute
   '/family-share/$token': typeof FamilyShareTokenRoute
   '/guide/$sport': typeof GuideSportRoute
+  '/handover/$token': typeof HandoverTokenRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/onboarding/age': typeof OnboardingAgeRoute
@@ -1064,6 +1072,7 @@ export interface FileRoutesById {
   '/family-share/$token': typeof FamilyShareTokenRoute
   '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/guide/$sport': typeof GuideSportRoute
+  '/handover/$token': typeof HandoverTokenRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/onboarding/age': typeof OnboardingAgeRoute
@@ -1189,6 +1198,7 @@ export interface FileRouteTypes {
     | '/family-share/$token'
     | '/games/$gameId'
     | '/guide/$sport'
+    | '/handover/$token'
     | '/messages/$conversationId'
     | '/onboarding/account-type'
     | '/onboarding/age'
@@ -1311,6 +1321,7 @@ export interface FileRouteTypes {
     | '/dev/route-doctor'
     | '/family-share/$token'
     | '/guide/$sport'
+    | '/handover/$token'
     | '/messages/$conversationId'
     | '/onboarding/account-type'
     | '/onboarding/age'
@@ -1435,6 +1446,7 @@ export interface FileRouteTypes {
     | '/family-share/$token'
     | '/games/$gameId'
     | '/guide/$sport'
+    | '/handover/$token'
     | '/messages/$conversationId'
     | '/onboarding/account-type'
     | '/onboarding/age'
@@ -1550,6 +1562,7 @@ export interface RootRouteChildren {
   FamilyShareTokenRoute: typeof FamilyShareTokenRoute
   GamesGameIdRoute: typeof GamesGameIdRouteWithChildren
   GuideSportRoute: typeof GuideSportRoute
+  HandoverTokenRoute: typeof HandoverTokenRoute
   MessagesConversationIdRoute: typeof MessagesConversationIdRoute
   OnboardingAccountTypeRoute: typeof OnboardingAccountTypeRoute
   OnboardingAgeRoute: typeof OnboardingAgeRoute
@@ -2090,6 +2103,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GuideSportRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/handover/$token': {
+      id: '/handover/$token'
+      path: '/handover/$token'
+      fullPath: '/handover/$token'
+      preLoaderRoute: typeof HandoverTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/messages/': {
       id: '/messages/'
       path: '/messages'
@@ -2566,6 +2586,7 @@ const rootRouteChildren: RootRouteChildren = {
   FamilyShareTokenRoute: FamilyShareTokenRoute,
   GamesGameIdRoute: GamesGameIdRouteWithChildren,
   GuideSportRoute: GuideSportRoute,
+  HandoverTokenRoute: HandoverTokenRoute,
   MessagesConversationIdRoute: MessagesConversationIdRoute,
   OnboardingAccountTypeRoute: OnboardingAccountTypeRoute,
   OnboardingAgeRoute: OnboardingAgeRoute,

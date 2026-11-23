@@ -40,5 +40,7 @@ export function sanitizeNextPath(raw: unknown): string | undefined {
   if (path === "/") return undefined;
   if (path === "/auth" || path.startsWith("/auth/")) return undefined;
   if (path === "/reset-password" || path.startsWith("/reset-password/")) return undefined;
+  // A handover link holds a one-time token and is never a place to return to.
+  if (path === "/handover" || path.startsWith("/handover/")) return undefined;
   return raw;
 }

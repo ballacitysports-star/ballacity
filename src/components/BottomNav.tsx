@@ -52,7 +52,7 @@ export function BottomNav() {
     ...(tab.to === "/profile" && !user ? signedOutProfile : presentation[tab.to]),
   }));
 
-  const PUBLIC_PATHS = ["/auth", "/reset-password"];
+  const PUBLIC_PATHS = ["/auth", "/reset-password", "/handover"];
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   if (isPublic) return null;
   // Inside a conversation the message box takes the bottom of the screen, as in

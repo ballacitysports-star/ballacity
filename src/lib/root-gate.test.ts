@@ -20,6 +20,13 @@ describe("root gates: which pages skip sign-in, age and account-type checks", ()
     }
   });
 
+  it("opens a handover link signed out (the token is the credential), and nothing next to it", () => {
+    expect(signedOut("/handover/abc123")).toBe(true);
+    expect(signedIn("/handover/abc123")).toBe(true);
+    expect(signedOut("/handoverx")).toBe(false);
+    expect(signedOut("/parent")).toBe(false);
+  });
+
   it("covers sub-pages of a public route, but not look-alike paths", () => {
     expect(signedOut("/guide/basketball")).toBe(true);
     expect(signedOut("/tryouts/123")).toBe(true);

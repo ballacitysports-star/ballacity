@@ -296,9 +296,23 @@ export const startManagedSession = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: child } = await supabaseAdmin.auth.admin.getUserById(data.childUserId);
-    const user = child?.user;
+    let user = child?.user;
     if (!user?.email || !isManagedUser(user) || managedByOf(user) !== ctx.userId) {
-      throw new Error(managedChildErrorMessage("NOT_MANAGED"));
+      // The database still says this guardian manages the account, so a sign-in record that does not say so is what a
+      // handover step that died half way leaves (docs/managed-account-handover.md). Put it right once and look again;
+      // it does nothing while a handover is being finished, and never when the managed row is gone.
+      let repaired = false;
+      try {
+        const { reconcileManagedRecord } = await import("@/lib/managed-handover.server");
+        repaired = (await reconcileManagedRecord(data.childUserId)) === "repaired";
+      } catch {
+        /* the migration or the helper is not there: the answer below is the same refusal as before */
+      }
+      if (repaired)
+        user = (await supabaseAdmin.auth.admin.getUserById(data.childUserId)).data?.user;
+      if (!user?.email || !isManagedUser(user) || managedByOf(user) !== ctx.userId) {
+        throw new Error(managedChildErrorMessage("NOT_MANAGED"));
+      }
     }
 
     const { data: link, error } = await supabaseAdmin.auth.admin.generateLink({
