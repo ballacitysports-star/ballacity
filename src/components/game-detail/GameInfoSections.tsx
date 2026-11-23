@@ -65,28 +65,42 @@ export type GamePaymentTermsProps = {
   isPaid: boolean;
   refundTerms: RefundTerms | null;
   settings: GamePaymentSettings | null;
+  /**
+   * What a viewer who cannot read the settings row may know of the payment (payTermsView): the deadline and the accepted
+   * apps by name. Never handles or the host's own text. Null when the row is readable or nothing was told.
+   */
+  paymentTerms?: { deadline: string | null; methodNames: string[] } | null;
 };
 
-export function GamePaymentTerms({ game, isPaid, refundTerms, settings }: GamePaymentTermsProps) {
+export function GamePaymentTerms({
+  game,
+  isPaid,
+  refundTerms,
+  settings,
+  paymentTerms = null,
+}: GamePaymentTermsProps) {
+  const deadline = settings?.payment_deadline ?? paymentTerms?.deadline ?? null;
+  const methodNames = settings ? [] : (paymentTerms?.methodNames ?? []);
   return (
     <>
       {/* Payment settings summary */}
-      {(isPaid ||
-        settings?.payment_deadline ||
-        settings?.refund_policy ||
-        settings?.payment_instructions) && (
+      {(isPaid || deadline || settings?.refund_policy || settings?.payment_instructions) && (
         <div className="rounded-3xl border border-border bg-surface p-4">
           <div className="flex items-center gap-2 mb-3">
             <Wallet className="h-4 w-4 text-lime" />
             <h2 className="section-eyebrow text-muted-foreground">Payment settings</h2>
           </div>
           <div className="space-y-3">
-            {settings?.payment_deadline && (
+            {deadline && (
               <div>
                 <div className="text-xs text-muted-foreground mb-0.5">Payment deadline</div>
-                <div className="text-sm font-semibold">
-                  {new Date(settings.payment_deadline).toLocaleString()}
-                </div>
+                <div className="text-sm font-semibold">{new Date(deadline).toLocaleString()}</div>
+              </div>
+            )}
+            {methodNames.length > 0 && (
+              <div data-testid="payment-terms-methods">
+                <div className="text-xs text-muted-foreground mb-0.5">Accepted payment apps</div>
+                <div className="text-sm font-semibold">{methodNames.join(", ")}</div>
               </div>
             )}
             {isPaid && (

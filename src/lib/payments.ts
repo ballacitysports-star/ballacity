@@ -329,6 +329,64 @@ export async function getGameJoinPolicy(
   return row ? { requires_approval: !!row.requires_approval } : null;
 }
 
+/**
+ * What a prospective player may know about the payment before the host approves them or they pay (docs/paid-path-gates.md
+ * section 6 (c)): the entry fee PayPal charges, the deadline, the accepted payment apps by NAME and whether the host
+ * approves players first. The handles and the host's free-text instructions are not part of it.
+ */
+export type GamePaymentTerms = {
+  entryFee: number;
+  currency: string;
+  /** ISO timestamp, or null when the host set none. */
+  paymentDeadline: string | null;
+  /** The accepted payment apps, in the order the host added them; each name is the app's own ("Venmo", "Cash App"). */
+  methods: { type: PaymentType; name: string }[];
+  requiresApproval: boolean;
+};
+
+const PAYMENT_TYPE_IDS: ReadonlySet<string> = new Set(PAYMENT_TYPES.map((p) => p.id));
+
+/**
+ * The server's row as the app uses it. Anything that is not exactly what the function promises (no row, a fee that is not
+ * a positive number, a method type this app does not know) is dropped, never guessed: a row with no usable fee is no row.
+ */
+export function gamePaymentTermsFrom(row: unknown): GamePaymentTerms | null {
+  if (!row || typeof row !== "object") return null;
+  const r = row as Record<string, unknown>;
+  const fee = Number(r.entry_fee);
+  if (!Number.isFinite(fee) || fee <= 0) return null;
+  const deadline =
+    typeof r.payment_deadline === "string" && !Number.isNaN(new Date(r.payment_deadline).getTime())
+      ? r.payment_deadline
+      : null;
+  const types = Array.isArray(r.accepted_methods) ? r.accepted_methods : [];
+  const methods: GamePaymentTerms["methods"] = [];
+  for (const t of types) {
+    if (typeof t !== "string" || !PAYMENT_TYPE_IDS.has(t)) continue;
+    if (methods.some((m) => m.type === t)) continue;
+    methods.push({ type: t as PaymentType, name: paymentTypeMeta(t).name });
+  }
+  return {
+    entryFee: fee,
+    currency: typeof r.currency === "string" && r.currency ? r.currency : "USD",
+    paymentDeadline: deadline,
+    methods,
+    requiresApproval: r.requires_approval === true,
+  };
+}
+
+/**
+ * The payment terms a signed-in player who may join this game is told before approval or payment
+ * (public.get_game_payment_terms). Null when the server tells them nothing (a game with no fee or settings, or one the
+ * rules refuse them). Throws when the call fails, including when the function does not exist yet: callers show what they
+ * showed before.
+ */
+export async function getGamePaymentTerms(gameId: string): Promise<GamePaymentTerms | null> {
+  const { data, error } = await supabase.rpc("get_game_payment_terms", { _game_id: gameId });
+  if (error) throw error;
+  return gamePaymentTermsFrom(data?.[0] ?? null);
+}
+
 export async function getMyGamePaymentSettings(
   gameId: string,
 ): Promise<GamePaymentSettings | null> {

@@ -321,6 +321,16 @@ holdsPlace)` and draws nothing on a cancelled game, or an ended one for a viewer
   claude/pay-fresh-viewer-methods (section 6 "Also related" (c)).
 - An 18+ viewer with a leftover active guardian link: done on branch claude/guardian-adult-manual-claim (section 6
   (d)): the pay page asks the manual-claim rule itself and holds back the manual methods (PayPal kept).
+- The entry fee, deadline and accepted apps (by name) before approval or payment, and no handles through the API for
+  a viewer the claim rules refuse: done on branch claude/payment-terms-before-pay (section 6 "Also related" (f);
+  migration 20261128120000). **Still open (honest list):**
+  - the host's general payment instructions (free text) are still shown only after the viewer is entitled, on purpose
+    (they may contain a handle);
+  - a visible, unapproved viewer of an approval-required game can still receive the handles through the API (the page
+    holds them back). Closing it is one more condition in `get_game_host_payment_methods`, an owner decision;
+  - PayPal checkout is not named among the accepted apps (it is the host's connection, not a payment method row);
+  - the terms' `currency` is a constant `USD` until the app prices in anything else;
+  - E2E for (f) is written (`e2e/pay-terms-before-approval.spec.ts`) and runs in the serial phase.
 
 ## 6. Server gaps: payment claim preconditions (IMPLEMENTED, branch claude/payment-claim-preconditions)
 
@@ -564,6 +574,7 @@ guardian rule unchanged, (e) a full game blocked on the pay page on branch claud
     never "Host hasn't set up payment yet". (Review round 1, 2026-11-20.) A fresh viewer on an open game who is then
     gated by the age range or a full roster still receives the handles in the RPC's answer (nothing renders them):
     those gates are decided beside the settings read, and the RPC answers any caller its own guards let through.
+    **Closed by (f): the RPC now also refuses a caller `payment_claim_block` would refuse.**
   - Fails closed: a failed or timed-out policy read is the "Couldn't reach the payment service" Retry, never "no
     approval needed". The policy answers with no row when the payee has no settings row at all; then nothing is
     offered, as before ("Host hasn't set up payment yet"), and PayPal's precondition would refuse such a player
@@ -579,7 +590,9 @@ guardian rule unchanged, (e) a full game blocked on the pay page on branch claud
     method's own instructions do come from the RPC), the payment deadline, and `entry_fee` (the page shows the
     game's `price`, as the game page does for that viewer; PayPal charges `entry_fee`, computed on the server). If
     the host changed the fee after creating the game, that viewer sees the old price until they can read the row.
-    Exposing these through a public RPC would need a migration and an owner decision; not done.
+    Exposing these through a public RPC would need a migration and an owner decision; not done here. **Done since,
+    for the fee, the deadline and the accepted apps by name (not the instructions): see (f) below (migration
+    20261128120000, owner instruction 2026-11-21).**
 
 - (e) **Full game on the pay page (owner decision 2026-11-20, "Continue session as you recommend").** Since #434
   `private_sec.payment_claim_block` refuses a manual claim, and PayPal's precondition refuses checkout, from a player
@@ -617,6 +630,76 @@ guardian rule unchanged, (e) a full game blocked on the pay page on branch claud
   | Pay page       | `src/routes/games.$gameId.pay.tsx`                                                                                       |
   | E2E (real RLS) | `e2e/pay-fresh-viewer-methods.spec.ts`: real games, settings and method on the local stack (skips on any hosted project); 5 tests |
   | E2E (mocked)   | `e2e/pay-entry-blocked.spec.ts` (4 new full-game tests)                                                                  |
+
+- (f) **Payment terms before approval or payment, and no handles for a viewer the claim rules refuse (owner
+  instruction 2026-11-21, "do all 3 steps as your best recommendation"; migration `20261128120000_game_payment_terms`,
+  SQL test 993, rollback `docs/rollbacks/20261128120000_game_payment_terms.down.sql`).** Two gaps from the 2026-11-20
+  release record (`docs/release/records/2026-11-20-pay-fresh-viewer.md`, "Left open"): a new player on a paid open game
+  saw only the game's price, not the entry fee PayPal charges (`game_payment_settings.entry_fee` wins over
+  `hosted_games.price`), the deadline or which apps the host takes; and `get_game_host_payment_methods` still returned
+  the host's handles through the API to a viewer the pay page refuses on an open game (outside the age range, a full
+  roster, a host's block, a guardian's switch, an ended game). RLS on `game_payment_settings` is **not** changed.
+  - `public.get_game_payment_terms(_game_id)`: one read-only SECURITY DEFINER function, `authenticated` only (not
+    `anon`, not `service_role`: it answers about `auth.uid()`). At most one row, and only these five columns:
+    `entry_fee`, `currency` (`USD`, the only currency BallaCity charges in), `payment_deadline`, `accepted_methods`
+    (the TYPES: `venmo`, `cashapp`, `zelle`, `paypal`, `applecash`, `googlepay`, `cash`, `custom`, from a fixed list, in
+    the order the host added them, only the enabled ones the game accepts) and `requires_approval`. **Never a handle, a
+    label, a link, a contact or any free text**, so not the host's general instructions (which may hold a handle)
+    either: those, and the handles, keep exactly the entitlement they had (the settings row, and
+    `get_game_host_payment_methods`). PayPal checkout is not a listed method (it is the host's connection, not a row).
+  - Empty (the same empty answer as a game with no payment settings, so it says nothing about why) unless: the game
+    exists and the caller may see it (the `hosted_games` read rules; a private or hidden game the caller cannot see is
+    empty, never "not found"; an invitee of a private game may see it); neither the caller nor the host is suspended
+    and no block stands between them **in either direction**; the payee's settings row for the game charges a fee
+    (> 0); the payee is a confirmed adult; the caller may coordinate payments (`game_payments_allowed`), passes the
+    guardian rule the pay page applies (`game_payment_guardian_ready`, so a minor with a guardian needs the approval
+    first) and `private_sec.payment_claim_block` has nothing against them (cancelled or ended game, a guardian's "Can
+    join games" switch, the host's block, the age range unless approved or on the roster, closed joining, a full
+    roster: #434). The host reading their own game is answered without the caller rules.
+  - `get_game_host_payment_methods` only **tightens**: a caller who is not the payee, not on the roster and has no
+    claim of their own for the game, and whom `payment_claim_block` would refuse, gets nothing. The payee, a rostered
+    player (who still owes for a game that has ended, and keeps the handles) and a payer with a claim in get exactly
+    what they got; so does any stranger or approved requester the claim rules let through. An approved requester who
+    is not on the roster is tightened exactly where `payment_claim_block` refuses their claim (a full roster, a
+    cancelled or ended game, a guardian's "Can join games" switch off): no handles there either, consistent with the
+    claim trigger (test 993 pins a full game and a switch off). The SQL test compares it
+    with its previous definition for every person against every game (272 pairs): nobody gains a handle, no entitled
+    caller loses one, only a refused caller who held handles now gets none. It changes one assertion of test 900
+    (a guardian's "Can join games" switch off used to leave the handles visible to a non-rostered 16-year-old; it now
+    hides them, as the claim would be refused). **Not changed:** the handles still reach a visible, unapproved viewer
+    of an approval-required game through the API (the page holds them back, `payMethodsHeldForApproval`): the owner
+    said the handles stay "behind exactly the existing entitlement". Closing that too would be one more condition in
+    the same function; an open question below.
+  - The app (client, `src/lib/pay-entry-gate.ts` is the one place that decides): `payTermsView` shows the terms only
+    to a viewer who does not read the settings row (the row's own values are shown to everyone who does), is not the
+    host, and whom the page's own entry check lets through (`payEntryView` clear: never while it is checking, failed
+    or blocking). The page can only show LESS than the server said. The pay page shows the entry fee in the amount
+    card (the terms' fee in place of the game's price, also on the PayPal button label, the pay links and the proof
+    form), "Pay by <deadline>" under it, and, on the "Waiting on host approval" card, "This host accepts Venmo and
+    Cash App. The payment details appear once the host approves you." The game page's "Before you join" Payment line
+    and its "Payment settings" card say the same (fee, deadline, accepted apps by name), and its fee (button, `isPaid`)
+    follows the terms' fee too. After approval or any entitlement the viewer reads the row and the existing view
+    appears unchanged. **Fails closed:** the terms are best effort and **off the critical path**: the function not
+    there yet (the migration not applied) or an error is "no terms". The pay page starts the read beside the rest
+    and does not wait for it (it gives up after 4 s, and the page never shows "Loading payment options" because of
+    it); the game page's hook has no timeout and keeps showing today's view until, and unless, the read answers.
+    The answer is kept per signed-in account and game (the user id is part of the key), dropped on sign-out, and
+    never read for the game's own host. The pages show what they showed before (the game's price, no
+    deadline, no apps), never a Retry for this read, never raw error text, never invented terms. The app works with
+    or without the migration; deploy the migration before or with the app.
+  - Decisions that follow the owner's rules: no guardian or age rule is loosened (every new condition removes an
+    answer); nothing is shown to a viewer the page or the server refuses; the host's free text and the handles are
+    not exposed earlier; legal text and consent wording untouched.
+
+  | Piece          | Where                                                                                                                           |
+  | -------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+  | Migration      | `supabase/migrations/20261128120000_game_payment_terms.sql`; rollback `docs/rollbacks/20261128120000_game_payment_terms.down.sql` |
+  | SQL test       | `supabase/tests/993_game_payment_terms.test.sql` (102 assertions; `900` changed in one assertion)                               |
+  | Decision       | `src/lib/pay-entry-gate.ts` (`payTermsView`, `payTermsMethodsLine`, `PAY_TERMS_APPROVAL_LINE`)                                   |
+  | Read           | `src/lib/payments.ts` (`getGamePaymentTerms`, `gamePaymentTermsFrom`), `src/hooks/use-game-payment-terms.ts`                     |
+  | Pages          | `src/routes/games.$gameId.pay.tsx`; `src/routes/games.$gameId.index.tsx`, `GamePolicySummary`, `GamePaymentTerms`, `game-policy.ts` |
+  | Unit tests     | `pay-entry-gate.test.ts` (+10), `payments-terms.test.ts` (10), `use-game-payment-terms.test.tsx` (7), `GamePaymentTermsView.test.tsx` (6), `pay-terms-wiring.test.ts` (7) |
+  | E2E (real RLS) | `e2e/pay-terms-before-approval.spec.ts` (5 tests; local stack only; written, not run when it was added)                          |
 
 ## 7. Product decision: should paid joins show "Before you join"?
 
@@ -811,3 +894,24 @@ Review round 1 (same branch, reviewer verdict "approve", three low findings, all
   refused" E2E fail (the page shows the Retry); with the methods never held, both approval-game E2E tests fail on
   "no methods RPC". The PayPal capture itself is not driven in E2E (PayPal's SDK is external): its re-read is covered
   by the unit tests above and a wiring test.
+
+### Section 6 (f) (branch claude/payment-terms-before-pay, owner instruction 2026-11-21)
+
+- Migration 20261128120000 (checked on a local disposable Postgres 16 only; nothing applied anywhere else). SQL:
+  993 passes (102); the whole SQL suite on a fresh replay of every migration: 3538 passed, 0 failed (test 900 changed
+  in one assertion, above). Negative control: against a replay without the migration, 993 stops at the first call (0 passed,
+  1 failed). Mutation checks (17 mutants of the migration, each applied to a replay and run against 993): every one is
+  killed: the claim rule dropped from the terms, from the methods tightening, the block, suspension, guardian,
+  adult-host and payments-allowed checks removed, the visibility rule removed or the invitee dropped, the roster or
+  payer exemption removed, a label leaked into the app list, the fee read from the game price, a free game answered,
+  `anon` granted, a disabled method listed, a settings row that is not the payee's believed.
+- Rollback rehearsed on a replay: refuses without `app.confirm_game_payment_terms_rollback`; refuses when
+  `get_game_host_payment_methods` has changed since; with the confirmation drops the terms function and restores the
+  methods function byte for byte (md5 `ea525f29aa2da2aca39d9a797ce8a11e`, the same grants); a second run refuses; the
+  migration applies again afterwards (md5 `84f7d766aa961f2230750a4e05b150a8` and `5472b48285447dd3db44cc0e77fb796a`).
+- Ledger-route rehearsal (the apply script built as for 20261125200000, on a replay without the file, with a local
+  `supabase_migrations.schema_migrations`): a copy with a wrong md5 raised and rolled back (ledger 0, fingerprint
+  unchanged 3460|4e5e82fd); the good copy applied (ledger 1); the object fingerprint of the ledger-applied database
+  (3461|07a451c6) equals a full replay with the file; a second run stopped on the ledger key.
+- App: `npx tsc --noEmit -p .` clean; `npx vitest run` (full) 465 files passed, 4949 passed, 22 skipped. E2E not run by
+  the session that wrote it (shared stack, serial phase).
