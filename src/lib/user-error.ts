@@ -503,6 +503,10 @@ export const FEATURE_ERROR_MESSAGES = {
     "You can only answer for yourself or a child you're the verified parent or guardian of.",
   // cancel_event_registration (20261107180000), the tryout sign-up screens: NOT_ALLOWED, bare.
   signupNotAllowed: "You can only change your own or your linked children's sign-ups.",
+  // reviewJoinRequest (payments.ts): a host's decline that reached a request already approved, e.g. the player accepted
+  // the host's invitation meanwhile (WP 5.5).
+  declineAlreadyApproved:
+    "This player already has a place in this game, so there's nothing to decline. To take it back, use Remove on the roster.",
 } as const;
 
 /**

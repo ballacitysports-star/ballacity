@@ -107,9 +107,11 @@ SELECT t.eq((SELECT join_request_id FROM public.game_invites WHERE game_id = 'go
   (SELECT id FROM public.join_requests WHERE game_id = 'gopen' AND player_id = t.id('ana')), 'the invitation points at it');
 SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE user_id = t.id('host') AND type = 'game_invite_accepted'), 1,
   'the host is told');
+SELECT t.eq((SELECT count(*)::int FROM public.game_participants WHERE game_id = 'gopen' AND user_id = t.id('ana')), 1,
+  'and, the game being free, the player has taken the place, through the join gate (20261127120000)');
 SELECT t.as_user(t.id('ana'));
-SELECT t.lives($q$INSERT INTO public.game_participants (game_id, user_id) VALUES ('gopen', t.id('ana'))$q$,
-  'and the player then takes the place, through the join gate');
+SELECT t.throws($q$INSERT INTO public.game_participants (game_id, user_id) VALUES ('gopen', t.id('ana'))$q$, 'duplicate key',
+  'a second place for them is refused');
 SELECT t.eq((public.game_respond_invite(t.invite_id('gopen', 'ana'), false)) ->> 'status', 'accepted', 'answering again changes nothing');
 SELECT t.reset();
 

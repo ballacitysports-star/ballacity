@@ -25,7 +25,8 @@ function when(date: string, tz: string | null): string {
 
 /**
  * WP 2.0: invitations to games waiting for the player's answer, newest first, with the real game from the server. Accept
- * approves their place; they then open the game to join, or to pay when it has a fee. Renders nothing when there are none.
+ * approves their place and, on a free game with no guardian step, puts them on the roster (20261127120000); otherwise they
+ * open the game to pay or to wait for their guardian. Renders nothing when there are none.
  */
 export function GameInvitationsSection({
   userId,
@@ -54,7 +55,9 @@ export function GameInvitationsSection({
       const res = await respondToGameInvite(row.id, accept);
       if (res.status === "accepted") {
         setAccepted((a) => ({ ...a, [row.id]: row.game_id }));
-        toast.success("You're in. Open the game to finish joining.");
+        // A free game with no guardian step puts the player on the roster as they accept (20261127120000); otherwise a
+        // payment or a guardian's approval is still to come on the game page.
+        toast.success(res.on_roster ? "You're in." : "You're in. Open the game to finish joining.");
       } else if (res.status === "full") {
         toast.error("This game is full right now. Your invitation stays open.");
         return;

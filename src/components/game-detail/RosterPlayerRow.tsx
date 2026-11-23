@@ -349,7 +349,7 @@ export function RosterPlayerRow({
     setBusy(true);
     const rollback = onOptimistic(req.id, "rejected");
     try {
-      await reviewJoinRequest(req.id, "rejected", "Removed by host");
+      await reviewJoinRequest(req.id, "rejected", "Removed by host", { removing: true });
       const { error: delErr } = await supabase
         .from("game_participants")
         .delete()
@@ -382,7 +382,7 @@ export function RosterPlayerRow({
     setBusy(true);
     const rollback = onOptimistic(req.id, "rejected");
     try {
-      await reviewJoinRequest(req.id, "rejected", "Blocked by host");
+      await reviewJoinRequest(req.id, "rejected", "Blocked by host", { removing: true });
       const { error: delErr } = await supabase
         .from("game_participants")
         .delete()

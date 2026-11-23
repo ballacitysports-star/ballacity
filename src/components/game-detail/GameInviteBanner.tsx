@@ -79,7 +79,7 @@ export function GameInviteBanner({
       <div className="rounded-2xl border border-border bg-surface p-4 text-sm" role="status">
         {invite.status === "cancelled"
           ? "The host withdrew this invitation."
-          : "This invitation has ended: the game is no longer taking players."}
+          : "This invitation has ended."}
       </div>
     );
   }
