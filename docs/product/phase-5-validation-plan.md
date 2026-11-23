@@ -565,6 +565,16 @@ The owner narrowed WP 5.5 on 2026-11-23, after a 26-file version kept growing. W
 - **Migration:** yes. Rollback unschedules the job and drops the function. Deleted rows cannot be restored; say so in the release record.
 - **Acceptance:** after the first run, no rows older than 90 days remain in the sandbox.
 
+**As built (2026-11-23)**
+
+- Decision 12 was taken as its default, "enforce". The first production run waits for the owner: the migration purges nothing itself, so applying it to production is the go-ahead, and the first deletion is the job's next 03:37 UTC run after that.
+- Migration `20261129120000_diagnostics_purge.sql`. Rollback `docs/rollbacks/20261129120000_diagnostics_purge.down.sql`. It needs `app.confirm_diagnostics_purge_rollback=yes` and refuses if either function, their grants or the job changed since. It unschedules the job, then drops both functions. Rows already deleted cannot be restored; the release record must say so.
+- `public.purge_diagnostics(_older_than interval DEFAULT '90 days', _max_rows integer DEFAULT 100000)` follows `purge_app_error_events`: SECURITY DEFINER, `search_path = ''`, EXECUTE for `service_role` only. It returns the count per table and `capped` as jsonb. It deletes rows whose `created_at` is strictly older than the window, so a row exactly 90 days old stays until the next night. It refuses a window under one day.
+- Each table's timestamp is `created_at` (`timestamptz NOT NULL DEFAULT now()`). A DELETE fires nothing: the only triggers, the two `aa_anonymise_minor_*`, run before insert or update. No foreign key points at the three tables, and no view or function reads them. What the app reads fits inside the window: the push problems card reads the last 7 days, and the superadmin card reads the newest 10 rows. The admin location analytics page still offers "Last 180 days", which now shows at most 90.
+- Bounded, not batched. A function with a SET clause cannot commit part-way, so each call is one transaction. It deletes at most `_max_rows` per table, and a larger backlog drains over the following nights. The function sets `lock_timeout = 5s`. A DELETE takes ROW EXCLUSIVE, which the app's inserts and reads do not wait on. No index was added: `notification_delivery_log` has no index on `created_at` alone, so the daily run scans it.
+- `private_sec.schedule_diagnostics_purge()` (no API role can call it) schedules `purge-diagnostics` at `37 3 * * *` (03:37 UTC) where pg_cron is installed. Otherwise it does nothing. 03:37 is not used by another job: the daily jobs run at 03:17, 04:17, 04:41, 04:47, 04:51 and 08:47, one hourly job runs at :23, and the rest run every 5 minutes or every minute.
+- SQL test `986_diagnostics_purge.test.sql`: each table at the boundary (400 days, 90 days and 1 second, exactly 90 days, just under, now); only the service role purges (a member, an admin and a visitor are refused), and no API role, the service role included, reschedules the job; a second run deletes nothing; the cap and the nights after it; the job only with pg_cron.
+
 ### WP 5.10 Fix what the data shows
 
 - **Goal:** turn the pilot data into fixes.
