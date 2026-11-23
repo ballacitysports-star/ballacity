@@ -42,15 +42,21 @@ if a column list were wrong.
 | Reports & safety | Indefinite today | Kept without profile details | Yes |
 | Uploaded media | While active | Files removed from every media bucket | No |
 | AI analysis | With the clip; deletable any time | Deleted with the clip | No |
-| Logs & audit | Diagnostics ~90 days; admin audit append-only | Diagnostics unlinked; audit untouched | Yes |
+| Logs & audit | Diagnostics 90 days (daily purge); admin audit append-only | Diagnostics unlinked; audit untouched | Yes |
 | Payments | Financial record-keeping (~7 years, TBD) | Payout handles deleted; receipts kept | Yes |
 
-Nothing in this table is purged automatically. Account deletion is user-triggered via
-`deleteMyAccount` in `src/lib/account.functions.ts`; anything that legitimately survives it is
-listed above and shown to the member before they confirm.
+Only the diagnostics are purged automatically (below); nothing else in this table is. Account
+deletion is user-triggered via `deleteMyAccount` in `src/lib/account.functions.ts`; anything that
+legitimately survives it is listed above and shown to the member before they confirm.
 
-The "~90 days" for diagnostics is a promise only. No job deletes `auth_signin_events`,
-`location_denial_events` or `notification_delivery_log` yet.
+Diagnostics are kept 90 days (WP 5.9, migration `20261129120000_diagnostics_purge.sql`).
+`public.purge_diagnostics()` deletes the rows of `auth_signin_events`, `location_denial_events` and
+`notification_delivery_log` whose `created_at` is more than 90 days old. The `purge-diagnostics` job
+runs it daily at 03:37 UTC where pg_cron is installed. A run deletes at most 100,000 rows per table,
+and a larger backlog drains over the following nights. Only the service role and the job can run
+it. Deleted rows cannot be restored. Until the migration is applied to production, the promise is
+not kept there. Applying it is the owner's go-ahead: the first deletion is the job's first run after
+the apply.
 
 ### Tables not in the member-facing list
 
