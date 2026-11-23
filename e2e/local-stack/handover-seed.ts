@@ -48,9 +48,16 @@ export function yearsAgo(years: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-export function must<T>(r: { data: T | null; error: { message: string } | null }, what: string): T {
+/** What a supabase-js auth result holds once its error case is excluded (its failure branches carry `user: null`). */
+type Ok<D> = D extends { user: null } ? never : NonNullable<D>;
+
+/** The data of a supabase-js result, or a thrown error naming `what` (supabase-js results are a union of data-or-error). */
+export function must<R extends { data: unknown; error: { message: string } | null }>(
+  r: R,
+  what: string,
+): Ok<R["data"]> {
   if (r.error || r.data == null) throw new Error(`${what}: ${r.error?.message ?? "no data"}`);
-  return r.data;
+  return r.data as Ok<R["data"]>;
 }
 
 /** The managed placeholder address (`managedEmailFor` in src/lib/managed-children.ts; the itest asserts `isManagedEmail`). */

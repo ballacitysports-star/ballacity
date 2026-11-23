@@ -363,7 +363,7 @@ not part of `vitest run` or of CI):
 
 ```sh
 node e2e/local-stack/stack.mjs up && set -a && . e2e/local-stack/.state/env.sh && set +a
-npm run test:realauth                                  # 18 tests: e2e/local-stack/managed-handover-real-auth.itest.ts
+npm run test:realauth                                  # 17 tests here (managed-handover-real-auth.itest.ts) plus the seed below
 npx vitest run -c vitest.realauth.config.ts e2e/local-stack/handover-browser-seed.itest.ts   # makes the account and link
 npx playwright test --trace=off --workers=1 e2e/managed-handover-real-auth.spec.ts           # the browser journey
 ```
