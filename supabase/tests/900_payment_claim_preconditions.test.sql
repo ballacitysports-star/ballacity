@@ -273,10 +273,12 @@ SELECT t.eq(pg_temp.handles('nodob', 'host', 'c-open'), 0, 'nor an account with 
 SELECT t.ok(NOT public.game_payments_allowed(t.id('young')), 'setup: young may not coordinate payments');
 SELECT t.eq(pg_temp.handles('young', 'young', 'c-young'), 1, 'a payee sees their own handles whatever their age');
 SELECT t.eq(pg_temp.handles('pa', 'young', 'c-young'), 0, 'nobody else sees a minor payee''s handles, as before');
--- The guardian's "Can join games" switch is a game rule (refused on the claim), not a payment one: handles still show.
+-- The guardian's "Can join games" switch is a game rule (refused on the claim). Until 20261128120000 the handles still
+-- showed; since then a caller the claim rules refuse who is not on the roster gets none (993 compares the two).
 UPDATE public.child_controls SET game_participation = false WHERE child_user_id = t.id('teen');
-SELECT t.eq(pg_temp.handles('teen', 'host', 'c-open'), 1, 'the guardian switch alone does not hide the handles');
+SELECT t.eq(pg_temp.handles('teen', 'host', 'c-open'), 0, 'the guardian switch off: no handles (the claim would be refused)');
 UPDATE public.child_controls SET game_participation = true WHERE child_user_id = t.id('teen');
+SELECT t.eq(pg_temp.handles('teen', 'host', 'c-open'), 1, 'and back on: they show again');
 -- A consent-locked 16-year-old (parental consent required up to 17 by the age policy, and not given):
 -- game_payments_allowed is false, so no handles.
 INSERT INTO public.app_settings (key, value) VALUES ('age_policy', '{"parental_consent_max_age": 17}')
