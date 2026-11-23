@@ -132,6 +132,26 @@ describe("joinGame", () => {
     expect(JSON.parse(window.localStorage.getItem("openrun.joinedGameIds.v1") ?? "[]")).toEqual([]);
   });
 
+  it("counts a refusal as joined when the player's own row is already on the roster", async () => {
+    // Accepting an invitation to a free game puts the player on the roster (20261127120000). If that row took the last
+    // place, the game page's auto-join is refused as full by the join gate before the unique key answers.
+    server.insertError = { code: "P0001", message: "GAME_FULL: the roster is full." };
+    server.roster = ["g1"];
+    const { joinGame, isJoined } = await loadStore();
+    await expect(joinGame("g1")).resolves.toBe(true);
+    expect(isJoined("g1")).toBe(true);
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("still reports the refusal when the player's row is for another game", async () => {
+    server.insertError = { code: "P0001", message: "GAME_FULL: the roster is full." };
+    server.roster = ["g2"];
+    const { joinGame, isJoined } = await loadStore();
+    await expect(joinGame("g1")).resolves.toBe(false);
+    expect(isJoined("g1")).toBe(false);
+    expect(toastError).toHaveBeenCalledWith("This game is full.");
+  });
+
   it("points a player who lost the last spot at the waitlist when the host kept one", async () => {
     server.insertError = { code: "P0001", message: "GAME_FULL: the roster is full." };
     const { joinGame } = await loadStore();

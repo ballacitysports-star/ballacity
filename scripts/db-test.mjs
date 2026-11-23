@@ -218,6 +218,60 @@ async function lastSeatRace() {
   ];
 }
 
+// WP 5.5: two invitees accept the last place of a free game at the same moment. Accepting takes the game-row lock before it
+// counts the roster and writes the winner's roster row, so the second waits for the first and is told "full": one place
+// is given, never two, and the loser's invitation still waits (no request, no error, no deadlock).
+const INVITE_RACE_CLEANUP = `
+  DELETE FROM public.hosted_games WHERE id = 'race-invite-last';
+  DELETE FROM public.notifications WHERE user_id IN (t.id('raceinvhost'), t.id('raceinva'), t.id('raceinvb'));
+  DELETE FROM auth.users WHERE id IN (t.id('raceinvhost'), t.id('raceinva'), t.id('raceinvb'));`;
+
+async function inviteLastPlaceRace() {
+  psql(dbName, [], INVITE_RACE_CLEANUP);
+  r = psql(
+    dbName,
+    [],
+    `SELECT t.person('raceinvhost', 35), t.person('raceinva', 25), t.person('raceinvb', 26);
+     INSERT INTO public.hosted_games (id, host_id, sport, title, date, max_players)
+       VALUES ('race-invite-last', t.id('raceinvhost'), 'basketball', 'Last place', now() + interval '2 days', 1);
+     INSERT INTO public.game_payment_settings (game_id, host_id, entry_fee, requires_approval)
+       VALUES ('race-invite-last', t.id('raceinvhost'), 0, true);
+     INSERT INTO public.game_invites (id, game_id, host_id, invitee_id) VALUES
+       (t.id('race-inv-a'), 'race-invite-last', t.id('raceinvhost'), t.id('raceinva')),
+       (t.id('race-inv-b'), 'race-invite-last', t.id('raceinvhost'), t.id('raceinvb'));`,
+  );
+  if (r.status !== 0) fail("The invitation race could not set up its game.", r.stderr);
+  const accept = (who, inv, hold) =>
+    `BEGIN; SELECT t.as_user(t.id('${who}'));
+     SELECT 'ANSWER:' || (public.game_respond_invite(t.id('${inv}'), true) ->> 'status');
+     ${hold ? "SELECT pg_sleep(3);" : ""} COMMIT;`;
+  const first = session(accept("raceinva", "race-inv-a", true));
+  await pause(1000);
+  const second = session(accept("raceinvb", "race-inv-b", false));
+  const results = await Promise.all([first, second]);
+  const state = psql(dbName, [
+    "-At",
+    "-c",
+    `SELECT (SELECT string_agg(user_id::text, ',') FROM public.game_participants WHERE game_id = 'race-invite-last') || '|' ||
+            (SELECT count(*) FROM public.join_requests WHERE game_id = 'race-invite-last') || '|' ||
+            (SELECT string_agg(status, ',' ORDER BY id = t.id('race-inv-b')) FROM public.game_invites
+              WHERE game_id = 'race-invite-last')`,
+  ]);
+  const winner = psql(dbName, ["-At", "-c", "SELECT t.id('raceinva')"]).stdout.trim();
+  psql(dbName, [], INVITE_RACE_CLEANUP);
+  const answers = results.map((x) => (x.out.match(/ANSWER:(\w+)/) ?? [])[1]);
+  return [
+    [
+      "two invitees accepting the last free place: the first is on the roster, the other invitation waits",
+      state.status === 0 && state.stdout.trim() === `${winner}|1|accepted,pending`,
+    ],
+    [
+      'and the second is told "full", without an error or a deadlock',
+      results.every((x) => x.code === 0) && answers[0] === "accepted" && answers[1] === "full",
+    ],
+  ];
+}
+
 // P2-1 stage 4a: one family signs up through the old path (rsvp_tryout) and another through
 // events (register_for_event) for the last seat of the same copied tryout. Both lock the post
 // first, so the second waits for the first and is told it is full: one seat is taken, never two,
@@ -360,6 +414,7 @@ try {
       console.log("\nraces");
       for (const [name, ok] of [
         ...(await lastSeatRace()),
+        ...(await inviteLastPlaceRace()),
         ...(await oldVsNewSignupRace(true)),
         ...(await oldVsNewSignupRace(false)),
       ]) {

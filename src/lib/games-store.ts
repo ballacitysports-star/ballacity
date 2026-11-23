@@ -320,6 +320,20 @@ function ensureRealtime() {
   });
 }
 
+/** The id of the signed-in player's roster row for a game, or null when there is none or it cannot be read. */
+async function myRosterRowId(gameId: string, userId: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from("game_participants")
+      .select("id, game_id")
+      .eq("user_id", userId);
+    if (error) return null;
+    return (data ?? []).find((r) => r.game_id === gameId)?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Join a game. Resolves once the server has answered: true when the player is on
  * the roster (including when they already were), false when it refused or they
@@ -368,6 +382,15 @@ export async function joinGame(
       .single();
     // A duplicate means they were already on the roster, which is the outcome they wanted.
     if (error && error.code !== "23505") {
+      // The join gate counts the roster before the unique key is checked, so a player whose own row is already there
+      // (accepting an invitation to a free game writes it, 20261127120000) is refused as "full" when that row took the
+      // last place. Look for the row before reporting a refusal.
+      const existing = await myRosterRowId(id, uid);
+      if (existing) {
+        learnRow(existing, id);
+        markGameChanged(id);
+        return true;
+      }
       undo();
       // The server-side join gate rejects cancelled/ended/closed/full games and
       // anything that needs a host's or guardian's approval first. Tell the

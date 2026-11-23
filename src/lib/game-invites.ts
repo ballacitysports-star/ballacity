@@ -3,8 +3,9 @@
  *
  * The host invites through game_invite_player / game_invite_players; the database checks that they host an open game with
  * room, that the player can be reached (one neutral refusal otherwise), and writes the notification from the real game.
- * The invitee answers through game_respond_invite: accepting approves their place request at once, and the roster, payment
- * and guardian steps then follow as for any approved player. Nothing here decides who may invite whom.
+ * The invitee answers through game_respond_invite: accepting approves their place request at once and, on a free game with
+ * no guardian approval outstanding, puts them on the roster in the same step (20261127120000); otherwise the payment and
+ * guardian steps follow as for any approved player. Nothing here decides who may invite whom.
  */
 import { supabase } from "@/integrations/supabase/client";
 import { USER_ERROR_MESSAGES, errorCode, knownErrorMessage } from "@/lib/user-error";
@@ -39,6 +40,8 @@ export type GameInviteWithGame = GameInvite & { game: GameInviteGame | null };
 export type RespondResult = {
   status: GameInviteStatus | "full";
   join_request_id?: string | null;
+  /** Whether the player has a roster row in the game now: accepting a free game's invitation writes it (20261127120000). */
+  on_roster?: boolean;
 };
 
 export type BulkInviteResult = { invited: number; skipped: Record<string, number> };
@@ -112,6 +115,37 @@ export function respondToGameInvite(inviteId: string, accept: boolean): Promise<
 
 export function cancelGameInvite(inviteId: string): Promise<string> {
   return call<string>("game_cancel_invite", { _invite: inviteId });
+}
+
+/** game_invites is not in the generated types; a filter chain that resolves to the matching ids. */
+type PendingInvitesQuery = { eq: (col: string, v: unknown) => PendingInvitesQuery } & PromiseLike<{
+  data: { id: string }[] | null;
+  error: unknown;
+}>;
+
+/**
+ * The host ends a player's invitation to one game that is still waiting for an answer, through game_cancel_invite, once
+ * the host has removed the player or declined their request: an invitation the host has taken back should not stay open
+ * to accept. Best-effort, like the rest of that cleanup: it never throws, and the host's action has already happened.
+ */
+export async function cancelPendingGameInvitesFor(gameId: string, playerId: string): Promise<void> {
+  try {
+    const { data, error } = await (
+      supabase.from("game_invites" as never) as unknown as {
+        select: (cols: string) => PendingInvitesQuery;
+      }
+    )
+      .select("id")
+      .eq("game_id", gameId)
+      .eq("invitee_id", playerId)
+      .eq("status", "pending");
+    if (error) return;
+    for (const row of data ?? []) {
+      await cancelGameInvite(row.id).catch(() => undefined);
+    }
+  } catch {
+    // best-effort
+  }
 }
 
 function normalize(rows: unknown[] | null): GameInviteWithGame[] {

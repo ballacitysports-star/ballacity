@@ -76,6 +76,15 @@ describe("GameInviteBanner", () => {
     expect(container.innerHTML).toBe("");
   });
 
+  it("an invitation that ended on accept says so without claiming the game is closed", async () => {
+    // WP 5.5: a taken-back invitation answers expired while the game is still open to others.
+    env.respond.mockResolvedValue({ status: "expired", on_roster: false });
+    render(<GameInviteBanner inviteId="inv1" viewerId="me" onAnswered={() => {}} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
+    expect(await screen.findByText("This invitation has ended.")).toBeTruthy();
+    expect(screen.queryByText(/no longer taking players/)).toBeNull();
+  });
+
   it("a withdrawn invitation says so", async () => {
     env.invite = pending({ status: "cancelled" });
     render(<GameInviteBanner inviteId="inv1" viewerId="me" onAnswered={() => {}} />);

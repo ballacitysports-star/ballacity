@@ -1,11 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getCurrentUserId } from "@/lib/current-user-id";
 import { validateImageMeta } from "@/lib/image-validation";
+import { cancelPendingGameInvitesFor } from "@/lib/game-invites";
 import { hostAnswersRequest, isGuardianOnlyRequest } from "@/lib/guarded-open-join";
 import type { CancellationReason, PaymentSubmissionStatus } from "@/lib/payment-states";
 import type { PaymentMode } from "@/lib/monetization/fees";
 import { PAYMENTS_AGE_REQUIRED_MESSAGE, PAYMENTS_BLOCKED_MESSAGE } from "@/lib/payments-policy";
-import { paymentSubmissionErrorMessage } from "@/lib/user-error";
+import { FEATURE_ERROR_MESSAGES, paymentSubmissionErrorMessage } from "@/lib/user-error";
 
 export type PaymentType =
   "venmo" | "cashapp" | "zelle" | "paypal" | "applecash" | "googlepay" | "cash" | "custom";
@@ -738,7 +739,8 @@ export async function withdrawMyApprovedJoinRequest(gameId: string) {
  * rendering a "ghost" approved player when only game_participants is
  * cleaned up), and any pending/verified payment submission for that player
  * on this game so payment chips don't linger. RLS restricts each delete
- * to the game's host.
+ * to the game's host. An invitation to this game the player has not answered
+ * yet is ended too, so they cannot accept their way back in.
  */
 export async function hostRemoveParticipant(params: {
   gameId: string;
@@ -771,6 +773,7 @@ export async function hostRemoveParticipant(params: {
       () => undefined,
       () => undefined,
     );
+  await cancelPendingGameInvitesFor(gameId, playerId);
 }
 
 export async function getMyJoinRequest(gameId: string): Promise<JoinRequest | null> {
@@ -844,12 +847,25 @@ export async function listMyJoinRequests(
   return (data ?? []) as JoinRequest[];
 }
 
+/**
+ * A host's decision on a join request. A decline also ends the player's invitation to that game if they have not
+ * answered it yet (best-effort, after the decline has been saved): an invitation the host has taken back should not stay
+ * open to accept. The server (20261127120000) also refuses such an accept while the declined request is still there, but
+ * the player can delete that request, or rewrite its decline time when sending it again, so this cancel is the only
+ * protection that survives that (a known gap, WP 5.5 follow-up).
+ *
+ * A decline never lands on a request that is already approved: the player may have accepted the host's invitation in the
+ * meantime (on a free game that puts them on the roster), and turning that approval into a decline would leave them on
+ * the roster with a declined request. The host is told to use Remove instead. `removing` is for the roster's Remove,
+ * which declines an approved request on purpose and takes the roster row away itself.
+ */
 export async function reviewJoinRequest(
   id: string,
   status: "approved" | "rejected",
   notes?: string,
+  opts?: { removing?: boolean },
 ) {
-  const { error } = await supabase
+  const update = supabase
     .from("join_requests")
     .update({
       status,
@@ -857,5 +873,35 @@ export async function reviewJoinRequest(
       reviewed_at: new Date().toISOString(),
     })
     .eq("id", id);
-  if (error) throw error;
+  if (status === "rejected" && !opts?.removing) {
+    const { data, error } = await update.neq("status", "approved").select("id");
+    if (error) throw error;
+    if (!data?.length && (await requestStatus(id)) === "approved") {
+      throw new Error(FEATURE_ERROR_MESSAGES.declineAlreadyApproved);
+    }
+  } else {
+    const { error } = await update;
+    if (error) throw error;
+  }
+  if (status === "rejected") await endInvitationForRequest(id);
+}
+
+/** The request's status as the host reads it now; null when it cannot be read (or is gone). */
+async function requestStatus(id: string): Promise<string | null> {
+  const { data } = await supabase.from("join_requests").select("status").eq("id", id).maybeSingle();
+  return (data as { status?: string } | null)?.status ?? null;
+}
+
+/** Best-effort: end the pending invitation of a declined request's player to its game. Never throws. */
+async function endInvitationForRequest(requestId: string): Promise<void> {
+  try {
+    const { data } = await supabase
+      .from("join_requests")
+      .select("game_id, player_id")
+      .eq("id", requestId)
+      .maybeSingle();
+    if (data) await cancelPendingGameInvitesFor(data.game_id, data.player_id);
+  } catch {
+    // best-effort
+  }
 }
