@@ -8,6 +8,7 @@
  * guardian steps follow as for any approved player. Nothing here decides who may invite whom.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { DEFAULT_GAME_REMINDER_OFFSETS, saveMyGameReminderOffsets } from "@/lib/game-reminders";
 import { USER_ERROR_MESSAGES, errorCode, knownErrorMessage } from "@/lib/user-error";
 
 export type GameInviteStatus = "pending" | "accepted" | "declined" | "cancelled" | "expired";
@@ -111,6 +112,21 @@ export function invitePlayersToGame(
 
 export function respondToGameInvite(inviteId: string, accept: boolean): Promise<RespondResult> {
   return call<RespondResult>("game_respond_invite", { _invite: inviteId, _accept: accept });
+}
+
+/**
+ * WP 5.4: once game_respond_invite answers `accepted`, the player gets the reminder lead times the game page starts its
+ * RSVP picker from (DEFAULT_GAME_REMINDER_OFFSETS), unless they already chose some for this game, "no reminders"
+ * included. Best-effort: it never throws, so a failed save cannot turn the accept into an error.
+ */
+export async function saveDefaultRemindersOnAccept(gameId: string): Promise<void> {
+  try {
+    await saveMyGameReminderOffsets(gameId, [...DEFAULT_GAME_REMINDER_OFFSETS], {
+      keepExisting: true,
+    });
+  } catch {
+    // best-effort
+  }
 }
 
 export function cancelGameInvite(inviteId: string): Promise<string> {

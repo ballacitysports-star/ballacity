@@ -1583,6 +1583,7 @@ export type Database = {
           all_day: boolean
           allow_waitlist: boolean
           arrive_early_min: number
+          attendance_prompted_at: string | null
           cancel_cutoff_min: number
           cancellation_notes: string | null
           cancellation_policy: string
@@ -1640,6 +1641,7 @@ export type Database = {
           all_day?: boolean
           allow_waitlist?: boolean
           arrive_early_min?: number
+          attendance_prompted_at?: string | null
           cancel_cutoff_min?: number
           cancellation_notes?: string | null
           cancellation_policy?: string
@@ -1697,6 +1699,7 @@ export type Database = {
           all_day?: boolean
           allow_waitlist?: boolean
           arrive_early_min?: number
+          attendance_prompted_at?: string | null
           cancel_cutoff_min?: number
           cancellation_notes?: string | null
           cancellation_policy?: string
@@ -2581,6 +2584,7 @@ export type Database = {
           created_at: string
           id: string
           link: string | null
+          push_sent_at: string | null
           read_at: string | null
           title: string
           type: string
@@ -2591,6 +2595,7 @@ export type Database = {
           created_at?: string
           id?: string
           link?: string | null
+          push_sent_at?: string | null
           read_at?: string | null
           title: string
           type: string
@@ -2601,6 +2606,7 @@ export type Database = {
           created_at?: string
           id?: string
           link?: string | null
+          push_sent_at?: string | null
           read_at?: string | null
           title?: string
           type?: string

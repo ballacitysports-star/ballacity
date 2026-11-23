@@ -5,6 +5,7 @@ import {
   gameInviteErrorMessage,
   getGameInvite,
   respondToGameInvite,
+  saveDefaultRemindersOnAccept,
   type GameInvite,
 } from "@/lib/game-invites";
 
@@ -53,6 +54,8 @@ export function GameInviteBanner({
     try {
       const res = await respondToGameInvite(invite.id, accept);
       if (res.status === "accepted") {
+        // Reminders as if they had joined from the game page; not awaited, and a failure never reaches the catch below.
+        void saveDefaultRemindersOnAccept(invite.game_id).catch(() => {});
         toast.success("You're in. The host has been told.");
         setInvite({ ...invite, status: "accepted" });
         onAnswered();

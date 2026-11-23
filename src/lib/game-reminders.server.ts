@@ -28,7 +28,8 @@
  */
 import { guardianLinksInForce } from "@/lib/guardian-links-in-force.server";
 import { formatDatedWhen, formatNotificationWhen } from "@/lib/format";
-import { isAllowedIn, mergeNotifPrefs } from "@/lib/notification-prefs-core";
+import { gameEndsAt } from "@/lib/game-time";
+import { isAllowedIn, mergeNotifPrefs, type NotifPrefs } from "@/lib/notification-prefs-core";
 import { deliverPush, type PushInput } from "@/lib/push.server";
 
 /** A run stops claiming reminders once it has taken this long; the rest stay due. */
@@ -136,6 +137,12 @@ type Q<T> = Res<T> & {
   lte: (c: string, v: unknown) => Q<T>;
   or: (f: string) => Q<T>;
   limit: (n: number) => Q<T>;
+  /** `column IS NULL` (WP 5.4 / 5.6 claims). */
+  is: (c: string, v: null) => Q<T>;
+  neq: (c: string, v: unknown) => Q<T>;
+  order: (c: string, o?: { ascending?: boolean }) => Q<T>;
+  /** Rows `from` to `to` (inclusive) of the ordered result: paging past the API's row cap. */
+  range: (from: number, to: number) => Q<T>;
 };
 export type ReminderAdmin = {
   from: (t: string) => Q<unknown> & {
@@ -248,30 +255,43 @@ async function readRecipients(admin: ReminderAdmin, games: ReminderGame[], userI
  */
 async function playersWantingPush(admin: ReminderAdmin, userIds: string[]): Promise<Set<string>> {
   try {
-    const { data, error } = await (admin
-      .from("notification_preferences")
-      .select("user_id, prefs")
-      .in("user_id", userIds) as Q<unknown>);
-    if (error) throw new Error(error.message);
-    const stored = new Map(
-      ((data ?? []) as { user_id: string; prefs?: unknown }[]).map((r) => [
-        String(r.user_id),
-        r.prefs,
-      ]),
-    );
-    return new Set(
-      userIds.filter((u) => {
-        const p = stored.get(u);
-        const prefs = mergeNotifPrefs(
-          p && typeof p === "object" ? (p as Record<string, unknown>) : null,
-        );
-        return isAllowedIn(prefs, "game_reminder", "push");
-      }),
-    );
+    const prefs = await readNotifPrefs(admin, userIds);
+    return new Set(userIds.filter((u) => isAllowedIn(prefs.get(u)!, "game_reminder", "push")));
   } catch (e) {
     console.warn("[reminders] preferences unavailable; no pushes this run", e);
     return new Set();
   }
+}
+
+/**
+ * Each member's notification settings (notification_preferences.prefs), merged exactly as the
+ * app merges them; a member with no saved row gets the defaults. One query. Throws when the read
+ * fails: no caller pushes on a guess.
+ */
+async function readNotifPrefs(
+  admin: ReminderAdmin,
+  userIds: string[],
+): Promise<Map<string, NotifPrefs>> {
+  const { data, error } = await (admin
+    .from("notification_preferences")
+    .select("user_id, prefs")
+    .in("user_id", userIds) as Q<unknown>);
+  if (error) throw new Error(error.message);
+  const stored = new Map(
+    ((data ?? []) as { user_id: string; prefs?: unknown }[]).map((r) => [
+      String(r.user_id),
+      r.prefs,
+    ]),
+  );
+  return new Map(
+    userIds.map((u) => {
+      const p = stored.get(u);
+      return [
+        u,
+        mergeNotifPrefs(p && typeof p === "object" ? (p as Record<string, unknown>) : null),
+      ];
+    }),
+  );
 }
 
 /** Runs `task` over `items`, at most `limit` at a time, and waits for every one to settle. */
@@ -452,4 +472,577 @@ export async function sendDueGameReminders(
   }
   summary.pushed = pushes.length;
   return summary;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// WP 5.4: invites reach the phone. The game_invite and game_invite_accepted notifications are written by the database
+// (game_invite_player, game_respond_invite), which cannot push. The sweep pushes each one of the last hour once.
+
+/** The notification types the sweep pushes. */
+export const INVITE_PUSH_TYPES = ["game_invite", "game_invite_accepted"] as const;
+/** Older rows are left alone: an invite push an hour late is noise, and the in-app row is there. */
+export const INVITE_PUSH_MAX_AGE_MS = 60 * 60_000;
+/** Rows one read takes, oldest first; the rest wait for the next read or run (5 minutes) while still in the hour. */
+export const MAX_INVITE_PUSHES_PER_RUN = 50;
+/** Reads one run makes. A read whose rows were all passed over is followed by the next, so they never crowd out the rest. */
+const MAX_INVITE_READS_PER_RUN = 4;
+/** How far apart an acceptance's notification and its invitation's answer may be written (one transaction: the same now()). */
+const ACCEPT_MATCH_MS = 60_000;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export type InvitePushSummary = {
+  /** Rows this run took (push_sent_at set by this run). */
+  taken: number;
+  /** Pushes handed to deliverPush (it may still hold one for quiet hours or skip it; see the delivery log). */
+  pushed: number;
+  /** Taken without a push: the member switched that push off, or had already read the notification. */
+  passed: number;
+  /** Rows a push was wanted for but left for the next run (not taken): the run's time was up. */
+  deferred: number;
+};
+
+type InviteNotice = {
+  id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  read_at: string | null;
+  created_at: string;
+};
+
+/** The invitation an invite link names (`inv=<uuid>`, written by game_invite_player), or null. */
+function inviteIdOf(link: string | null): string | null {
+  if (!link) return null;
+  try {
+    const inv = new URL(link, "https://app.local").searchParams.get("inv");
+    return inv && UUID_RE.test(inv) ? inv.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The game an acceptance links to (`/games/<id>`, written by game_respond_invite), or null. */
+function gameIdOf(link: string | null): string | null {
+  // A query or hash after the game id is ignored.
+  const m = /^\/games\/([^/?#]+)(?:[?#].*)?$/.exec(link ?? "");
+  if (!m) return null;
+  try {
+    return decodeURIComponent(m[1]!);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The rows whose push may go, decided now from the invitations themselves (the notification row stays as it was written,
+ * whatever happened since):
+ * - an invite: its `inv=` names an invitation to this row's recipient that public.invite_pushes_allowed (20261129100000,
+ *   service role only) still allows: pending, AND everything game_invite_player checked when it wrote the row still holds
+ *   (the game open for invitations: not cancelled or hidden by its host, a moderator or its organization; the host not
+ *   suspended or banned; the minor messaging rules; a guardian's game permission; the game's age range). An invitation
+ *   stays 'pending' through all of those changes, so its status alone is not enough. A guardian's copy (link /parent)
+ *   names none, so only the invitee is pushed;
+ * - an acceptance: an invitation to this game from this host (the recipient) was accepted when the row was written;
+ * - and no block, either way, between the host and the invited player.
+ * Every read throws on failure, and so does a client without the check (no rpc), so the caller takes nothing and the rows
+ * stay due: an invite is never pushed on a guess.
+ */
+async function invitePushesStillWanted(
+  admin: ReminderAdmin,
+  rows: InviteNotice[],
+): Promise<Set<string>> {
+  const pairs = new Map<string, [string, string][]>();
+  const invIds = [
+    ...new Set(
+      rows
+        .filter((n) => n.type === "game_invite")
+        .map((n) => inviteIdOf(n.link))
+        .filter((v): v is string => v != null),
+    ),
+  ];
+  if (invIds.length > 0) {
+    if (typeof admin.rpc !== "function") throw new Error("invitation check unavailable");
+    const { data, error } = await admin.rpc("invite_pushes_allowed", { _invites: invIds });
+    if (error) throw new Error(`invitation check failed: ${error.message}`);
+    if (!Array.isArray(data)) throw new Error("invitation check failed: no rows");
+    const byId = new Map(
+      (data as { id: string; host_id: string; invitee_id: string }[]).map((i) => [
+        String(i.id).toLowerCase(),
+        i,
+      ]),
+    );
+    for (const n of rows) {
+      if (n.type !== "game_invite") continue;
+      const i = byId.get(inviteIdOf(n.link) ?? "");
+      if (i && String(i.invitee_id) === String(n.user_id)) {
+        pairs.set(String(n.id), [[String(i.host_id), String(i.invitee_id)]]);
+      }
+    }
+  }
+
+  const acceptances = rows.filter((n) => n.type === "game_invite_accepted" && gameIdOf(n.link));
+  if (acceptances.length > 0) {
+    const earliest = Math.min(...acceptances.map((n) => Date.parse(n.created_at)));
+    const { data, error } = await (admin
+      .from("game_invites")
+      .select("game_id, host_id, invitee_id, responded_at")
+      .in("game_id", [...new Set(acceptances.map((n) => gameIdOf(n.link)!))])
+      .eq("status", "accepted")
+      .gt("responded_at", new Date(earliest - ACCEPT_MATCH_MS).toISOString()) as Q<unknown>);
+    if (error) throw new Error(`invitation read failed: ${error.message}`);
+    const answered = (data ?? []) as {
+      game_id: string;
+      host_id: string;
+      invitee_id: string;
+      responded_at: string;
+    }[];
+    for (const n of acceptances) {
+      const at = Date.parse(n.created_at);
+      const match = answered.filter(
+        (i) =>
+          String(i.game_id) === gameIdOf(n.link) &&
+          String(i.host_id) === String(n.user_id) &&
+          Math.abs(Date.parse(i.responded_at) - at) <= ACCEPT_MATCH_MS,
+      );
+      if (match.length > 0) {
+        pairs.set(
+          String(n.id),
+          match.map((i) => [String(i.host_id), String(i.invitee_id)]),
+        );
+      }
+    }
+  }
+  if (pairs.size === 0) return new Set();
+
+  const people = [...new Set([...pairs.values()].flat(2))];
+  const { data: blocks, error: bErr } = await (admin
+    .from("user_blocks")
+    .select("blocker_id, blocked_id")
+    .in("blocker_id", people)
+    .in("blocked_id", people) as Q<unknown>);
+  if (bErr) throw new Error(`block read failed: ${bErr.message}`);
+  const blocked = new Set(
+    ((blocks ?? []) as { blocker_id: string; blocked_id: string }[]).flatMap((b) => [
+      `${b.blocker_id}|${b.blocked_id}`,
+      `${b.blocked_id}|${b.blocker_id}`,
+    ]),
+  );
+  return new Set(
+    [...pairs.entries()]
+      .filter(([, ps]) => ps.every(([host, player]) => !blocked.has(`${host}|${player}`)))
+      .map(([id]) => id),
+  );
+}
+
+/**
+ * The game's start from an invite link (`exp=<ms>`, written by game_invite_player): a push held past it (a minor's quiet
+ * hours) is dropped rather than sent after the game began. Null when the link has none.
+ */
+export function inviteLinkExpiry(link: string | null): string | null {
+  if (!link) return null;
+  try {
+    const exp = Number(new URL(link, "https://app.local").searchParams.get("exp"));
+    return Number.isFinite(exp) && exp > 0 ? new Date(exp).toISOString() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Pushes the invite notifications of the last hour that no run has taken yet.
+ *
+ * - Settings first: one read of the members' notification settings. If it fails nothing is taken, so the rows stay due.
+ * - Then the invitations behind the rows (invitePushesStillWanted): an invitation that is no longer pending, or that
+ *   game_invite_player would no longer allow (game cancelled or hidden, host suspended or banned, a block either way, the
+ *   minor messaging rules, a guardian's game permission, the age range), or a row no invitation stands behind, gets no
+ *   push. A failed read or check takes nothing.
+ * - A row is TAKEN by an update that sets push_sent_at only where it is still NULL; the rows it returns are this run's
+ *   alone, so two runs at once (the scheduler retrying, two instances) split the rows and never push one twice. Rows that
+ *   get no push (the member switched that category's push off: game_invite: Invitations, game_invite_accepted: Game
+ *   updates; already read in the app; the invitation no longer stands) are taken together, so they are never pushed later.
+ * - Rows that get a push are taken PUSH_CONCURRENCY at a time, each group just before its pushes, and the next group only
+ *   once those pushes have finished. pg_net stops waiting after 5 seconds and the Worker's remaining work is then
+ *   cancelled, so a row taken long before its push could be stamped and never pushed. Once the run's time is up
+ *   (RUN_BUDGET_MS, shared with the other jobs by runScheduledSweeps) no more rows are read or taken: they stay due
+ *   (summary.deferred) for the next run, 5 minutes later, while still in the hour. At most one group can be in flight when
+ *   a run is cut off.
+ * - A taken row is pushed through deliverPush, which applies a minor's quiet hours and a guardian's off switch. The push
+ *   says exactly what the notification says: its title and body (the sport and time for an invite, the game's title for
+ *   an acceptance; never a venue) and its link.
+ * - A run reads up to MAX_INVITE_PUSHES_PER_RUN rows at a time, oldest first, and reads again (at most
+ *   MAX_INVITE_READS_PER_RUN times) while a read came back full and fewer than that many pushes went out, so rows passed
+ *   over never hold back the rest. The database stamps rows it did not write for an invite as it stores them
+ *   (20261129100000), so a member's own rows never reach this read.
+ * Pushes are best effort after the row is taken: a failed push is logged by deliverPush and not retried.
+ */
+export async function pushInviteNotifications(
+  admin: ReminderAdmin,
+  opts: { now?: number; max?: number; clock?: () => number; budgetMs?: number } = {},
+): Promise<InvitePushSummary> {
+  const clock = opts.clock ?? Date.now;
+  const startedAt = clock();
+  const overBudget = () => clock() - startedAt >= (opts.budgetMs ?? RUN_BUDGET_MS);
+  const now = opts.now ?? Date.now();
+  const pageSize = Math.max(1, opts.max ?? MAX_INVITE_PUSHES_PER_RUN);
+  const summary: InvitePushSummary = { taken: 0, pushed: 0, passed: 0, deferred: 0 };
+
+  /** Takes these rows; returns the ids this run took. */
+  const take = async (ids: string[]): Promise<Set<string>> => {
+    if (ids.length === 0) return new Set();
+    const { data, error } = await (admin
+      .from("notifications")
+      .update({ push_sent_at: new Date(now).toISOString() })
+      .in("id", ids)
+      .is("push_sent_at", null)
+      .select("id") as Q<unknown>);
+    if (error) throw new Error(`invite notification claim failed: ${error.message}`);
+    return new Set(((data ?? []) as { id: string }[]).map((r) => String(r.id)));
+  };
+
+  for (let read = 0; read < MAX_INVITE_READS_PER_RUN && summary.pushed < pageSize; read++) {
+    if (overBudget()) break;
+    const { data, error } = await (admin
+      .from("notifications")
+      .select("id, user_id, type, title, body, link, read_at, created_at")
+      .in("type", INVITE_PUSH_TYPES)
+      .is("push_sent_at", null)
+      .gt("created_at", new Date(now - INVITE_PUSH_MAX_AGE_MS).toISOString())
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .limit(pageSize) as Q<unknown>);
+    if (error) throw new Error(`invite notification read failed: ${error.message}`);
+    const due = (data ?? []) as InviteNotice[];
+    if (due.length === 0) break;
+
+    const prefs = await readNotifPrefs(admin, [...new Set(due.map((n) => String(n.user_id)))]);
+    const wanted = await invitePushesStillWanted(admin, due);
+    const pushFor = (n: InviteNotice) => {
+      const memberPrefs = prefs.get(String(n.user_id));
+      return (
+        wanted.has(String(n.id)) &&
+        n.read_at == null &&
+        memberPrefs != null &&
+        isAllowedIn(memberPrefs, n.type, "push")
+      );
+    };
+
+    const quiet = await take(due.filter((n) => !pushFor(n)).map((n) => String(n.id)));
+    summary.taken += quiet.size;
+    summary.passed += quiet.size;
+
+    const loud = due.filter(pushFor);
+    for (let i = 0; i < loud.length; i += PUSH_CONCURRENCY) {
+      if (overBudget()) {
+        // Out of time: these stay untaken, so the next run pushes them.
+        summary.deferred += loud.length - i;
+        return summary;
+      }
+      const group = loud.slice(i, i + PUSH_CONCURRENCY);
+      const mine = await take(group.map((n) => String(n.id)));
+      const pushes: PushInput[] = group
+        .filter((n) => mine.has(String(n.id)))
+        .map((n) => ({
+          userId: String(n.user_id),
+          title: n.title,
+          body: n.body,
+          url: n.link,
+          expiresAt: inviteLinkExpiry(n.link),
+          notificationId: String(n.id),
+        }));
+      summary.taken += pushes.length;
+      summary.pushed += pushes.length;
+      const results = await Promise.allSettled(pushes.map((p) => deliverPush(p)));
+      for (const res of results) {
+        if (res.status === "rejected") console.warn("[invite-push] push failed", res.reason);
+      }
+    }
+    if (due.length < pageSize) break;
+  }
+  return summary;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// WP 5.6: prompt hosts to mark attendance. Nothing reminded hosts to record who showed up.
+
+/** The notification type of the prompt (notification settings: Game reminders). */
+export const ATTENDANCE_PROMPT_TYPE = "game_attendance_prompt";
+/** The prompt goes out this long after the game ends. */
+export const ATTENDANCE_PROMPT_DELAY_MS = 2 * 60 * 60_000;
+/**
+ * And not later than this after it was due: a game whose prompt time passed while the sweep was not running (or before
+ * the prompt existed) gets none, instead of every past game prompting at once.
+ */
+export const ATTENDANCE_PROMPT_WINDOW_MS = 24 * 60 * 60_000;
+/** Games one run prompts for, soonest due first. */
+export const MAX_ATTENDANCE_PROMPTS_PER_RUN = 50;
+/** Games looked at: started at most this long ago (covers the window plus a long game). */
+const ATTENDANCE_LOOKBACK_MS = 3 * 86_400_000;
+/** Rows asked for per read. The API may return fewer (its row cap); reads continue until one returns none. */
+const READ_PAGE = 1000;
+/** Reads of unprompted games one run makes (READ_PAGE each); past this the oldest are looked at first. */
+const MAX_GAME_PAGES = 10;
+/** Reads of one batch's roster; a roster still unread after this many is not decided on (no prompt this run). */
+const MAX_ROSTER_PAGES = 20;
+
+/**
+ * Every row of a read, page by page (`range`), so the API's row cap never cuts it short silently. `query` must order the
+ * rows by a unique key. Stops when a page comes back empty (`complete`), or after `maxPages` pages with the rows read so
+ * far (`complete: false`).
+ */
+async function readAllPages<T>(
+  query: (
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+  maxPages: number,
+  what: string,
+): Promise<{ rows: T[]; complete: boolean }> {
+  const rows: T[] = [];
+  for (let page = 0; page < maxPages; page++) {
+    const { data, error } = await query(rows.length, rows.length + READ_PAGE - 1);
+    if (error) throw new Error(`${what} read failed: ${error.message}`);
+    const got = (data ?? []) as T[];
+    if (got.length === 0) return { rows, complete: true };
+    rows.push(...got);
+  }
+  return { rows, complete: false };
+}
+
+/** Where the prompt opens: the Attendance block on the game page's roster (src/routes/games.$gameId.index.tsx). */
+export function attendancePromptLink(gameId: string): string {
+  return `/games/${gameId}?tab=overview#attendance`;
+}
+
+/** The prompt's words, in-app and on the lock screen alike: the game's title, never a player's name. */
+export function attendancePromptText(gameTitle: string): { title: string; body: string } {
+  return {
+    title: `Who showed up at ${gameTitle}?`,
+    body: "Mark who showed up. It builds your host reliability score.",
+  };
+}
+
+export type AttendanceGame = {
+  id: string;
+  host_id: string;
+  title: string;
+  date: string;
+  duration: string | null;
+  ends_at: string | null;
+  status: string | null;
+  cancelled_at: string | null;
+};
+
+export type AttendancePromptSummary = {
+  /** Prompts sent (in-app notice written; attendance_prompted_at set). */
+  prompted: number;
+  /** Pushes handed to deliverPush. */
+  pushed: number;
+  /** Games in the prompt window left for the next run (past the run's budget or cap), checked or not. */
+  deferred: number;
+};
+
+/**
+ * Sends each host whose game ended 2 hours ago one prompt to mark attendance, in the app and as a push.
+ *
+ * A game gets one when ALL hold: it is not cancelled (status or cancelled_at); 2 hours have passed since its end
+ * (gameEndsAt, the app's rule: ends_at, or the start plus its duration) but not 26; it has at least one participant
+ * other than the host; nobody's attendance is marked (no roster row with attended or attendance_marked_at); and no
+ * prompt was sent (attendance_prompted_at is NULL). Each game of a series is its own row and is prompted once.
+ *
+ * The prompt goes to the game's host (hosted_games.host_id), the one person host_mark_attendance lets mark it besides
+ * moderators. public.send_attendance_prompt (20261129110000, service role only) stamps attendance_prompted_at where it is
+ * still NULL (so two runs never both prompt), checks the game is still due (not cancelled, a non-host participant, nothing
+ * marked), and writes the notice, in one transaction: a run cut off part way (pg_net stops waiting after 5 seconds) never
+ * leaves a game stamped without its notice, and a notice that cannot be written leaves nothing stamped, so the next run
+ * tries again. A run whose time is already up (runScheduledSweeps shares RUN_BUDGET_MS) reads nothing. The push follows the
+ * host's Game reminders push setting and goes through deliverPush (a minor's quiet hours, a guardian's off switch).
+ */
+export async function promptHostsForAttendance(
+  admin: ReminderAdmin,
+  opts: { now?: number; clock?: () => number; budgetMs?: number; max?: number } = {},
+): Promise<AttendancePromptSummary> {
+  const clock = opts.clock ?? Date.now;
+  const startedAt = clock();
+  const overBudget = () => clock() - startedAt >= (opts.budgetMs ?? RUN_BUDGET_MS);
+  const now = opts.now ?? Date.now();
+  const max = Math.max(1, opts.max ?? MAX_ATTENDANCE_PROMPTS_PER_RUN);
+  const summary: AttendancePromptSummary = { prompted: 0, pushed: 0, deferred: 0 };
+  if (overBudget()) return summary;
+  if (typeof admin.rpc !== "function") throw new Error("attendance prompt unavailable");
+  const rpc = admin.rpc.bind(admin);
+
+  // The database drops cancelled games; every unprompted game left in the lookback is read, page by page, oldest first.
+  const games = await readAllPages<AttendanceGame>(
+    (from, to) =>
+      admin
+        .from("hosted_games")
+        .select("id, host_id, title, date, duration, ends_at, status, cancelled_at")
+        .is("attendance_prompted_at", null)
+        .is("cancelled_at", null)
+        .or("status.is.null,status.neq.cancelled")
+        .gt("date", new Date(now - ATTENDANCE_LOOKBACK_MS).toISOString())
+        .lte("date", new Date(now - ATTENDANCE_PROMPT_DELAY_MS).toISOString())
+        .order("date", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to) as Q<unknown>,
+    MAX_GAME_PAGES,
+    "game",
+  );
+  if (!games.complete) {
+    console.warn(
+      "[attendance-prompt] more unprompted games than one run reads; the oldest go first",
+    );
+  }
+  const dueAt = (g: AttendanceGame) =>
+    gameEndsAt({ date: g.date, duration: g.duration ?? "", endsAt: g.ends_at }) +
+    ATTENDANCE_PROMPT_DELAY_MS;
+  const candidates = games.rows
+    .filter((g) => {
+      if (g.status === "cancelled" || g.cancelled_at != null || !g.host_id) return false;
+      const due = dueAt(g);
+      return due <= now && now - due < ATTENDANCE_PROMPT_WINDOW_MS;
+    })
+    .sort((a, b) => dueAt(a) - dueAt(b));
+
+  // Soonest due first, a batch at a time: a game that is marked or has only its host never holds back the ones after it.
+  const pushes: PushInput[] = [];
+  let next = 0;
+  while (next < candidates.length && summary.prompted < max && !overBudget()) {
+    const chunk = candidates.slice(next, next + max);
+    next += chunk.length;
+    const ids = chunk.map((g) => g.id);
+    const roster = await readAllPages<{
+      game_id: string;
+      user_id: string;
+      attended: boolean | null;
+      attendance_marked_at: string | null;
+    }>(
+      (from, to) =>
+        admin
+          .from("game_participants")
+          .select("game_id, user_id, attended, attendance_marked_at")
+          .in("game_id", ids)
+          .order("game_id", { ascending: true })
+          .order("user_id", { ascending: true })
+          .range(from, to) as Q<unknown>,
+      MAX_ROSTER_PAGES,
+      "roster",
+    );
+    if (!roster.complete) {
+      console.warn(
+        "[attendance-prompt] a roster batch was too large to read; no prompts for it this run",
+      );
+      summary.deferred += chunk.length;
+      continue;
+    }
+    const byId = new Map(chunk.map((g) => [g.id, g]));
+    const others = new Set<string>();
+    const marked = new Set<string>();
+    for (const p of roster.rows) {
+      const g = byId.get(p.game_id);
+      if (!g) continue;
+      if (p.attended != null || p.attendance_marked_at != null) marked.add(g.id);
+      if (String(p.user_id) !== String(g.host_id)) others.add(g.id);
+    }
+    const due = chunk.filter((g) => others.has(g.id) && !marked.has(g.id));
+    if (due.length === 0) continue;
+
+    // A failed settings read sends no push (the in-app notice still goes), as for reminders.
+    let prefs = new Map<string, NotifPrefs>();
+    try {
+      prefs = await readNotifPrefs(admin, [...new Set(due.map((g) => String(g.host_id)))]);
+    } catch (e) {
+      console.warn("[attendance-prompt] preferences unavailable; no pushes this run", e);
+    }
+
+    for (let i = 0; i < due.length; i++) {
+      if (summary.prompted >= max || overBudget()) {
+        summary.deferred += due.length - i;
+        break;
+      }
+      const g = due[i]!;
+      const text = attendancePromptText(g.title);
+      const link = attendancePromptLink(g.id);
+      // The stamp and the notice in one call: both or neither. NULL: another run sent it, or the game is no longer due.
+      const { data: noticeId, error: pErr } = await rpc("send_attendance_prompt", {
+        _game: g.id,
+        _title: text.title,
+        _body: text.body,
+        _link: link,
+      });
+      if (pErr) {
+        console.warn("[attendance-prompt] prompt not sent; the next run tries again", pErr.message);
+        continue;
+      }
+      if (noticeId == null) continue;
+      summary.prompted += 1;
+
+      const hostPrefs = prefs.get(String(g.host_id));
+      if (hostPrefs && isAllowedIn(hostPrefs, ATTENDANCE_PROMPT_TYPE, "push")) {
+        pushes.push({
+          userId: String(g.host_id),
+          ...text,
+          url: link,
+          notificationId: String(noticeId),
+        });
+      }
+    }
+  }
+  summary.deferred += candidates.length - next;
+
+  const results = await settleWithLimit(pushes, PUSH_CONCURRENCY, (p) => deliverPush(p));
+  for (const res of results) {
+    if (res.status === "rejected") console.warn("[attendance-prompt] push failed", res.reason);
+  }
+  summary.pushed = pushes.length;
+  return summary;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The scheduled run (/api/public/reminders/run): the three jobs, one after another, on one clock.
+
+export type ScheduledSweepResult = {
+  reminders: ReminderRunSummary | null;
+  invitePushes: InvitePushSummary | null;
+  attendancePrompts: AttendancePromptSummary | null;
+  /** One message per job that failed; the others still ran. */
+  errors: string[];
+};
+
+/**
+ * Runs the game reminders, then the invite pushes (WP 5.4), then the attendance prompts (WP 5.6), one after another under
+ * ONE budget (RUN_BUDGET_MS from the start of the run): pg_net stops waiting for the call after 5 seconds and the Worker's
+ * remaining work is then cancelled, so each job gets only the time the jobs before it left, and a job whose time is up
+ * takes nothing (its rows stay due for the next run, 5 minutes later). One after another, the pushes in flight never
+ * exceed PUSH_CONCURRENCY, so the reminders' pushes are not slowed by the other jobs. One job failing does not stop the
+ * others. Reminders go first, as before; invite pushes next (they have an hour, twelve runs); attendance prompts last
+ * (they have a day).
+ */
+export async function runScheduledSweeps(
+  admin: ReminderAdmin,
+  opts: { clock?: () => number; budgetMs?: number } = {},
+): Promise<ScheduledSweepResult> {
+  const clock = opts.clock ?? Date.now;
+  const startedAt = clock();
+  const budget = opts.budgetMs ?? RUN_BUDGET_MS;
+  const left = () => Math.max(0, budget - (clock() - startedAt));
+  const errors: string[] = [];
+  const attempt = async <T>(job: () => Promise<T>): Promise<T | null> => {
+    try {
+      return await job();
+    } catch (e) {
+      errors.push(e instanceof Error ? e.message : String(e));
+      return null;
+    }
+  };
+  const reminders = await attempt(() => sendDueGameReminders(admin, { clock, budgetMs: left() }));
+  const invitePushes = await attempt(() =>
+    pushInviteNotifications(admin, { clock, budgetMs: left() }),
+  );
+  const attendancePrompts = await attempt(() =>
+    promptHostsForAttendance(admin, { clock, budgetMs: left() }),
+  );
+  return { reminders, invitePushes, attendancePrompts, errors };
 }

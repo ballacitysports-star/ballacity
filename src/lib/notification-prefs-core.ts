@@ -79,10 +79,20 @@ const LEGACY_CATEGORY_MAP: Record<string, NotifCategory> = {
 
 export function categoryFor(type: string): NotifCategory {
   // "Still available?" for the player's own weekly availability (WP 1.2): a reminder, like a game's.
-  if (type === "game_reminder" || type === "availability_reconfirm") return "gameReminders";
+  // WP 5.6: the host's "Who showed up?" prompt after a game they hosted is a reminder about that game too.
+  if (
+    type === "game_reminder" ||
+    type === "availability_reconfirm" ||
+    type === "game_attendance_prompt"
+  )
+    return "gameReminders";
   if (type === "message") return "messages";
+  // WP 5.4: the invite push follows the invitee's Invitations setting.
   if (type === "game_invite" || type === "org_membership" || type === "team_invite")
     return "invitations";
+  // WP 5.4: the host told a player accepted their invite, like a join request: Game updates (named here so it does
+  // not depend on the "game_" fallback below).
+  if (type === "game_invite_accepted") return "gameUpdates";
   if (type.startsWith("payment")) return "payments";
   if (
     type === "moderation" ||

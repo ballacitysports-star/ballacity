@@ -38,6 +38,7 @@ import { devicePushSubscriptionState } from "@/lib/onesignal";
 import { isManagedUser } from "@/lib/managed-children";
 import {
   MEMBER_PUSH_COPY,
+  isIosBrowserTab,
   memberPushPrompt,
   type DevicePushSubscription,
   type PushPermission,
@@ -593,10 +594,20 @@ export function PushPrompt({ managed = false }: { managed?: boolean }) {
   const [device, setDevice] = useState<DevicePushSubscription>("unknown");
   const [dismissed, setDismissed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [iosBrowserTab, setIosBrowserTab] = useState(false);
 
   useEffect(() => {
     setPerm(pushPermissionState());
     setDismissed(isPushPromptDismissed());
+    setIosBrowserTab(
+      isIosBrowserTab({
+        userAgent: navigator.userAgent,
+        maxTouchPoints: navigator.maxTouchPoints ?? 0,
+        standalone:
+          window.matchMedia?.("(display-mode: standalone)").matches === true ||
+          (navigator as { standalone?: boolean }).standalone === true,
+      }),
+    );
   }, []);
 
   const checkDevice = useCallback(async () => {
@@ -630,7 +641,9 @@ export function PushPrompt({ managed = false }: { managed?: boolean }) {
   }, [perm, managed, checkDevice]);
 
   const prompt =
-    perm === null ? null : memberPushPrompt({ permission: perm, device, dismissed, managed });
+    perm === null
+      ? null
+      : memberPushPrompt({ permission: perm, device, dismissed, managed, iosBrowserTab });
   if (!prompt) return null;
 
   const enable = async () => {
@@ -671,17 +684,30 @@ export function PushPrompt({ managed = false }: { managed?: boolean }) {
   };
 
   const blocked = prompt === "blocked";
+  // WP 5.4: an iPhone or iPad browser tab has no push until BallaCity is on the Home Screen; say how instead.
+  const homeScreen = prompt === "home_screen";
   return (
-    <div className="mb-4 rounded-2xl border border-lime/40 bg-lime/10 p-3 flex items-start gap-3">
+    <div
+      className="mb-4 rounded-2xl border border-lime/40 bg-lime/10 p-3 flex items-start gap-3"
+      data-testid={homeScreen ? "push-home-screen-guidance" : undefined}
+    >
       <BellRing className="h-5 w-5 text-lime shrink-0 mt-0.5" aria-hidden />
       <div className="min-w-0 flex-1">
         <div className="font-semibold text-sm">
-          {blocked ? MEMBER_PUSH_COPY.blockedTitle : MEMBER_PUSH_COPY.enableTitle}
+          {homeScreen
+            ? MEMBER_PUSH_COPY.homeScreenTitle
+            : blocked
+              ? MEMBER_PUSH_COPY.blockedTitle
+              : MEMBER_PUSH_COPY.enableTitle}
         </div>
         <p className="text-xs text-muted-foreground mt-0.5">
-          {blocked ? MEMBER_PUSH_COPY.blockedBody : MEMBER_PUSH_COPY.enableBody}
+          {homeScreen
+            ? MEMBER_PUSH_COPY.homeScreenBody
+            : blocked
+              ? MEMBER_PUSH_COPY.blockedBody
+              : MEMBER_PUSH_COPY.enableBody}
         </p>
-        {!blocked && (
+        {!blocked && !homeScreen && (
           <button
             type="button"
             onClick={enable}

@@ -26,7 +26,8 @@ export const CATEGORY_META: Record<
 > = {
   gameReminders: {
     label: "Game reminders",
-    description: "Heads-up before a game you joined or host starts, so you don't miss it.",
+    description:
+      "Heads-up before a game you joined or host starts, so you don't miss it, and a nudge to mark who showed up after a game you hosted.",
   },
   gameUpdates: {
     label: "Game updates",
