@@ -176,6 +176,7 @@ const DB_RAISES: readonly string[] = [
   "INVALID_EVENT",
   "INVALID_FOLLOW_TARGET",
   "INVALID_KIND",
+  "INVALID_LIMIT",
   "INVALID_LOCATION",
   "INVALID_MESSAGE",
   "INVALID_PARENT_EMAIL",
@@ -349,7 +350,12 @@ const HINT_RAISES: readonly { message: string; code: string; hint: string }[] = 
 ];
 
 /** Codes deliberately left to the caller's fallback: an app bug or a cron failure with nothing better to say. */
-const LEFT_TO_FALLBACK = new Set(["INVALID_WINDOW", "INVALID_WORKER_PATH", "UNKNOWN_LISTING_KIND"]);
+const LEFT_TO_FALLBACK = new Set([
+  "INVALID_LIMIT",
+  "INVALID_WINDOW",
+  "INVALID_WORKER_PATH",
+  "UNKNOWN_LISTING_KIND",
+]);
 
 /**
  * Codes deliberately not in the catalog because no member meets them: Content Studio, which only superadmins use and
