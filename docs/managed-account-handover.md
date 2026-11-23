@@ -311,6 +311,13 @@ mocked tests cannot prove):
 5. The password the adult chooses (browser, recovery session) replaces the throwaway one, and a password sign-in then works; a
    password a guardian set earlier no longer does.
 
+Release order for `20261130100000_managed_notice_points_to_handover`: that migration makes the next sweep tell every managing
+guardian of a managed adult to start the handover. Nothing gates the notice on the five checks above. Before applying it to
+production, record in the release record whether the five were observed on a real auth stack (local Supabase stack or E2E). If
+they were not, either hold that migration, or write in the release record that the notice goes out ahead of that proof. After
+applying it, record the production `md5(pg_get_functiondef('private_sec.end_adult_guardian_links(integer)'::regprocedure))`; it
+must equal the guard value in its rollback (`c3f95d699d9cb5e23c757eea4128f055`, computed on Postgres 16).
+
 Rollback: `docs/rollbacks/20261128100000_managed_account_handover.down.sql` (guarded: needs
 `SET app.confirm_managed_account_handover_rollback = 'yes'`, stops if any of the twelve functions changed, stops while a handover
 is being finished). It cannot un-complete a handover; it cancels every pending one.
@@ -324,6 +331,8 @@ is being finished). It cannot un-complete a handover; it cancels every pending o
    the definition with the old one by md5); no legal, consent or age-of-majority wording. Rollback:
    `docs/rollbacks/20261130100000_managed_notice_points_to_handover.down.sql`, which must run before the rollback of
    20261125200000.
+   Decision 1 being done does not settle 2 and 3 below: the notice now steers guardians to the flow while they are still
+   open, and the five real-auth checks in section 6 have no record yet.
 2. Whether a handover should need a second factor beyond the mailbox (a code the guardian reads out, a waiting period, or a
    support review for addresses on the same domain as the guardian's). Not built; the residual risk above is the trade.
 3. Whether handing over an account carries any legal consent or notice requirement. Not decided here; the issues #306-#313

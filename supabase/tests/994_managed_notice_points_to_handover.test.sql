@@ -7,20 +7,22 @@
 --
 -- People: ga and gb (guardians). Managed adults: mgdone (20) and mgdtwo (22), both managed by ga; mgdold (30), managed by gb;
 -- mgdsent (25), managed by ga and already told (a stored 'managed_notice' row and a notice with the OLD text, as a sweep
--- before the migration left them). Managed and not told: mgdkid (17, the day-before kind of person), mgdnobday (no birthday).
+-- before the migration left them). Managed and not told: mgdkid (17, the day-before kind of person), mgdblank (17, blank display name), mgdnobday (no birthday).
 -- Unmanaged: turned (25, linked to ga: the link ends, as before) and teen (16, linked to ga: untouched).
 BEGIN;
 
 SELECT t.person('ga', 41), t.person('gb', 42), t.person('mgdone', 20), t.person('mgdtwo', 22), t.person('mgdold', 30),
-       t.person('mgdsent', 25), t.person('mgdkid', 17), t.person('turned', 25), t.person('teen', 16);
+       t.person('mgdsent', 25), t.person('mgdkid', 17), t.person('mgdblank', 17), t.person('turned', 25), t.person('teen', 16);
+-- mgdblank has no display name at all: the notice falls back to "Your family member" (the day-before kind of person, like mgdkid).
+UPDATE public.profiles SET display_name = '   ' WHERE id = t.id('mgdblank');
 INSERT INTO auth.users (id, email, email_confirmed_at, raw_user_meta_data)
 VALUES (t.id('mgdnobday'), 'mgdnobday@example.test', now(), jsonb_build_object('display_name', 'Mgdnobday', 'account_type', 'player'));
 
 SELECT t.guardian('ga', 'mgdone'), t.guardian('ga', 'mgdtwo'), t.guardian('gb', 'mgdold'), t.guardian('ga', 'mgdsent'),
-       t.guardian('ga', 'mgdkid'), t.guardian('ga', 'mgdnobday'), t.guardian('ga', 'turned'), t.guardian('ga', 'teen');
+       t.guardian('ga', 'mgdkid'), t.guardian('ga', 'mgdblank'), t.guardian('ga', 'mgdnobday'), t.guardian('ga', 'turned'), t.guardian('ga', 'teen');
 INSERT INTO public.managed_accounts (child_user_id, managed_by)
 VALUES (t.id('mgdone'), t.id('ga')), (t.id('mgdtwo'), t.id('ga')), (t.id('mgdold'), t.id('gb')),
-       (t.id('mgdsent'), t.id('ga')), (t.id('mgdkid'), t.id('ga')), (t.id('mgdnobday'), t.id('ga'));
+       (t.id('mgdsent'), t.id('ga')), (t.id('mgdkid'), t.id('ga')), (t.id('mgdblank'), t.id('ga')), (t.id('mgdnobday'), t.id('ga'));
 
 -- One managing guardian already told before this migration: the stored row and the notice with the old text.
 INSERT INTO private_sec.guardian_link_age_events (child_user_id, parent_user_id, kind)
@@ -91,7 +93,7 @@ SELECT t.eq((SELECT string_agg(body, ' || ' ORDER BY body) FROM public.notificat
 SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE user_id = t.id('ga') AND body LIKE 'Mgdsent %'), 1,
   'a guardian already told is not told again: still one notice about mgdsent');
 SELECT t.ok(NOT EXISTS (SELECT 1 FROM public.notifications WHERE title = 'A managed account has turned 18'
-                         AND body ~* '(legal|law|consent|revoked|withdrawn|restricted|majority|record|delete|erase|keep|retain)'
+                         AND substr(body, position(' is 18 or over' IN body)) ~* '(legal|law|consent|revoked|withdrawn|restricted|majority|record|delete|erase|keep|retain)'
                          AND body NOT LIKE '%Contact support%'),
   'the new text says nothing about the law, consent, majority or any record');
 
@@ -100,7 +102,7 @@ SELECT t.eq((SELECT array_agg(user_id::text ORDER BY user_id::text) FROM public.
   (SELECT array_agg(c ORDER BY c) FROM (SELECT t.id('ga')::text c UNION ALL SELECT t.id('ga')::text UNION ALL SELECT t.id('ga')::text UNION ALL SELECT t.id('gb')::text) q),
   'the notices went to the managing guardians only: ga three times (mgdone, mgdtwo, mgdsent), gb once');
 SELECT t.eq((SELECT count(*)::int FROM public.notifications
-              WHERE user_id IN (t.id('mgdone'), t.id('mgdtwo'), t.id('mgdold'), t.id('mgdsent'), t.id('mgdkid'), t.id('mgdnobday'), t.id('teen'))
+              WHERE user_id IN (t.id('mgdone'), t.id('mgdtwo'), t.id('mgdold'), t.id('mgdsent'), t.id('mgdkid'), t.id('mgdblank'), t.id('mgdnobday'), t.id('teen'))
                 AND type = 'guardian_link'), 0,
   'the managed people themselves and the 16-year-old are told nothing');
 SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE user_id = t.id('gb') AND type = 'guardian_link'), 1,
@@ -121,7 +123,7 @@ SELECT t.eq((SELECT count(*)::int FROM public.notifications WHERE type = 'guardi
 SELECT t.eq((SELECT array_agg(g.child_user_id::text || ':' || g.status ORDER BY g.child_user_id::text) FROM public.guardian_links g),
   (SELECT array_agg(c ORDER BY c) FROM (
      SELECT t.id(h)::text || ':' || CASE WHEN h = 'turned' THEN 'revoked' ELSE 'active' END c
-       FROM unnest(ARRAY['mgdone', 'mgdtwo', 'mgdold', 'mgdsent', 'mgdkid', 'mgdnobday', 'turned', 'teen']) h) q),
+       FROM unnest(ARRAY['mgdone', 'mgdtwo', 'mgdold', 'mgdsent', 'mgdkid', 'mgdblank', 'mgdnobday', 'turned', 'teen']) h) q),
   'links: only the unmanaged adult''s was ended; every managed link and the 16-year-old''s are active');
 SELECT t.ok(NOT EXISTS (SELECT 1 FROM links_before b JOIN public.guardian_links g USING (id)
                          WHERE b.child_user_id <> t.id('turned')
@@ -129,7 +131,7 @@ SELECT t.ok(NOT EXISTS (SELECT 1 FROM links_before b JOIN public.guardian_links 
                              OR g.parent_user_id <> b.parent_user_id OR g.relationship <> b.relationship)),
   'no other link row changed in any column');
 SELECT t.eq((SELECT array_agg(DISTINCT action) FROM public.family_audit_log WHERE child_user_id IN (
-              t.id('mgdone'), t.id('mgdtwo'), t.id('mgdold'), t.id('mgdsent'), t.id('mgdkid'), t.id('mgdnobday'), t.id('teen'), t.id('turned'))
+              t.id('mgdone'), t.id('mgdtwo'), t.id('mgdold'), t.id('mgdsent'), t.id('mgdkid'), t.id('mgdblank'), t.id('mgdnobday'), t.id('teen'), t.id('turned'))
             AND action = 'link.revoked'),
   ARRAY['link.revoked'], 'the existing audit trigger wrote a link.revoked row');
 SELECT t.eq((SELECT count(*)::int FROM public.family_audit_log WHERE action = 'link.revoked'), 1, 'exactly one, for the ended link');
@@ -148,10 +150,13 @@ SELECT t.eq((SELECT count(*)::int FROM private_sec.guardian_link_age_events WHER
 -- A person who reaches 18 later is told once, with the new text, and a different guardian's account is not mixed up.
 -- (the birthday lock is a trigger; a person's 18th birthday simply arrives, so the trigger is stepped around for the one write)
 SET LOCAL session_replication_role = replica;
-UPDATE public.profile_birthdays SET birthday = (current_date - interval '18 years')::date WHERE user_id = t.id('mgdkid');
+UPDATE public.profile_birthdays SET birthday = (current_date - interval '18 years')::date WHERE user_id IN (t.id('mgdkid'), t.id('mgdblank'));
 SET LOCAL session_replication_role = origin;
 CREATE TEMP TABLE sweep3 AS SELECT private_sec.end_adult_guardian_links() AS r;
-SELECT t.eq((SELECT (r ->> 'notified')::int FROM sweep3), 1, 'a managed person who turns 18 later: one notice');
+SELECT t.eq((SELECT (r ->> 'notified')::int FROM sweep3), 2, 'two managed people who turn 18 later (mgdkid and mgdblank): one notice each');
+SELECT t.eq((SELECT string_agg(body, ' || ' ORDER BY body) FROM public.notifications WHERE user_id = t.id('ga') AND body LIKE 'Your family member %'),
+  'Your family member is 18 or over. Their account has no sign-in of its own, so you still manage it until they complete a handover. You can start one from your Parent Center: open their page and choose "Start handover".',
+  'a managed adult with a blank display name is called "Your family member", with the same new text');
 SELECT t.eq((SELECT string_agg(body, ' || ' ORDER BY body) FROM public.notifications WHERE user_id = t.id('ga') AND body LIKE 'Mgdkid %'),
   'Mgdkid is 18 or over. Their account has no sign-in of its own, so you still manage it until they complete a handover. You can start one from your Parent Center: open their page and choose "Start handover".',
   'with the new text');

@@ -15,6 +15,14 @@
 -- It refuses to run unless the session sets the confirmation first:
 --     SET app.confirm_managed_notice_points_to_handover_rollback = 'yes';
 --     (or PGOPTIONS="-c app.confirm_managed_notice_points_to_handover_rollback=yes")
+-- LEDGER: this file does not touch supabase_migrations.schema_migrations. After a successful rollback, delete the ledger row
+-- for 20261130100000 by hand (as the earlier release records do), or the ledger says applied while the function is the old
+-- one, and a later re-apply hits a primary-key conflict.
+-- PRODUCTION CHECK: the md5 above was computed on the local Postgres 16; production runs 17 and pg_get_functiondef text may
+-- differ between versions. The guard fails closed (it refuses, changing nothing), but do not find that out in an emergency:
+-- after applying the migration, run this read-only query in production and record the result in the release record. It must
+-- equal c3f95d699d9cb5e23c757eea4128f055; if not, the guard value here needs a person to look first.
+--     SELECT md5(pg_get_functiondef('private_sec.end_adult_guardian_links(integer)'::regprocedure));
 -- Locks: CREATE OR REPLACE FUNCTION takes a brief lock on the function only; the wait is limited to 5 s.
 BEGIN;
 DO $guard$

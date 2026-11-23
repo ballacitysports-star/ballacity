@@ -208,7 +208,9 @@ strand it, so:
   once, to the same guardian; notices sent before keep the old words).
 - The Parent Center page says a managed account stays linked.
 
-Handover options, for the owner to choose (nothing here is built):
+Handover options. Option 1 is now built: the handover (migration `20261128100000`, `docs/managed-account-handover.md`) lets
+the managing guardian start it, and the notice above points to it (`20261130100000`). Options 2 and 3 are unchanged: 2 is
+still what the Parent Center offers for a managed child, and 3 is still not recommended. The question as it stood:
 
 1. The new adult gets their own sign-in: they set an email and password (the account is claimed), the `managed_accounts`
    row is removed, and then the link ends by the same rule. Keeps their history, games and teams.
@@ -216,7 +218,7 @@ Handover options, for the owner to choose (nothing here is built):
    account held.
 3. Leave it: the guardian keeps managing an adult. Not recommended; it is what this change is meant to stop.
 
-Needs: who may start the handover (the adult can't sign in), identity checks, what the guardian keeps afterwards.
+Needed (answered by the handover design): who may start the handover (the adult can't sign in), identity checks, what the guardian keeps afterwards.
 
 ## 4. Anything touching age of majority or legal wording
 
