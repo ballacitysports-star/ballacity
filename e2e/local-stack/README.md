@@ -93,3 +93,22 @@ Global setup seeds the fixture accounts and the `g1`/`g2` games whenever
 acceptance of the current Terms and Privacy versions: on a fresh database they have none, and the
 legal re-accept dialog would otherwise cover every signed-in page. Each `up` starts from an empty
 database, so a run never inherits another run's rows.
+
+## Real-auth integration tests
+
+Some behaviours only a real auth server (GoTrue) can show, such as the managed-account handover's Admin API calls
+(docs/managed-account-handover.md, section 6). `*.itest.ts` files here call the app's real server code against this stack with
+the service-role key, and sign in with the real client. They are not part of `vitest run`, and they
+refuse to start unless the environment is this stack: `local-only.ts` rejects the E2E sandbox, production and any non-loopback URL
+(`src/lib/e2e-local-only.test.ts` checks that guard in the default run).
+
+```sh
+node e2e/local-stack/stack.mjs up
+set -a; . e2e/local-stack/.state/env.sh; set +a
+npm run test:realauth        # vitest -c vitest.realauth.config.ts; needs psql on the host (one birthday move, SQL probes)
+```
+
+`handover-browser-seed.itest.ts` makes a managed adult and a pending handover and writes the link to `.state/handover-browser.json`
+for `e2e/managed-handover-real-auth.spec.ts` (a spec never holds the service-role key; global setup removes it), which skips when
+the file or the local stack is missing (CI's Playwright job collects it and shows it as one skipped test).
+
