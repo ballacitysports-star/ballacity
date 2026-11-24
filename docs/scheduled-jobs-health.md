@@ -31,10 +31,17 @@ cannot be read, or when the migration is not applied yet.
   endpoint URL, so the function never selects it.
 - The job's database user, database name, node name or port, and the run's command.
 - A succeeded run's message (the function returns a message for failed runs only, and the app drops any other).
-- A failed run's message as written. Error messages can carry key values, so before it leaves the database the message
-  has its whitespace collapsed; URLs, UUIDs, email addresses, `(column)=(value)` key details, tokens of 32 or more
-  characters and runs of 6 or more digits replaced by `[url]`, `[id]`, `[email]`, `([value])`, `[token]` and `[number]`;
-  and is cut to 200 characters.
+- A failed run's message as written. pg_cron saves libpq's whole error text, and its `DETAIL` (`Failing row contains
+  (...)`, `Key (col)=(value) already exists`), `HINT`, `QUERY` and `CONTEXT` (`SQL statement "..."`) lines carry row
+  values. So before the message leaves the database, only the primary error is kept: everything from the first line that
+  starts with an upper-case label and a colon, or from `DETAIL:`, `HINT:`, `QUERY:`, `CONTEXT:` or `LINE n:` anywhere, is
+  dropped. Then whitespace is collapsed; URLs, UUIDs, email addresses, everything after a `(column)=(` key detail,
+  double-quoted literals (a quoted name right after column, relation, table, constraint, index, schema, function, type,
+  sequence, view, trigger, extension, policy, operator, domain or role is kept), single-quoted literals, tokens of 32 or
+  more characters and numbers of 6 or more digits (phone numbers and dates included) are replaced by `[url]`, `[id]`,
+  `[email]`, `([value])`, `"[value]"`, `'[value]'`, `[token]` and `[number]`; and it is cut to 200 characters. Free text
+  that a job's own `RAISE` writes into its primary message (a name without quotes, say) is not recognised, so a job's
+  function should not put personal data in its error messages.
 - pg_net request URLs, headers or bodies: counts only.
 - Anything from an app table.
 
@@ -55,6 +62,10 @@ and pg_net's.
 - **History window.** Runs are read from the newest 100,000 rows of `cron.job_run_details` (a primary-key range, so the
   card stays cheap however much history pg_cron keeps). That is weeks of runs at the current rate; a job whose last run
   is older reads as "Never ran", which is flagged anyway.
+- **Runs that never started.** pg_cron leaves `start_time` empty when it could not connect (`connection failed`) or the
+  job did not start in time (`job startup timeout`); such a run is timed by its `end_time`. A run marked
+  `server restarted` while still starting has neither time: it counts in "failed in 7 days" when the newest time among
+  the runs recorded before it is within the 7 days, and it gives no "last run" time.
 - At most 200 jobs are listed.
 
 ## Rollback

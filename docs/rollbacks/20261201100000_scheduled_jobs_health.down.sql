@@ -12,7 +12,7 @@
 -- PRODUCTION CHECK: the md5 below was computed on the local Postgres 16; production runs 17 and pg_get_functiondef text may
 -- differ between versions. The guard fails closed (it refuses, changing nothing), but do not find that out in an emergency:
 -- after applying the migration, run this read-only query in production and record the result in the release record. It must
--- equal 29b2e99d79081363a65de45ff57715c8; if not, the guard value here needs a person to look first.
+-- equal 373c82595845f90c62020f70c9f9427c; if not, the guard value here needs a person to look first.
 --     SELECT md5(pg_get_functiondef('public.superadmin_scheduled_jobs(integer)'::regprocedure));
 -- Locks: DROP FUNCTION takes a lock on the function only; the wait is limited to 5 s.
 BEGIN;
@@ -25,8 +25,8 @@ BEGIN
     RAISE EXCEPTION 'Refusing to run: superadmins lose the Scheduled jobs card. Set app.confirm_scheduled_jobs_health_rollback=yes for the session to proceed deliberately.';
   END IF;
   SELECT md5(pg_get_functiondef(p.oid)) INTO _got FROM pg_proc p WHERE p.oid = _fn;
-  IF _fn IS NULL OR _got IS DISTINCT FROM '29b2e99d79081363a65de45ff57715c8' THEN
-    RAISE EXCEPTION 'Refusing to run: public.superadmin_scheduled_jobs(integer) is not the definition 20261201100000 created (md5 %, expected 29b2e99d79081363a65de45ff57715c8). A later change needs a person to look first.', _got;
+  IF _fn IS NULL OR _got IS DISTINCT FROM '373c82595845f90c62020f70c9f9427c' THEN
+    RAISE EXCEPTION 'Refusing to run: public.superadmin_scheduled_jobs(integer) is not the definition 20261201100000 created (md5 %, expected 373c82595845f90c62020f70c9f9427c). A later change needs a person to look first.', _got;
   END IF;
   SELECT coalesce(string_agg(coalesce(r.rolname, 'PUBLIC') || ':' || x.privilege_type || CASE WHEN x.is_grantable THEN '*' ELSE '' END,
                              ',' ORDER BY coalesce(r.rolname, 'PUBLIC'), x.privilege_type), '')

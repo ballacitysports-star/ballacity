@@ -1,8 +1,10 @@
 -- 20261201100000_scheduled_jobs_health: only a superadmin reads the scheduled jobs' health, and it never carries a job's
 -- command (which can hold an endpoint URL), user, database or node, a succeeded run's message, or a raw key value: a failed
--- run's message has URLs, UUIDs, emails, key details, tokens and long digit runs redacted and is cut to 200 characters. The
--- last N runs are clamped to 1..20. Flags: last run failed, not run in 25 hours, never run, inactive. pg_net responses are
--- counts by status class only. Where pg_cron is not installed (or its tables cannot be read) it says so, with no jobs.
+-- run's message keeps only the primary error (no DETAIL such as "Failing row contains", no HINT, QUERY or CONTEXT), has
+-- URLs, UUIDs, emails, key details, quoted literals, tokens and long numbers (phone numbers and dates too) redacted and is
+-- cut to 200 characters. The last N runs are clamped to 1..20. Flags: last run failed, not run in 25 hours (active jobs
+-- only), never run, inactive. A run that never started is timed by its end. pg_net responses are counts by status class
+-- only. Where pg_cron is not installed (or its tables cannot be read) it says so, with no jobs.
 -- This database has no pg_cron or pg_net, so the test builds stand-ins shaped like their tables, inside the transaction.
 BEGIN;
 SELECT t.person('member', 30), t.person('modone', 31), t.person('adminone', 32), t.person('superone', 33);
@@ -87,8 +89,16 @@ INSERT INTO cron.job (jobid, jobname, schedule, command, nodename, nodeport, dat
    $c$SELECT net.http_post(url := 'https://reels-secret995.example.test/api/public/reels/process', headers := '{"x-worker-secret": "hdrsecret995"}'::jsonb)$c$,
    'nodehost995', 5432, 'dbname995', 'cronowner995', false),
   (6, 'send-game-reminders', '*/5 * * * *', $c$SELECT private_sec.worker_post('/api/public/reminders/run')$c$,
-   'nodehost995', 5432, 'dbname995', 'cronowner995', true);
+   'nodehost995', 5432, 'dbname995', 'cronowner995', true),
+  (7, 'end-adult-guardian-links', '41 4 * * *', 'SELECT private_sec.end_adult_guardian_links()', 'nodehost995', 5432,
+   'dbname995', 'cronowner995', true),
+  (8, 'extend-game-series', '17 4 * * *', 'SELECT private_sec.extend_game_series()', 'nodehost995', 5432,
+   'dbname995', 'cronowner995', true);
 
+-- end-adult-guardian-links: the oldest run recorded is a failed run that never started and has no time ("server restarted"
+-- while starting): nothing recorded before it, so it is not counted in the 7 days.
+INSERT INTO cron.job_run_details (jobid, database, username, command, status, return_message, start_time, end_time)
+VALUES (7, 'dbname995', 'cronowner995', 'c', 'failed', 'server restarted', NULL, NULL);
 -- flush-held-notifications: 25 succeeded runs, every 5 minutes, newest 5 minutes ago.
 INSERT INTO cron.job_run_details (jobid, database, username, command, status, return_message, start_time, end_time)
 SELECT 1, 'dbname995', 'cronowner995', 'worker_post command', 'succeeded', '1 row okmarker995 https://ok995.example.test',
@@ -101,20 +111,52 @@ INSERT INTO cron.job_run_details (jobid, database, username, command, status, re
    now() - interval '3 days', now() - interval '3 days' + interval '5 seconds'),
   (2, 'dbname995', 'cronowner995', 'c', 'succeeded', 'DELETE 12', now() - interval '25 hours', now() - interval '25 hours'),
   (2, 'dbname995', 'cronowner995', 'c', 'failed',
-   E'ERROR:\n  game 5f0c1e2d-3b4a-4c5d-8e6f-708192a3b4c5: insert or update on table "delivery_log" violates foreign key. Key (user_id)=(0b9a2a4e-1111-4222-8333-944455556666) '
-   'and (display_name)=(Jane Q Public) for jane.doe@example.com order 123456789 at https://hook995.example.test/api/public/x?token=abc '
+   E'ERROR:\n  game 5f0c1e2d-3b4a-4c5d-8e6f-708192a3b4c5: insert on table "delivery_log" violates foreign key for jane.doe@example.com ' ||
+   E'order 123456789 phone +44 7700 900123 value "Jane Q Public" or \'Jane\' at https://hook995.example.test/api/public/x?token=abc '
    'secret ' || repeat('A1', 20) || ' ' || repeat('padding ', 30) || 'tail 7d1c2b3a-aaaa-4bbb-8ccc-ddddeeeeffff',
    now() - interval '1 hour', now() - interval '1 hour' + interval '1 second');
 -- age-adult-cohorts: its last run was 30 hours ago (stale). expire-managed-handovers: never ran.
 INSERT INTO cron.job_run_details (jobid, database, username, command, status, return_message, start_time, end_time) VALUES
   (3, 'dbname995', 'cronowner995', 'c', 'succeeded', '1 row', now() - interval '30 hours', now() - interval '30 hours'),
--- process-highlight-reels: inactive, ran 2 minutes ago.
-  (5, 'dbname995', 'cronowner995', 'c', 'succeeded', '1 row', now() - interval '2 minutes', now() - interval '2 minutes'),
+-- process-highlight-reels: inactive, last ran 30 hours ago (an inactive job is not "not run in 25 hours").
+  (5, 'dbname995', 'cronowner995', 'c', 'succeeded', '1 row', now() - interval '30 hours', now() - interval '30 hours'),
 -- send-game-reminders: succeeded 6 minutes ago, running now.
   (6, 'dbname995', 'cronowner995', 'c', 'succeeded', '1 row', now() - interval '6 minutes', now() - interval '6 minutes'),
   (6, 'dbname995', 'cronowner995', 'c', 'running', NULL, now() - interval '1 minute', NULL),
 -- a run of a job that no longer exists.
   (99, 'dbname995', 'cronowner995', 'c', 'failed', 'ERROR: orphan995', now() - interval '1 minute', now());
+-- end-adult-guardian-links: succeeded 26 hours ago; then failed while starting with no time ("server restarted"), after runs
+-- inside the 7 days; then failed to connect 10 minutes ago, which pg_cron records with an end_time and no start_time.
+INSERT INTO cron.job_run_details (jobid, database, username, command, status, return_message, start_time, end_time) VALUES
+  (7, 'dbname995', 'cronowner995', 'c', 'succeeded', '1 row', now() - interval '26 hours', now() - interval '26 hours'),
+  (7, 'dbname995', 'cronowner995', 'c', 'failed', 'server restarted', NULL, NULL),
+  (7, 'dbname995', 'cronowner995', 'c', 'failed', 'connection failed', NULL, now() - interval '10 minutes');
+-- extend-game-series: failed runs whose messages are libpq's whole error text, as pg_cron saves it (oldest first).
+INSERT INTO cron.job_run_details (jobid, database, username, command, status, return_message, start_time, end_time) VALUES
+  (8, 'dbname995', 'cronowner995', 'c', 'failed',
+   E'ERROR:  null value in column "birth_date" of relation "profiles" violates not-null constraint\n' ||
+   E'DETAIL:  Failing row contains (3f2a, Jane Public, jane, null, +44 7700 900123, f).',
+   now() - interval '7 hours', now() - interval '7 hours'),
+  (8, 'dbname995', 'cronowner995', 'c', 'failed', E'ERROR:  invalid input syntax for type date: "Jane Q Public"',
+   now() - interval '6 hours', now() - interval '6 hours'),
+  (8, 'dbname995', 'cronowner995', 'c', 'failed',
+   E'ERROR:  duplicate key value violates unique constraint "profiles_display_name_key"\n' ||
+   E'DETAIL:  Key (display_name)=(Jane (JJ) Public) already exists.',
+   now() - interval '5 hours', now() - interval '5 hours'),
+  (8, 'dbname995', 'cronowner995', 'c', 'failed',
+   E'ERROR:  boom995\n' ||
+   E'CONTEXT:  SQL statement "UPDATE profiles SET display_name = \'Jane Public\' WHERE phone = \'07700 900123\'"\n' ||
+   E'PL/pgSQL function private_sec.extend_game_series() line 4 at SQL statement',
+   now() - interval '4 hours', now() - interval '4 hours'),
+  (8, 'dbname995', 'cronowner995', 'c', 'failed',
+   E'ERROR:  value too long for type character varying(20)\nSCHEMA NAME:  Jane Public\nTABLE NAME:  profiles',
+   now() - interval '3 hours', now() - interval '3 hours'),
+  (8, 'dbname995', 'cronowner995', 'c', 'failed',
+   E'ERROR:  duplicate key value violates unique constraint "k" DETAIL:  Failing row contains (Jane Public, 2010-04-02).',
+   now() - interval '2 hours', now() - interval '2 hours'),
+  (8, 'dbname995', 'cronowner995', 'c', 'failed',
+   E'ERROR:  guardian check: \'Jane\' born 2010-04-02, call (415) 555-0134, key (display_name)=(Jane (JJ) Public) more',
+   now() - interval '1 hour', now() - interval '1 hour');
 
 SELECT pg_temp.read995('default', '');
 SELECT pg_temp.read995('null', 'NULL');
@@ -126,8 +168,8 @@ SELECT pg_temp.read995('negative', '-3');
 SELECT t.eq((SELECT v -> 'available' FROM out995 WHERE call = 'default'), 'true'::jsonb, 'with pg_cron: available');
 SELECT t.eq((SELECT array_agg(j ->> 'jobname' ORDER BY j ->> 'jobname') FROM out995 o, jsonb_array_elements(o.v -> 'jobs') j
               WHERE o.call = 'default'),
-            ARRAY['age-adult-cohorts', 'expire-managed-handovers', 'flush-held-notifications', 'process-highlight-reels',
-                  'purge-diagnostics', 'send-game-reminders'],
+            ARRAY['age-adult-cohorts', 'end-adult-guardian-links', 'expire-managed-handovers', 'extend-game-series',
+                  'flush-held-notifications', 'process-highlight-reels', 'purge-diagnostics', 'send-game-reminders'],
             'every job, once, and no run of a job that no longer exists');
 SELECT t.eq((SELECT array_agg(k ORDER BY k) FROM out995 o, jsonb_object_keys(o.v) k WHERE o.call = 'default'),
             ARRAY['available', 'generated_at', 'http', 'jobs', 'runs_per_job'], 'top level: only the expected keys');
@@ -158,18 +200,33 @@ SELECT t.eq((SELECT (j -> 'runs' -> 1 ->> 'message') FROM (SELECT pg_temp.job995
             NULL, 'the run that succeeded carries no message');
 SELECT t.eq((SELECT (j -> 'runs' -> 2 ->> 'message') FROM (SELECT pg_temp.job995('default', 'purge-diagnostics') j) s),
             'ERROR: canceling statement due to lock timeout', 'a message with nothing to redact is kept as it is');
-SELECT t.ok((SELECT m !~* '(5f0c1e2d|0b9a2a4e|7d1c2b3a|jane|Q Public|example\.com|123456789|hook995|token=|A1A1A1)'
+SELECT t.ok((SELECT m !~* '(5f0c1e2d|7d1c2b3a|jane|Q Public|example\.com|123456789|7700|hook995|token=|A1A1A1)'
                FROM (SELECT pg_temp.job995('default', 'purge-diagnostics') -> 'runs' -> 0 ->> 'message' AS m) s),
-            'redacted: no UUID, name, email, long number, URL or token is left');
-SELECT t.ok((SELECT m LIKE 'ERROR: game [id]: insert or update on table "delivery_log" violates foreign key. Key (user_id)=([value]) and (display_name)=([value]) for [email] order [number] at [url] secret [token] padding%'
+            'redacted: no UUID, name, email, long number, phone number, URL or token is left');
+SELECT t.ok((SELECT m LIKE 'ERROR: game [id]: insert on table "delivery_log" violates foreign key for [email] order [number] phone +[number] value "[value]" or ''[value]'' at [url] secret [token] padding%'
                FROM (SELECT pg_temp.job995('default', 'purge-diagnostics') -> 'runs' -> 0 ->> 'message' AS m) s),
-            'redacted in place: [id], ([value]), [email], [number], [url], [token]');
+            'redacted in place: [id], [email], [number], "[value]", ''[value]'', [url], [token]; a table name is kept');
 SELECT t.ok((SELECT m LIKE 'ERROR: game%' AND m NOT LIKE E'%\n%'
                FROM (SELECT pg_temp.job995('default', 'purge-diagnostics') -> 'runs' -> 0 ->> 'message' AS m) s),
             'whitespace is collapsed to single spaces');
 SELECT t.ok((SELECT length(m) = 200 AND m LIKE '%…'
                FROM (SELECT pg_temp.job995('default', 'purge-diagnostics') -> 'runs' -> 0 ->> 'message' AS m) s),
             'a long message is cut to 200 characters');
+SELECT t.eq((SELECT jsonb_path_query_array(pg_temp.job995('many', 'extend-game-series') -> 'runs', '$[*].message')),
+            jsonb_build_array(
+              'ERROR: guardian check: ''[value]'' born [number], call (415) [number], key (display_name)=([value])',
+              'ERROR: duplicate key value violates unique constraint "k"',
+              'ERROR: value too long for type character varying(20)',
+              'ERROR: boom995',
+              'ERROR: duplicate key value violates unique constraint "profiles_display_name_key"',
+              'ERROR: invalid input syntax for type date: "[value]"',
+              'ERROR: null value in column "birth_date" of relation "profiles" violates not-null constraint'),
+            'libpq error text: only the primary error is kept (no DETAIL, CONTEXT or other labelled line, inline or not); '
+            'quoted literals, a key detail with parentheses, dates and phone numbers redacted; column, relation and '
+            'constraint names kept');
+SELECT t.eq((SELECT count(*)::int FROM out995 o, jsonb_array_elements(o.v -> 'jobs') j, jsonb_array_elements(j -> 'runs') r
+              WHERE r ->> 'message' ~* '(jane|JJ|7700|900123|555-0134|2010-04|3f2a|profiles SET|Failing row|SCHEMA NAME|SQL statement)'),
+            0, 'no message carries a name, phone number, date, row or SQL statement');
 
 -- ================= 7. counts and flags =================
 SELECT t.eq((SELECT jsonb_build_object('failures_7d', j -> 'failures_7d', 'last_success_at', j -> 'last_success_at',
@@ -186,11 +243,29 @@ SELECT t.eq((SELECT jsonb_build_array(j -> 'flags', j -> 'attention', j -> 'runs
                                       j -> 'failures_7d')
                FROM (SELECT pg_temp.job995('default', 'expire-managed-handovers') j) s),
             '[["never_run"], true, [], null, null, 0]'::jsonb, 'expire-managed-handovers: never ran, flagged');
-SELECT t.eq((SELECT jsonb_build_array(j -> 'flags', j -> 'active') FROM (SELECT pg_temp.job995('default', 'process-highlight-reels') j) s),
-            '[["inactive"], false]'::jsonb, 'an inactive job is flagged as inactive');
-SELECT t.eq((SELECT jsonb_build_array(j -> 'flags', j -> 'attention', j -> 'last_status', j -> 'runs' -> 0 -> 'end_time')
+SELECT t.eq((SELECT jsonb_build_array(j -> 'flags', j -> 'active', j -> 'last_run_at')
+               FROM (SELECT pg_temp.job995('default', 'process-highlight-reels') j) s),
+            jsonb_build_array('["inactive"]'::jsonb, false, now() - interval '30 hours'),
+            'an inactive job is flagged as inactive only, not as not run in 25 hours');
+SELECT t.eq((SELECT jsonb_build_array(j -> 'flags', j -> 'attention', j -> 'last_status', j -> 'runs' -> 0 -> 'end_time',
+                                      j -> 'last_success_at')
                FROM (SELECT pg_temp.job995('default', 'send-game-reminders') j) s),
-            '[[], false, "running", null]'::jsonb, 'a running job is not flagged');
+            jsonb_build_array('[]'::jsonb, false, 'running', NULL, now() - interval '6 minutes'),
+            'a running job is not flagged, and a running run is not its last success');
+SELECT t.eq((SELECT jsonb_build_object('last_status', j -> 'last_status', 'last_run_at', j -> 'last_run_at',
+                                       'last_success_at', j -> 'last_success_at', 'failures_7d', j -> 'failures_7d',
+                                       'flags', j -> 'flags',
+                                       'runs', jsonb_path_query_array(j -> 'runs', '$[*].message'),
+                                       'first', j -> 'runs' -> 0)
+               FROM (SELECT pg_temp.job995('default', 'end-adult-guardian-links') j) s),
+            jsonb_build_object('last_status', 'failed', 'last_run_at', now() - interval '10 minutes',
+                               'last_success_at', now() - interval '26 hours', 'failures_7d', 2,
+                               'flags', '["last_run_failed"]'::jsonb,
+                               'runs', '["connection failed", "server restarted", null, "server restarted"]'::jsonb,
+                               'first', jsonb_build_object('status', 'failed', 'start_time', NULL,
+                                                           'end_time', now() - interval '10 minutes',
+                                                           'message', 'connection failed')),
+            'runs that never started: timed by their end, counted in the 7 days (one with no time only after runs in them)');
 SELECT t.eq((SELECT jsonb_build_array(j -> 'flags', j -> 'attention', j -> 'failures_7d', j -> 'schedule')
                FROM (SELECT pg_temp.job995('default', 'flush-held-notifications') j) s),
             '[[], false, 0, "*/5 * * * *"]'::jsonb, 'a healthy job is not flagged');
@@ -248,6 +323,6 @@ SELECT t.eq((SELECT v FROM out995 WHERE call = 'hidden'), '{"available": false, 
             'no cron schema: not available, no jobs');
 ALTER SCHEMA cron_hidden995 RENAME TO cron;
 SELECT pg_temp.read995('back', '');
-SELECT t.eq((SELECT jsonb_array_length(v -> 'jobs') FROM out995 WHERE call = 'back'), 6, 'available again once it is back');
+SELECT t.eq((SELECT jsonb_array_length(v -> 'jobs') FROM out995 WHERE call = 'back'), 8, 'available again once it is back');
 
 ROLLBACK;

@@ -169,7 +169,8 @@ function RunRow({ run }: { run: ScheduledJobRun }) {
         <Badge variant={statusVariant(run.status)} className="px-1.5 py-0 text-[10px]">
           {run.status}
         </Badge>
-        <span className="text-muted-foreground">{formatJobTime(run.startTime)}</span>
+        {/* a run that never started (pg_cron could not connect) has only an end time */}
+        <span className="text-muted-foreground">{formatJobTime(run.startTime ?? run.endTime)}</span>
         {duration ? <span className="text-muted-foreground">· {duration}</span> : null}
         {run.status === "failed" && run.message ? (
           <Button

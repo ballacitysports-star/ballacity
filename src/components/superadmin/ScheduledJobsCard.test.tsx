@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
+  formatJobTime,
   formatRunDuration,
   parseScheduledJobs,
   type ScheduledJobsResult,
@@ -16,7 +17,8 @@ vi.mock("@/lib/superadmin.functions", () => ({
 
 import { ScheduledJobsCard } from "./ScheduledJobsCard";
 
-const FAILED_MESSAGE = "ERROR: insert failed. Key (user_id)=([value]) for [email]";
+const FAILED_MESSAGE =
+  'ERROR: insert on table "delivery_log" violates foreign key for [email] value "[value]"';
 
 // The function's answer as the database sends it, with a field the card must never pass on (command).
 const RAW = {
@@ -199,6 +201,39 @@ describe("ScheduledJobsCard", () => {
     expect(screen.queryByText(/DELETE 12/)).toBeNull();
     fireEvent.click(runs.getByText("Hide message"));
     expect(screen.queryByText(FAILED_MESSAGE)).toBeNull();
+  });
+
+  it("times a run that never started (pg_cron could not connect) by its end", async () => {
+    const endTime = "2026-11-24T11:50:00+00:00";
+    loadJobs.mockResolvedValue(
+      parsed({
+        ...RAW,
+        jobs: [
+          {
+            ...RAW.jobs[1],
+            last_status: "failed",
+            flags: ["last_run_failed"],
+            attention: true,
+            runs: [
+              {
+                status: "failed",
+                start_time: null,
+                end_time: endTime,
+                message: "connection failed",
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    renderCard();
+    await screen.findByText("flush-held-notifications");
+    fireEvent.click(within(jobRow("flush-held-notifications")).getByText("Last 1 runs"));
+    const runs = within(
+      screen.getByRole("list", { name: "Last runs of flush-held-notifications" }),
+    );
+    expect(runs.getByText(formatJobTime(endTime))).toBeTruthy();
+    expect(runs.queryByText("–")).toBeNull();
   });
 
   it("shows the pg_net response counts, with server errors and no responses marked", async () => {
