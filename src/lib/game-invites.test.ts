@@ -10,6 +10,8 @@ const server = vi.hoisted(() => ({
   error: null as { message: string } | null,
 }));
 
+// The guardian notice an accept off the roster asks for (guardian-push.functions); its own tests are elsewhere.
+vi.mock("@/lib/guardian-push.functions", () => ({ pingGuardians: () => {} }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     rpc: async (fn: string, args: Record<string, unknown>) => {

@@ -10,6 +10,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 const env = vi.hoisted(() => ({
   respond: vi.fn(),
   saveReminders: vi.fn(),
+  waits: vi.fn(),
   toast: { error: vi.fn(), success: vi.fn() },
 }));
 
@@ -35,6 +36,7 @@ vi.mock("@/lib/game-invites", () => ({
   ],
   respondToGameInvite: env.respond,
   saveDefaultRemindersOnAccept: env.saveReminders,
+  acceptWaitsForGuardian: env.waits,
   gameInviteErrorMessage: () => "nope",
 }));
 
@@ -44,6 +46,8 @@ beforeEach(() => {
   env.respond.mockReset();
   env.saveReminders.mockReset();
   env.saveReminders.mockResolvedValue(undefined);
+  env.waits.mockReset();
+  env.waits.mockResolvedValue(false);
   env.toast.success.mockReset();
   env.toast.error.mockReset();
 });
@@ -63,7 +67,7 @@ describe("GameInvitationsSection accept", () => {
     expect(await accept()).toBe("You're in.");
   });
 
-  it("sends a player with a payment or a guardian step still to come to the game", async () => {
+  it("sends a player with a payment still to come (not held for a guardian) to the game", async () => {
     env.respond.mockResolvedValue({ status: "accepted", join_request_id: "jr", on_roster: false });
     expect(await accept()).toBe("You're in. Open the game to finish joining.");
   });
@@ -71,6 +75,34 @@ describe("GameInvitationsSection accept", () => {
   it("keeps today's copy when the server does not say (the function before 20261127120000)", async () => {
     env.respond.mockResolvedValue({ status: "accepted", join_request_id: "jr" });
     expect(await accept()).toBe("You're in. Open the game to finish joining.");
+  });
+
+  it("says the place waits for the parent when the accept is held for the guardian", async () => {
+    const res = { status: "accepted", join_request_id: "jr", on_roster: false };
+    env.respond.mockResolvedValue(res);
+    env.waits.mockResolvedValue(true);
+    const words = await accept();
+    expect(words).toBe("Invitation accepted. Your parent has to approve before you're in.");
+    expect(env.waits).toHaveBeenCalledWith(res, "me");
+    expect(await screen.findByText("Open the game")).toBeTruthy();
+  });
+});
+
+describe("GameInvitationsSection accept while the held check is still reading", () => {
+  it("shows the game link and frees the row at once; the words follow the check", async () => {
+    env.respond.mockResolvedValue({ status: "accepted", join_request_id: "jr", on_roster: false });
+    let answer: (v: boolean) => void = () => {};
+    env.waits.mockReturnValue(new Promise<boolean>((r) => (answer = r)));
+    render(<GameInvitationsSection userId="me" refreshKey={0} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
+    expect(await screen.findByText("Open the game")).toBeTruthy();
+    expect(env.toast.success).not.toHaveBeenCalled();
+    answer(true);
+    await waitFor(() =>
+      expect(env.toast.success).toHaveBeenCalledWith(
+        "Invitation accepted. Your parent has to approve before you're in.",
+      ),
+    );
   });
 });
 
