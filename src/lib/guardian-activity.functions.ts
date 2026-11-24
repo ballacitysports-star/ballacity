@@ -378,7 +378,17 @@ export const listChildrenActivity = createServerFn({ method: "GET" })
  * roster spot, or a pending request). Done in the database by
  * `guardian_cancel_child_game`, which re-checks the guardian link itself, and
  * runs as the guardian so the late-cancellation and refund rules apply as if
- * the child had cancelled. Tryouts use `cancelTryoutRsvp` with `onBehalfOf`.
+ * the child had cancelled. A request the host (or the guardian) already
+ * declined is left in place, with its resend cooldown, and any guardian
+ * approval left on it is taken back (20261130110000).
+ * Tryouts use `cancelTryoutRsvp` with `onBehalfOf`.
+ *
+ * The function runs as one transaction. A host's removal of the same child, or
+ * the child accepting an invitation to the game, at that moment can deadlock
+ * with it (40P01); Postgres then ends one side whole, so an ended cancel is
+ * tried once more, as hostRemoveParticipant does. The cancel is idempotent: a
+ * retry after the other side won finds what it left (a removal's declined
+ * request is kept).
  */
 export const cancelChildGame = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -386,10 +396,13 @@ export const cancelChildGame = createServerFn({ method: "POST" })
     z.object({ childUserId: z.string().uuid(), gameId: z.string().min(1).max(200) }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.rpc("guardian_cancel_child_game", {
-      _child: data.childUserId,
-      _game: data.gameId,
-    });
+    const cancel = () =>
+      context.supabase.rpc("guardian_cancel_child_game", {
+        _child: data.childUserId,
+        _game: data.gameId,
+      });
+    let { error } = await cancel();
+    if (error?.code === "40P01") ({ error } = await cancel());
     if (error) return { ok: false as const, error: error.message };
     return { ok: true as const };
   });
