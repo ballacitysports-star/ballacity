@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * A host's Remove and Decline also end the player's invitation to that game if they have not answered it yet, through
- * the host's own game_cancel_invite (20261119100000), best-effort like the rest of that cleanup: a failure there never
- * undoes or fails what the host did. A decline never turns an approved request (the player accepted the host's invitation
- * meanwhile) into a declined one; the roster's Remove still does, on purpose.
+ * A host's Remove goes through host_remove_player (20261129130000), which takes the roster row, declines the request and
+ * cancels the pending invitation in one transaction; a refusal reaches the host's screen as userErrorMessage words. While
+ * that function is missing (PGRST202/42883), Remove runs the old statements, and with them ends the player's invitation
+ * through the host's own game_cancel_invite (20261119100000), best-effort. A Decline also ends it that way: a failure
+ * there never undoes or fails what the host did. A decline never turns an approved request (the player accepted the
+ * host's invitation meanwhile) into a declined one; the roster's Remove still does, on purpose.
  */
 type Step = { table: string; op: string; payload?: unknown; filters: unknown[][] };
 const env = vi.hoisted(() => ({
@@ -13,6 +15,12 @@ const env = vi.hoisted(() => ({
   pendingInvites: [] as { id: string }[],
   failOn: new Map<string, { message: string; code?: string }>(),
   rpcError: null as { message: string } | null,
+  removeResult: { data: null, error: null } as {
+    data: unknown;
+    error: { message: string; code?: string } | null;
+  },
+  /** Answers for the first host_remove_player calls, in order; removeResult after them. */
+  removeFirst: [] as { data: unknown; error: { message: string; code?: string } | null }[],
   request: { game_id: "g1", player_id: "p1" } as { game_id: string; player_id: string } | null,
   status: "pending" as string,
 }));
@@ -83,6 +91,7 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: (table: string) => builder(table),
     rpc: async (fn: string, args: Record<string, unknown>) => {
       env.rpcs.push({ fn, args });
+      if (fn === "host_remove_player") return env.removeFirst.shift() ?? env.removeResult;
       return env.rpcError
         ? { data: null, error: env.rpcError }
         : { data: "cancelled", error: null };
@@ -99,13 +108,122 @@ beforeEach(() => {
   env.pendingInvites = [{ id: "inv1" }];
   env.failOn.clear();
   env.rpcError = null;
+  env.removeResult = {
+    data: { removed: true, request_declined: true, invites_cancelled: 1 },
+    error: null,
+  };
+  env.removeFirst = [];
   env.request = { game_id: "g1", player_id: "p1" };
   env.status = "pending";
 });
 
 const inviteLookup = () => env.steps.find((s) => s.table === "game_invites");
+/** The invitation cancels, without the removal call itself. */
+const cancels = () => env.rpcs.filter((c) => c.fn !== "host_remove_player");
 
-describe("hostRemoveParticipant", () => {
+describe("hostRemoveParticipant through host_remove_player", () => {
+  it("removes in one call, then clears payment residue; no request delete, no invite lookup", async () => {
+    await hostRemoveParticipant({ gameId: "g1", playerId: "p1" });
+    expect(env.rpcs).toEqual([{ fn: "host_remove_player", args: { _game: "g1", _player: "p1" } }]);
+    expect(env.steps.map((s) => `${s.table}.${s.op}`)).toEqual(["payment_submissions.delete"]);
+    expect(env.steps[0]!.filters).toEqual([
+      ["eq", "game_id", "g1"],
+      ["eq", "player_id", "p1"],
+    ]);
+  });
+
+  it("still succeeds when the payment residue cannot be cleared", async () => {
+    env.failOn.set("payment_submissions.delete", { message: "denied", code: "42501" });
+    await expect(hostRemoveParticipant({ gameId: "g1", playerId: "p1" })).resolves.toBeUndefined();
+  });
+
+  it("a refusal is thrown as it came, read through userErrorMessage, and nothing else runs", async () => {
+    env.removeResult = {
+      data: null,
+      error: {
+        code: "42501",
+        message: "NOT_GAME_HOST: only the game's host can remove players from it.",
+      },
+    };
+    const err = await hostRemoveParticipant({ gameId: "g1", playerId: "p1" }).catch(
+      (e: unknown) => e,
+    );
+    expect(err).toBe(env.removeResult.error);
+    expect(userErrorMessage(err, "Couldn't remove this player. Please try again.")).toBe(
+      "Only the game's host can do that.",
+    );
+    expect(env.steps).toEqual([]);
+    expect(env.rpcs.map((c) => c.fn)).toEqual(["host_remove_player"]);
+  });
+
+  it("a signed-out host is told to sign in", async () => {
+    env.removeResult = { data: null, error: { code: "28000", message: "AUTH_REQUIRED" } };
+    const err = await hostRemoveParticipant({ gameId: "g1", playerId: "p1" }).catch(
+      (e: unknown) => e,
+    );
+    expect(userErrorMessage(err, "Couldn't remove this player. Please try again.")).toBe(
+      "Sign in to continue.",
+    );
+    expect(env.steps).toEqual([]);
+  });
+
+  const deadlock = { data: null, error: { code: "40P01", message: "deadlock detected" } };
+  const removals = () => env.rpcs.filter((c) => c.fn === "host_remove_player");
+
+  it("a deadlock (the payment-hold sweep at the same moment) is retried once, then the removal goes on", async () => {
+    env.removeFirst = [deadlock];
+    await expect(hostRemoveParticipant({ gameId: "g1", playerId: "p1" })).resolves.toBeUndefined();
+    expect(removals()).toHaveLength(2);
+    expect(env.steps.map((s) => `${s.table}.${s.op}`)).toEqual(["payment_submissions.delete"]);
+  });
+
+  it("a second deadlock is thrown, in plain words, and the old statements never run", async () => {
+    env.removeFirst = [deadlock];
+    env.removeResult = deadlock;
+    const err = await hostRemoveParticipant({ gameId: "g1", playerId: "p1" }).catch(
+      (e: unknown) => e,
+    );
+    expect(err).toBe(deadlock.error);
+    expect(removals()).toHaveLength(2);
+    expect(env.steps).toEqual([]);
+    expect(cancels()).toEqual([]);
+    const words = userErrorMessage(err, "Couldn't remove this player. Please try again.");
+    expect(words).toBe("Couldn't remove this player. Please try again.");
+    expect(words).not.toMatch(/deadlock/i);
+  });
+
+  it("a missing function after a deadlock still falls back", async () => {
+    env.removeFirst = [deadlock];
+    env.removeResult = { data: null, error: { code: "PGRST202", message: "function not found" } };
+    await hostRemoveParticipant({ gameId: "g1", playerId: "p1" });
+    expect(removals()).toHaveLength(2);
+    expect(env.steps.map((s) => `${s.table}.${s.op}`)[0]).toBe("game_participants.delete");
+  });
+
+  it.each(["PGRST202", "42883"])(
+    "falls back to the old statements while the function is missing (%s)",
+    async (code) => {
+      env.removeResult = { data: null, error: { code, message: "function not found" } };
+      await hostRemoveParticipant({ gameId: "g1", playerId: "p1" });
+      expect(env.steps.map((s) => `${s.table}.${s.op}`)).toEqual([
+        "game_participants.delete",
+        "join_requests.delete",
+        "payment_submissions.delete",
+        "game_invites.select",
+      ]);
+      expect(cancels()).toEqual([{ fn: "game_cancel_invite", args: { _invite: "inv1" } }]);
+    },
+  );
+});
+
+describe("hostRemoveParticipant without host_remove_player (fallback)", () => {
+  beforeEach(() => {
+    env.removeResult = {
+      data: null,
+      error: { code: "PGRST202", message: "Could not find the function" },
+    };
+  });
+
   it("ends the removed player's pending invitation to that game after the removal", async () => {
     await hostRemoveParticipant({ gameId: "g1", playerId: "p1" });
     expect(env.steps.map((s) => `${s.table}.${s.op}`)).toEqual([
@@ -119,13 +237,13 @@ describe("hostRemoveParticipant", () => {
       ["eq", "invitee_id", "p1"],
       ["eq", "status", "pending"],
     ]);
-    expect(env.rpcs).toEqual([{ fn: "game_cancel_invite", args: { _invite: "inv1" } }]);
+    expect(cancels()).toEqual([{ fn: "game_cancel_invite", args: { _invite: "inv1" } }]);
   });
 
   it("cancels nothing when no invitation is waiting", async () => {
     env.pendingInvites = [];
     await hostRemoveParticipant({ gameId: "g1", playerId: "p1" });
-    expect(env.rpcs).toEqual([]);
+    expect(cancels()).toEqual([]);
   });
 
   it("still succeeds when ending the invitation fails", async () => {
@@ -141,7 +259,7 @@ describe("hostRemoveParticipant", () => {
       message: "nope",
     });
     expect(inviteLookup()).toBeUndefined();
-    expect(env.rpcs).toEqual([]);
+    expect(cancels()).toEqual([]);
   });
 });
 

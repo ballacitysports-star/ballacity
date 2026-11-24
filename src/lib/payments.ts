@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getCurrentUserId } from "@/lib/current-user-id";
 import { validateImageMeta } from "@/lib/image-validation";
 import { cancelPendingGameInvitesFor } from "@/lib/game-invites";
+import { isMissingFunctionError } from "@/lib/managed-profile-names";
 import { hostAnswersRequest, isGuardianOnlyRequest } from "@/lib/guarded-open-join";
 import type { CancellationReason, PaymentSubmissionStatus } from "@/lib/payment-states";
 import type { PaymentMode } from "@/lib/monetization/fees";
@@ -733,20 +734,40 @@ export async function withdrawMyApprovedJoinRequest(gameId: string) {
   if (error) throw error;
 }
 
+/** host_remove_player (20261129130000) is not in the generated types yet. */
+type HostRemovePlayerRpc = (
+  fn: "host_remove_player",
+  args: { _game: string; _player: string },
+) => PromiseLike<{ data: unknown; error: { code?: string; message?: string } | null }>;
+
 /**
- * Host-side removal of a player from a game. Deletes the participant row,
- * any lingering join_request row (which is what causes the roster to keep
- * rendering a "ghost" approved player when only game_participants is
- * cleaned up), and any pending/verified payment submission for that player
- * on this game so payment chips don't linger. RLS restricts each delete
- * to the game's host. An invitation to this game the player has not answered
- * yet is ended too, so they cannot accept their way back in.
+ * Host-side removal of a player from a game, through host_remove_player (20261129130000): in one transaction it takes
+ * the player's roster row, declines their join request for the game (as a host's decline, "Removed by host", so the
+ * game page's auto-join cannot put them back) and cancels their pending invitation to it. Only the game's host may call
+ * it; a refusal is thrown as it came, for userErrorMessage. A deadlock (40P01) is retried once; the removal is
+ * idempotent and the failed attempt kept nothing. Then, best-effort, any pending/verified payment submission
+ * for that player on this game is deleted so payment chips don't linger.
+ *
+ * While the function is not in the database yet (PGRST202/42883), the old statements run instead: delete the roster
+ * row (RLS: the game's host), try to delete the request (hosts have no delete rule there, so it stays approved), delete
+ * the payment residue, and end the pending invitation through game_cancel_invite, best-effort.
  */
 export async function hostRemoveParticipant(params: {
   gameId: string;
   playerId: string;
 }): Promise<void> {
   const { gameId, playerId } = params;
+  const rpc = supabase.rpc.bind(supabase) as unknown as HostRemovePlayerRpc;
+  const remove = () => rpc("host_remove_player", { _game: gameId, _player: playerId });
+  let { error: rpcErr } = await remove();
+  // A deadlock (the payment-hold sweep or a guardian's cancel on the same player at that moment) undoes the whole call,
+  // and the call can be repeated safely: try once more before telling the host.
+  if (rpcErr?.code === "40P01") ({ error: rpcErr } = await remove());
+  if (rpcErr && !isMissingFunctionError(rpcErr)) throw rpcErr;
+  if (!rpcErr) {
+    await deletePaymentResidue(gameId, playerId);
+    return;
+  }
   const { error: partErr } = await supabase
     .from("game_participants")
     .delete()
@@ -764,6 +785,12 @@ export async function hostRemoveParticipant(params: {
       () => undefined,
       () => undefined,
     );
+  await deletePaymentResidue(gameId, playerId);
+  await cancelPendingGameInvitesFor(gameId, playerId);
+}
+
+/** Best-effort: the removed player's payment submissions for the game (RLS: the game's host). Never throws. */
+async function deletePaymentResidue(gameId: string, playerId: string): Promise<void> {
   await supabase
     .from("payment_submissions")
     .delete()
@@ -773,7 +800,6 @@ export async function hostRemoveParticipant(params: {
       () => undefined,
       () => undefined,
     );
-  await cancelPendingGameInvitesFor(gameId, playerId);
 }
 
 export async function getMyJoinRequest(gameId: string): Promise<JoinRequest | null> {
