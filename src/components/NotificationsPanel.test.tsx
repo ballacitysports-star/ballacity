@@ -4,9 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToString } from "react-dom/server";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
+const router = vi.hoisted(() => ({ nav: vi.fn() }));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
-  useNavigate: () => () => {},
+  useNavigate: () => router.nav,
 }));
 vi.mock("@/lib/auth-return", () => ({ useAuthSearchHere: () => ({}) }));
 
@@ -29,11 +30,12 @@ const n = vi.hoisted(() => ({
   requestPush: vi.fn(),
   ensureSub: vi.fn(),
   items: [] as unknown[],
+  markRead: vi.fn(),
 }));
 vi.mock("@/lib/notifications", () => ({
   listMyNotifications: async () => n.items,
   markAllNotificationsRead: n.markAll,
-  markNotificationRead: vi.fn(),
+  markNotificationRead: n.markRead,
   markNotificationUnread: vi.fn(),
   deleteNotification: vi.fn(),
   pushPermissionState: () => n.permission,
@@ -66,7 +68,9 @@ vi.mock("@/lib/notification-actors", () => ({
   usePrefetchNotificationActors: () => {},
 }));
 vi.mock("@/components/UserAvatar", () => ({ UserAvatarById: () => null }));
-vi.mock("@/lib/deep-links", () => ({ resolveNotificationTarget: () => "/" }));
+vi.mock("@/lib/deep-links", () => ({
+  resolveNotificationTarget: (row: { link?: string }) => row.link ?? "/",
+}));
 
 vi.mock("@/integrations/supabase/client", () => {
   const channel = {
@@ -243,5 +247,48 @@ describe("NotificationsPanel mark all read", () => {
     await renderPanel();
     const b = screen.getByRole("button", { name: /Mark all read/ }) as HTMLButtonElement;
     expect(b.disabled).toBe(true);
+  });
+});
+
+describe("NotificationsPanel opening an alert", () => {
+  const unreadInvite = {
+    id: "inv",
+    read_at: null,
+    created_at: "2026-11-19T10:00:00Z",
+    type: "game_invite",
+    title: "You're invited",
+    link: "/games/g1?invite=1",
+  };
+
+  it("opens the alert at once, without waiting for the read mark to be saved", async () => {
+    n.items = [unreadInvite];
+    let settle: () => void = () => {};
+    n.markRead.mockReturnValue(new Promise<void>((resolve) => (settle = resolve)));
+    await renderPanel();
+    fireEvent.click(await screen.findByText("You're invited"));
+    // The save has not answered, and the alert is already being opened.
+    expect(n.markRead).toHaveBeenCalledWith("inv");
+    expect(router.nav).toHaveBeenCalledWith({ href: "/games/g1?invite=1" });
+    expect(n.refresh).not.toHaveBeenCalled();
+    await act(async () => settle());
+    expect(n.refresh).toHaveBeenCalled();
+  });
+
+  it("still opens the alert when the read mark fails, and leaves the count alone", async () => {
+    n.items = [unreadInvite];
+    n.markRead.mockRejectedValue(new Error("offline"));
+    await renderPanel();
+    fireEvent.click(await screen.findByText("You're invited"));
+    expect(router.nav).toHaveBeenCalledWith({ href: "/games/g1?invite=1" });
+    await act(async () => {});
+    expect(n.refresh).not.toHaveBeenCalled();
+  });
+
+  it("does not mark an alert that is already read", async () => {
+    n.items = [{ ...unreadInvite, read_at: "2026-11-19T11:00:00Z" }];
+    await renderPanel();
+    fireEvent.click(await screen.findByText("You're invited"));
+    expect(n.markRead).not.toHaveBeenCalled();
+    expect(router.nav).toHaveBeenCalledWith({ href: "/games/g1?invite=1" });
   });
 });
