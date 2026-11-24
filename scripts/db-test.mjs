@@ -445,6 +445,103 @@ async function hostRemovalRaces() {
   ];
 }
 
+// 20261130110000: a guardian's cancel for their child against the host's removal of the same child. The cancel deletes
+// the request first and then the roster row, whose joined-count trigger updates the game; the removal takes the game and
+// then the request. The two can deadlock, and the app then tries the ended call once more (cancelChildGame,
+// hostRemoveParticipant), which is safe only because Postgres ends that side whole. The cancel session here takes the
+// request first and waits before cancelling, as a cancel that has just deleted it would; the removal starts meanwhile
+// and waits for the request. The cancel goes on only once it sees the removal waiting on it (pg_locks, polled, not a
+// fixed sleep, so a slow runner does not change the order) and a further 2s, past the removal's own deadlock check
+// (deadlock_timeout 1s, as in races 3 and 3b), which finds no cycle yet. So the cancel's check finds it: Postgres ends
+// the cancel, the removal commits, and the cancel tried once more answers 'withdrawn', keeps the removal's declined
+// request and takes back the guardian's approval on it.
+const GUARDIAN_RACE_CLEANUP = `
+  DELETE FROM public.hosted_games WHERE id = 'race-guardian-cancel';
+  DELETE FROM public.notifications WHERE user_id IN (t.id('racegchost'), t.id('racegcmom'), t.id('racegckid'));
+  DELETE FROM auth.users WHERE id IN (t.id('racegchost'), t.id('racegcmom'), t.id('racegckid'));`;
+
+async function guardianCancelRace() {
+  psql(dbName, [], GUARDIAN_RACE_CLEANUP);
+  // racegckid (15) is on the roster with a request the host approved and racegcmom approved as guardian.
+  r = psql(
+    dbName,
+    [],
+    `SELECT t.person('racegchost', 35), t.person('racegcmom', 42), t.person('racegckid', 15);
+     SELECT t.guardian('racegcmom', 'racegckid');
+     INSERT INTO public.hosted_games (id, host_id, sport, title, date, max_players)
+       VALUES ('race-guardian-cancel', t.id('racegchost'), 'basketball', 'Cancel race', now() + interval '2 days', 10);
+     INSERT INTO public.game_payment_settings (game_id, host_id, entry_fee, requires_approval)
+       VALUES ('race-guardian-cancel', t.id('racegchost'), 0, true);
+     SET session_replication_role = replica;
+     INSERT INTO public.join_requests (game_id, host_id, player_id, status, idempotency_key, reviewed_at,
+                                       guardian_approved_at, guardian_approved_by)
+       VALUES ('race-guardian-cancel', t.id('racegchost'), t.id('racegckid'), 'approved', 'race', now() - interval '1 hour',
+               now() - interval '1 hour', t.id('racegcmom'));
+     INSERT INTO public.game_participants (game_id, user_id) VALUES ('race-guardian-cancel', t.id('racegckid'));
+     UPDATE public.hosted_games SET joined = 1 WHERE id = 'race-guardian-cancel';
+     SET session_replication_role = origin;`,
+  );
+  if (r.status !== 0) fail("The guardian cancel race could not set up its game.", r.stderr);
+  // holdFirst: the cancel holds the child's request until the removal waits for it, then 2s more (false: it cancels at
+  // once). It gives up after 30s if the removal never waits, which fails the race's first check.
+  const holdUntilRemovalWaits = `SELECT 1 FROM public.join_requests WHERE game_id = 'race-guardian-cancel' AND player_id = t.id('racegckid') FOR UPDATE;
+     DO $wait$
+     BEGIN
+       FOR _try IN 1..300 LOOP
+         IF EXISTS (SELECT 1 FROM pg_locks l WHERE NOT l.granted AND pg_backend_pid() = ANY (pg_blocking_pids(l.pid))) THEN
+           RETURN;
+         END IF;
+         PERFORM pg_sleep(0.1);
+       END LOOP;
+       RAISE EXCEPTION 'the removal never waited for the request';
+     END $wait$;
+     SELECT pg_sleep(2);`;
+  const cancel = (holdFirst) =>
+    `BEGIN;
+     ${holdFirst ? holdUntilRemovalWaits : ""}
+     SELECT t.as_user(t.id('racegcmom'));
+     SELECT 'CANCEL:' || public.guardian_cancel_child_game(t.id('racegckid'), 'race-guardian-cancel');
+     COMMIT;`;
+  const remove = `BEGIN; SELECT t.as_user(t.id('racegchost'));
+     SELECT 'REMOVED:' || public.host_remove_player('race-guardian-cancel', t.id('racegckid'))::text;
+     COMMIT;`;
+  // roster rows | status | note | decline stamped | no guardian approval left
+  const state = () =>
+    psql(dbName, [
+      "-At",
+      "-c",
+      `SELECT (SELECT count(*) FROM public.game_participants WHERE game_id = 'race-guardian-cancel' AND user_id = t.id('racegckid'))
+              || '|' || coalesce((SELECT status || '|' || coalesce(reviewer_notes, '') || '|' || (last_rejected_at IS NOT NULL)::text
+                                         || '|' || (guardian_approved_at IS NULL AND guardian_approved_by IS NULL)::text
+                                    FROM public.join_requests
+                                   WHERE game_id = 'race-guardian-cancel' AND player_id = t.id('racegckid')), 'none')`,
+    ]).stdout.trim();
+  const first = session(cancel(true));
+  await pause(1000);
+  const second = session(remove);
+  const [ended, removal] = await Promise.all([first, second]);
+  const afterRace = state();
+  const retry = await session(cancel(false));
+  const afterRetry = state();
+  psql(dbName, [], GUARDIAN_RACE_CLEANUP);
+  return [
+    [
+      "a guardian's cancel holding the child's request, then the host's removal: the cancel is ended whole, the removal commits",
+      ended.code !== 0 &&
+        /deadlock detected/.test(ended.out) &&
+        removal.code === 0 &&
+        /REMOVED:\{"removed": true, "request_declined": true/.test(removal.out) &&
+        afterRace === "0|rejected|Removed by host|true|false",
+    ],
+    [
+      "the cancel tried once more answers withdrawn, keeps the removal's decline and takes back the guardian's approval",
+      retry.code === 0 &&
+        /CANCEL:withdrawn/.test(retry.out) &&
+        afterRetry === "0|rejected|Removed by host|true|true",
+    ],
+  ];
+}
+
 // P2-1 stage 4a: one family signs up through the old path (rsvp_tryout) and another through
 // events (register_for_event) for the last seat of the same copied tryout. Both lock the post
 // first, so the second waits for the first and is told it is full: one seat is taken, never two,
@@ -589,6 +686,7 @@ try {
         ...(await lastSeatRace()),
         ...(await inviteLastPlaceRace()),
         ...(await hostRemovalRaces()),
+        ...(await guardianCancelRace()),
         ...(await oldVsNewSignupRace(true)),
         ...(await oldVsNewSignupRace(false)),
       ]) {

@@ -9,6 +9,8 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { DEFAULT_GAME_REMINDER_OFFSETS, saveMyGameReminderOffsets } from "@/lib/game-reminders";
+import { fetchHasGuardianLinkInForce } from "@/lib/guardian-link-in-force";
+import { joinWait } from "@/lib/join-guardian-status";
 import { USER_ERROR_MESSAGES, errorCode, knownErrorMessage } from "@/lib/user-error";
 
 export type GameInviteStatus = "pending" | "accepted" | "declined" | "cancelled" | "expired";
@@ -50,7 +52,7 @@ export type BulkInviteResult = { invited: number; skipped: Record<string, number
 type Rpc = (
   fn: string,
   args: Record<string, unknown>,
-) => PromiseLike<{ data: unknown; error: { message?: string } | null }>;
+) => PromiseLike<{ data: unknown; error: { message?: string; code?: string } | null }>;
 const rpc = () => supabase.rpc.bind(supabase) as unknown as Rpc;
 
 type InvitesTable = {
@@ -77,8 +79,18 @@ export function gameInviteErrorMessage(e: unknown): string {
   return knownErrorMessage(e) ?? "Something went wrong. Please try again.";
 }
 
-async function call<T>(fn: string, args: Record<string, unknown>): Promise<T> {
-  const { data, error } = await rpc()(fn, args);
+/**
+ * One database function call; a refusal is thrown as an Error carrying its message only. With `retryDeadlock`, a
+ * deadlock (40P01) is tried once more first: Postgres ended the whole call and kept nothing of it, so repeating it is
+ * safe. A second deadlock is thrown like any other error.
+ */
+async function call<T>(
+  fn: string,
+  args: Record<string, unknown>,
+  opts: { retryDeadlock?: boolean } = {},
+): Promise<T> {
+  let { data, error } = await rpc()(fn, args);
+  if (opts.retryDeadlock && error?.code === "40P01") ({ data, error } = await rpc()(fn, args));
   if (error) throw new Error(error.message ?? fn);
   return data as T;
 }
@@ -110,8 +122,70 @@ export function invitePlayersToGame(
   });
 }
 
-export function respondToGameInvite(inviteId: string, accept: boolean): Promise<RespondResult> {
-  return call<RespondResult>("game_respond_invite", { _invite: inviteId, _accept: accept });
+/**
+ * The invitee answers. game_respond_invite runs as one transaction and takes the invitation, the game and the request in
+ * that order. A host's decline of the player's request, a guardian's cancel for the same child, or the payment-hold
+ * sweep (which locks every expired request in the game up front) at that moment can deadlock with it, and Postgres then
+ * ends one of them whole. An ended answer is tried once more (as hostRemoveParticipant does), and the second try reads
+ * whatever the other side did (after a host's decline the invitation answers 'cancelled' or 'expired').
+ *
+ * An accept that leaves the player off the roster may be held for their guardian (a guarded minor: 980 section 5,
+ * 20261130110000). The guardian is then told as for a request waiting for them: the server works out whether the place
+ * really waits for them and whether they were already told (guardian-push.server, invite_accept). Asked once, after the
+ * final answer, and never awaited: it cannot turn the accept into an error.
+ */
+export async function respondToGameInvite(
+  inviteId: string,
+  accept: boolean,
+): Promise<RespondResult> {
+  const res = await call<RespondResult>(
+    "game_respond_invite",
+    { _invite: inviteId, _accept: accept },
+    { retryDeadlock: true },
+  );
+  if (accept && res?.status === "accepted" && res.on_roster !== true) {
+    void import("@/lib/guardian-push.functions")
+      .then((m) => m.pingGuardians("invite_accept", inviteId))
+      .catch(() => {});
+  }
+  return res;
+}
+
+/**
+ * Whether an accepted answer leaves the place waiting for the player's guardian, by the game page's own rule (joinWait:
+ * a guardian link in force and a request with no guardian approval), so the toast and the page say the same. A paid
+ * game's accept is off the roster for everyone until the payment; only a guarded player's waits for the guardian.
+ * Never throws: when it cannot tell, it answers false and the usual words are shown.
+ */
+export async function acceptWaitsForGuardian(
+  res: RespondResult,
+  userId: string | null | undefined,
+): Promise<boolean> {
+  if (res.status !== "accepted" || res.on_roster === true || !res.join_request_id || !userId) {
+    return false;
+  }
+  try {
+    const [hasGuardian, req] = await Promise.all([
+      fetchHasGuardianLinkInForce(userId),
+      supabase
+        .from("join_requests")
+        .select("status, guardian_approved_at")
+        .eq("id", res.join_request_id)
+        .maybeSingle(),
+    ]);
+    const row = req.data as {
+      status: "pending" | "approved" | "rejected";
+      guardian_approved_at: string | null;
+    } | null;
+    if (req.error || !row) return false;
+    return !!joinWait({
+      hostStatus: row.status,
+      needsGuardian: hasGuardian,
+      guardianApproved: !!row.guardian_approved_at,
+    })?.onParent;
+  } catch {
+    return false;
+  }
 }
 
 /**

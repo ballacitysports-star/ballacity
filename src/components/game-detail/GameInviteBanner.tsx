@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
+  acceptWaitsForGuardian,
   gameInviteErrorMessage,
   getGameInvite,
   respondToGameInvite,
   saveDefaultRemindersOnAccept,
   type GameInvite,
 } from "@/lib/game-invites";
+import { inviteAcceptedMessage } from "@/lib/invite-accept-copy";
 
 /**
  * WP 2.0: the invitation a player opened from their notification (`?inv=<id>`). While it waits for an answer the player can
@@ -56,9 +58,13 @@ export function GameInviteBanner({
       if (res.status === "accepted") {
         // Reminders as if they had joined from the game page; not awaited, and a failure never reaches the catch below.
         void saveDefaultRemindersOnAccept(invite.game_id).catch(() => {});
-        toast.success("You're in. The host has been told.");
         setInvite({ ...invite, status: "accepted" });
         onAnswered();
+        // A place held for the player's guardian says so; otherwise the usual words. The accept is committed, so the
+        // banner closes now and the words follow the check (two reads; it never throws).
+        void acceptWaitsForGuardian(res, viewerId).then((waitsForGuardian) =>
+          toast.success(inviteAcceptedMessage(res, { waitsForGuardian, where: "banner" })),
+        );
       } else if (res.status === "declined") {
         toast.success("Invitation declined");
         setInvite({ ...invite, status: "declined" });

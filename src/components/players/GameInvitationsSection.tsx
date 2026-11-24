@@ -4,12 +4,14 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { safeTimezone } from "@/lib/availability-lifecycle";
 import {
+  acceptWaitsForGuardian,
   gameInviteErrorMessage,
   listMyPendingGameInvites,
   respondToGameInvite,
   saveDefaultRemindersOnAccept,
   type GameInviteWithGame,
 } from "@/lib/game-invites";
+import { inviteAcceptedMessage } from "@/lib/invite-accept-copy";
 
 function when(date: string, tz: string | null): string {
   const d = new Date(date);
@@ -59,8 +61,11 @@ export function GameInvitationsSection({
         // Reminders as if they had joined from the game page; not awaited, and a failure never reaches the catch below.
         void saveDefaultRemindersOnAccept(row.game_id).catch(() => {});
         // A free game with no guardian step puts the player on the roster as they accept (20261127120000); otherwise a
-        // payment or a guardian's approval is still to come on the game page.
-        toast.success(res.on_roster ? "You're in." : "You're in. Open the game to finish joining.");
+        // payment or a guardian's approval is still to come on the game page. A place held for the guardian says so; the
+        // words follow the check (two reads; it never throws) without holding the row busy.
+        void acceptWaitsForGuardian(res, userId).then((waitsForGuardian) =>
+          toast.success(inviteAcceptedMessage(res, { waitsForGuardian, where: "list" })),
+        );
       } else if (res.status === "full") {
         toast.error("This game is full right now. Your invitation stays open.");
         return;
