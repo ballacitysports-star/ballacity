@@ -23,7 +23,7 @@ managed and linked.
 | Email                  | `src/lib/email-templates/managed-handover.tsx` (registered in `registry.ts`; fixed subject, plain names only)                                                                                                                                     |
 | Parent Center          | `src/components/child/ManagedHandoverCard.tsx` (inside the child's panel in `src/routes/parent.index.tsx`), hooks in `src/lib/use-managed-handover.ts`                                                           |
 | The link page          | `src/routes/handover.$token.tsx` and `src/components/handover/HandoverClaim.tsx`; `/handover` is a public route (`root-gate.ts`)                                                                                 |
-| Tests                  | `managed-handover.test.ts`, `managed-handover.server.test.ts`, `email-templates/managed-handover.test.tsx`, `managed-handover.functions.test.ts`, `ManagedHandoverCard.test.tsx`, `HandoverClaim.test.tsx`; `e2e/managed-handover.spec.ts` (written, not run) |
+| Tests                  | `managed-handover.test.ts`, `managed-handover.server.test.ts`, `email-templates/managed-handover.test.tsx`, `managed-handover.functions.test.ts`, `ManagedHandoverCard.test.tsx`, `HandoverClaim.test.tsx`; `e2e/managed-handover.spec.ts`; against a real auth server (section 6): `e2e/local-stack/managed-handover-real-auth.itest.ts`, `e2e/managed-handover-real-auth.spec.ts` |
 
 ## 1. How managed accounts work today (read from the code, not from the summary)
 
@@ -300,16 +300,88 @@ and twelve functions, schedules one `pg_cron` job when the extension is there, a
 applied by this branch to production or to the hosted sandbox. The app is safe either way round: before the migration the
 Parent Center shows nothing and start says "isn't available yet"; with the migration and an old app, nothing links to it.
 
-Things only a real auth service can show (to check in the serial E2E phase or on the local stack; they are assumptions the
-mocked tests cannot prove):
+### Against a real auth server (seen 2026-11-23)
 
-1. Admin `updateUserById({ email, email_confirm: true })` updates `auth.users.email` and the `email` identity, so a password sign-in
-   with the new address works afterwards.
-2. `app_metadata: { managed: false, managed_by: null }` leaves `managed` not `true` in the next session's claims.
-3. `generateLink({ type: "recovery" })` for a confirmed user returns a `hashed_token` that `verifyOtp({ type: "recovery" })` accepts.
-4. After `finish_managed_handover`, the guardian's switched-in browser session cannot refresh and cannot call `updateUser`.
-5. The password the adult chooses (browser, recovery session) replaces the throwaway one, and a password sign-in then works; a
-   password a guardian set earlier no longer does.
+Until now only mocks (`managed-handover.server.test.ts`) and a few lines of stub schema (SQL test 991) stood in for the auth
+service. Five things only a real one can show were assumptions. They were run against the **local Docker stack**
+(`e2e/local-stack`: GoTrue v2.180.0, PostgREST, Postgres 17 with every migration applied), calling the app's real server code
+(`completeHandover`, `lookupHandover`, `reconcileManagedRecord` in `managed-handover.server.ts`) with its real service-role
+client. Nothing was run against the hosted sandbox or production.
+
+| #   | Assumption                                                                                                               | Seen? | What was seen                                                                                                                                                                                                                                                                                                                                                       |
+| --- | ------------------------------------------------------------------------------------------------------------------------ | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `updateUserById({ email, email_confirm: true })` updates the email identity, so a password sign-in with it works         | yes   | `auth.users.email` and the `email` identity row (`identity_data.email`, the generated `identities.email`) both become the adult's address, `provider_id` stays the user id, `email_confirmed_at` is set. Signing in with that address and a password works (any letter case); the old placeholder address no longer signs in.                                       |
+| 2   | `app_metadata.managed = false` is not `true` in the signed JWT after a refresh                                           | yes   | A session opened as the managed account carried `managed: true` and `managed_by`. After the update and `refreshSession()` the new JWT has `managed: false` and no `managed_by` (`isManagedUser` is false). A token issued before keeps `managed: true` until it is replaced, which is why the sessions must die at completion.                                      |
+| 3   | `generateLink({ type: "recovery" })` returns a `hashed_token` that `verifyOtp({ type: "recovery" })` accepts             | yes   | `completeHandover` returned the hash; `verifyOtp` gave a session for the adult (`amr: otp`, no managed claim). A second use failed ("Email link is invalid or has expired").                                                                                                                                                                                         |
+| 4   | After the handover the guardian's switched-in session cannot refresh or call `updateUser`; their magic link and password are dead | yes   | `refreshSession()` failed ("Invalid Refresh Token: Refresh Token Not Found", HTTP 400 for the raw token too). The old access token got HTTP 403 on `GET` and `PUT /auth/v1/user` (its session is gone). A magic link made earlier no longer verifies. The password the guardian set no longer signs in, with the adult's address or the placeholder. These checks are against GoTrue's own endpoints: the same access token still authenticates through the data API (PostgREST) for the rest of its hour (HTTP 200 and the account's own profile row; see "Sessions already issued"). The lock-out is also GoTrue's doing at step 3, not only `finish`'s. |
+| 5   | The password the adult chooses in the browser replaces the throwaway; a guardian-set password no longer works            | yes   | From the recovery session `updateUser({ password })` works and signing in with the adult's address and that password works. In a real browser (Playwright, dev server with the real server functions) the whole page worked: open the link, tick, confirm, choose a password, "this account is yours", sign in through `/auth`, and the spent link says it is invalid. |
+
+What the runs also showed (observed on the local configuration, GoTrue v2.180.0, with the settings listed under "not seen" below; not yet shown for the hosted projects):
+
+- **A switched-in guardian can plant credentials.** With the child's session `updateUser({ password })` succeeded, and so did
+  enrolling a TOTP second factor. That is the premise of finish step 2b, and it is real.
+- **GoTrue itself ends the guardian's sessions at step 3.** An Admin API update that sets a password signs every session of the
+  user out (refresh token deleted); an email-only or metadata-only update does not. So with the app's throwaway password the
+  guardian is already locked out (and their password already replaced) before `finish_managed_handover` runs;
+  `auth.sessions` was empty after step 3. `finish`'s deletes and credential replacement are the second line. They were checked
+  on their own, with the throwaway password left out of the update: the guardian's session then stays alive, can set a password
+  after the update, and that password signs in as the adult until `finish_managed_handover` runs. After it, the late and early
+  passwords, the second factor, the phone, the linked `google` identity (inserted by SQL; the Admin API cannot link one), every
+  session and refresh token, a planted one-time token (inserted by SQL after the Admin update, which had already dropped GoTrue's
+  own) and all eight token and pending-change columns of `auth.users` (also planted by SQL: `confirmation_token`,
+  `recovery_token`, both `email_change_token_*`, `phone_change_token`, `reauthentication_token`, `email_change`, `phone_change`)
+  are gone and the stored password is a fresh random one, all against the real `auth` schema (the real column names,
+  `extensions.crypt`, `one_time_tokens`, `mfa_factors`, `identities`). Each check was shown able to fail: with the
+  one-time-token delete removed from the live function, or the token-column clearing removed, the test fails.
+- **GoTrue also invalidates outstanding magic links when the email or phone changes through the Admin API.** A link made before an
+  email change, and one made before a phone change, no longer verified; a metadata-only update left the link working (a control).
+  All three are tests now. So `auth.one_time_tokens` is already empty at finish when the app's own update ran, and the magic-link
+  guarantee holds twice; the database's own delete is exercised by the planted token above.
+- **A finish that fails puts the record back.** With a trigger that made `finish_managed_handover` fail inside its transaction,
+  `completeHandover` threw, the account was managed again (same placeholder address, `managed: true`, `managed_by` the guardian,
+  the email identity back on the placeholder, row and link intact), the guardian could switch in again with a fresh magic link, and
+  retrying the same link then completed. A half-done record (the adult's address set, the database never finished) was repaired by
+  `reconcileManagedRecord` after the guardian cancelled, and the guardian could switch in.
+- The existing `e2e/managed-child.spec.ts` (add a child through the real `createManagedChild`, switch in with the real
+  `startManagedSession`, switch back, delete) and `e2e/managed-handover.spec.ts` also passed on the same stack.
+
+**What had to change:** nothing. No bug was found in the app code or the migration, so no code change, no migration and no
+SQL test were needed.
+
+**What was not seen, and why:**
+
+- **The email.** The app sends the link with `sendTemplateEmail` (Lovable's mail API, needs `LOVABLE_API_KEY`) and the local
+  stack has no mail catcher: GoTrue sends nothing and there is no inbox. The tests start the handover with the same
+  `start_managed_handover` call `startManagedHandover` makes (service role, the guardian's id, the token's hash) and follow the
+  link by passing the token on. `startManagedHandover` and its Parent Center card were therefore not run end to end, and the
+  "email cannot be sent, so nothing was changed" path was not run against a real mail service.
+- **Emails GoTrue itself would send** (email-changed and password-changed notices) and **the auth-email hook**: not configured on
+  the local stack. The placeholder address is `.invalid` and the hook acknowledges it, as before; this was not exercised.
+- **The "Forgot password" fallback** (when the one-time sign-in cannot be made): it needs a mailer; the recovery link itself
+  (`generateLink`) was seen, `resetPasswordForEmail` was not.
+- **The local GoTrue is not configured like a hosted project.** It runs with `GOTRUE_MAILER_AUTOCONFIRM=true`, no working mail
+  server, no leaked-password check, no password-strength rule, and without secure password change or reauthentication
+  (`e2e/local-stack/docker-compose.yml`). So: a hosted project may reject the adult's chosen password (leaked-password
+  protection, a strength rule), which was not exercised; an email change by a switched-in guardian takes effect at once here,
+  while on a hosted project it may be pending until confirmed, so that pending-change path was not exercised (the planted
+  `email_change` columns above are the closest check, and the Admin API update in step 3 replaces the address either way); and
+  the reauthentication a hosted project may demand before a password change was not in play.
+- **Other GoTrue versions.** The hosted projects may run a different GoTrue than v2.180.0; the behaviours above (sessions ended by
+  a password change, magic links dropped on an email change) are GoTrue's, not the app's, and the app does not rely on them
+  alone. A real linked OAuth account was not made (its row was inserted by SQL).
+- **The hosted sandbox and production**, by instruction.
+
+How to run it again (local only). The vitest integration tests (`*.itest.ts`) are not part of `vitest run`; the guard test
+`src/lib/e2e-local-only.test.ts` is. The Playwright spec `e2e/managed-handover-real-auth.spec.ts` is collected by the CI
+Playwright job (it matches `testDir`), where it shows as one skipped test: it skips itself unless the environment is the local
+stack and the seed file exists. Each file refuses to start otherwise:
+
+```sh
+node e2e/local-stack/stack.mjs up && set -a && . e2e/local-stack/.state/env.sh && set +a
+npm run test:realauth                                  # 20 tests here (managed-handover-real-auth.itest.ts) plus the seed below
+npx vitest run -c vitest.realauth.config.ts e2e/local-stack/handover-browser-seed.itest.ts   # makes the account and link
+npx playwright test --trace=off --workers=1 e2e/managed-handover-real-auth.spec.ts           # the browser journey
+```
 
 Release order for `20261130100000_managed_notice_points_to_handover`: that migration makes the next sweep tell every managing
 guardian of a managed adult to start the handover. Nothing gates the notice on the five checks above. Before applying it to

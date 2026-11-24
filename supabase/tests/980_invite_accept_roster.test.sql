@@ -189,7 +189,9 @@ SELECT t.as_user(t.id('host'));
 SELECT t.eq(t.changed($q$UPDATE public.join_requests SET status = 'rejected', reviewed_at = now()
                           WHERE game_id = 'gtb' AND player_id = t.id('ana')$q$), 1, 'the host declines a request');
 SELECT t.reset();
-SELECT t.eq(pg_temp.answer('gtb', 'ana') ->> 'status', 'expired', 'the invitation sent before it can no longer be accepted');
+-- Since 20261129130000 the host's decline itself ends the pending invitation ('cancelled'); before, the accept's
+-- taken-back rule caught it ('expired'). Either way it cannot be accepted.
+SELECT t.eq(pg_temp.answer('gtb', 'ana') ->> 'status', 'cancelled', 'the invitation sent before it can no longer be accepted');
 SELECT t.eq(pg_temp.req('gtb', 'ana'), 'rejected', 'the host''s decision stands');
 
 -- Declines the host did not make are not a take-back; the host's re-invitation (the same pending invitation, created
@@ -235,6 +237,9 @@ SELECT t.eq(pg_temp.req('ghold', 'oli'), 'pending', 'and the resent request is l
 -- KNOWN GAP (WP 5.5 follow-up, recorded by name; see the migration header): the rule reads the player's own request row,
 -- which the player can delete, or rewrite when sending it again. Closing the gap needs another object changed (the decline
 -- ending the invitation on the server, or last_rejected_at pinned on a resubmit) and turns these two into refusals.
+-- 20261129130000 closed it for every host decline made from then on (the decline cancels the invitation; 988). kat's and
+-- max's declines were written straight into the table, as declines made before that migration were, so for them the gap
+-- stands: no one-off ended the invitations already pending under such a decline.
 SELECT t.as_user(t.id('kat'));
 SELECT t.eq(t.changed($q$DELETE FROM public.join_requests WHERE game_id = 'gtb' AND player_id = t.id('kat')$q$), 1,
   'KNOWN GAP: a player deletes their own declined request');

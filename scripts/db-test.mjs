@@ -272,6 +272,179 @@ async function inviteLastPlaceRace() {
   ];
 }
 
+// 20261129130000: a host's removal or decline against whoever holds the player's invitation at the same moment.
+// game_respond_invite takes the invitation, then the game, then the request. host_remove_player takes them in that order,
+// so the two queue at the invitation. The decline trigger already holds the request and waits for the invitation: for a
+// holder that is not waiting on the request (an availability delete's foreign-key action, an accept that times out) it
+// then cancels it; with an accept that is, Postgres ends one side of the deadlock, and the trigger gives up its own wait
+// (the accept then reads the request declined and answers 'expired'). Those orders deadlock mid-function, which holding
+// a transaction open after the call would not show, so the accept session here takes its invitation first and waits
+// before answering, as an accept that has just locked it would. Races 3 and 3b assume deadlock_timeout 1s
+// (the default here and on Supabase): whichever side started waiting first runs the deadlock check first.
+const HOST_RACE_CLEANUP = `
+  DELETE FROM public.hosted_games WHERE id = 'race-host-remove';
+  DELETE FROM public.notifications WHERE user_id IN (t.id('racermhost'), t.id('racerma'), t.id('racermb'), t.id('racermc'), t.id('racermd'),
+                                                   t.id('racerme'), t.id('racermf'));
+  DELETE FROM auth.users WHERE id IN (t.id('racermhost'), t.id('racerma'), t.id('racermb'), t.id('racermc'), t.id('racermd'),
+                                         t.id('racerme'), t.id('racermf'));`;
+
+async function hostRemovalRaces() {
+  psql(dbName, [], HOST_RACE_CLEANUP);
+  // racerma: on the roster with no request (added by the host). racermb: invited only. racermc to racermf: invited,
+  // request pending; racermd's invitation came from her availability post.
+  r = psql(
+    dbName,
+    [],
+    `SELECT t.person('racermhost', 35), t.person('racerma', 25), t.person('racermb', 26), t.person('racermc', 27),
+            t.person('racermd', 28), t.person('racerme', 29), t.person('racermf', 30);
+     INSERT INTO public.hosted_games (id, host_id, sport, title, date, max_players)
+       VALUES ('race-host-remove', t.id('racermhost'), 'basketball', 'Remove race', now() + interval '2 days', 10);
+     INSERT INTO public.game_payment_settings (game_id, host_id, entry_fee, requires_approval)
+       VALUES ('race-host-remove', t.id('racermhost'), 0, true);
+     INSERT INTO public.game_participants (game_id, user_id) VALUES ('race-host-remove', t.id('racerma'));
+     INSERT INTO public.game_invites (id, game_id, host_id, invitee_id, created_at) VALUES
+       (t.id('race-rm-a'), 'race-host-remove', t.id('racermhost'), t.id('racerma'), now() - interval '1 hour'),
+       (t.id('race-rm-b'), 'race-host-remove', t.id('racermhost'), t.id('racermb'), now() - interval '1 hour'),
+       (t.id('race-rm-c'), 'race-host-remove', t.id('racermhost'), t.id('racermc'), now() - interval '1 hour');
+     SET session_replication_role = replica;
+     INSERT INTO public.join_requests (game_id, host_id, player_id, idempotency_key) VALUES
+       ('race-host-remove', t.id('racermhost'), t.id('racermc'), 'race'),
+       ('race-host-remove', t.id('racermhost'), t.id('racermd'), 'race'),
+       ('race-host-remove', t.id('racermhost'), t.id('racerme'), 'race'),
+       ('race-host-remove', t.id('racermhost'), t.id('racermf'), 'race');
+     INSERT INTO public.player_availabilities (id, user_id, sports) VALUES (t.id('race-rm-post'), t.id('racermd'), '{basketball}');
+     INSERT INTO public.game_invites (id, game_id, host_id, invitee_id, availability_id, created_at) VALUES
+       (t.id('race-rm-d'), 'race-host-remove', t.id('racermhost'), t.id('racermd'), t.id('race-rm-post'), now() - interval '1 hour'),
+       (t.id('race-rm-e'), 'race-host-remove', t.id('racermhost'), t.id('racerme'), NULL, now() - interval '1 hour'),
+       (t.id('race-rm-f'), 'race-host-remove', t.id('racermhost'), t.id('racermf'), NULL, now() - interval '1 hour');
+     SET session_replication_role = origin;`,
+  );
+  if (r.status !== 0) fail("The host removal races could not set up their game.", r.stderr);
+  // lockFirst: seconds the accept holds its invitation before answering (0: it answers at once).
+  const accept = (who, inv, lockFirst) =>
+    `BEGIN;
+     ${lockFirst ? `SELECT 1 FROM public.game_invites WHERE id = t.id('${inv}') FOR UPDATE; SELECT pg_sleep(${lockFirst});` : ""}
+     SELECT t.as_user(t.id('${who}'));
+     SELECT 'ANSWER:' || (public.game_respond_invite(t.id('${inv}'), true) ->> 'status');
+     COMMIT;`;
+  const remove = (who, hold) =>
+    `BEGIN; SELECT t.as_user(t.id('racermhost'));
+     SELECT 'REMOVED:' || public.host_remove_player('race-host-remove', t.id('${who}'))::text;
+     ${hold ? "SELECT pg_sleep(3);" : ""} COMMIT;`;
+  const state = (who, inv) =>
+    psql(dbName, [
+      "-At",
+      "-c",
+      `SELECT (SELECT count(*) FROM public.game_participants WHERE game_id = 'race-host-remove' AND user_id = t.id('${who}'))
+              || '|' || coalesce((SELECT status FROM public.join_requests
+                                   WHERE game_id = 'race-host-remove' AND player_id = t.id('${who}')), 'none')
+              || '|' || (SELECT status FROM public.game_invites WHERE id = t.id('${inv}'))`,
+    ]).stdout.trim();
+  const decline = (who) =>
+    `BEGIN; SELECT t.as_user(t.id('racermhost'));
+     UPDATE public.join_requests SET status = 'rejected', reviewed_at = now()
+      WHERE game_id = 'race-host-remove' AND player_id = t.id('${who}');
+     COMMIT;`;
+  const answer = (x) => (x.out.match(/ANSWER:(\w+)/) ?? [])[1];
+  const clean = (results) =>
+    results.every((x) => x.code === 0) && !/deadlock/i.test(results.map((x) => x.out).join(""));
+
+  // 1. The accept holds its invitation; the host removes the player meanwhile and waits for it, then removes the place
+  //    the accept gave and declines the request it approved.
+  let first = session(accept("racerma", "race-rm-a", 3));
+  await pause(1000);
+  let second = session(remove("racerma", false));
+  const r1 = await Promise.all([first, second]);
+  const s1 = state("racerma", "race-rm-a");
+  // 2. The removal holds its transaction; the accept arrives, waits at the invitation and finds it cancelled.
+  first = session(remove("racermb", true));
+  await pause(1000);
+  second = session(accept("racermb", "race-rm-b", false));
+  const r2 = await Promise.all([first, second]);
+  const s2 = state("racermb", "race-rm-b");
+  // 3. The accept holds its invitation; the host declines the request meanwhile and its trigger waits for the
+  //    invitation. Half a second later the accept asks for the request: a deadlock. The decline has waited longer, so
+  //    Postgres stops its wait first (deadlock_timeout 1s); the trigger gives the wait up, the decline commits, and the
+  //    accept reads the decline and answers expired.
+  first = session(accept("racermc", "race-rm-c", 1.5));
+  await pause(1000);
+  second = session(decline("racermc"));
+  const r3 = await Promise.all([first, second]);
+  const s3 = state("racermc", "race-rm-c");
+  // 3b. The same, with the accept holding its invitation for 3 seconds: the decline's deadlock check (at 1s) finds no
+  //    cycle yet, so the accept's own check finds it and Postgres ends the accept (40P01, nothing kept). The decline
+  //    then cancels the invitation. Either way the host's decline holds.
+  first = session(accept("racermf", "race-rm-f", 3));
+  await pause(1000);
+  second = session(decline("racermf"));
+  const r3b = await Promise.all([first, second]);
+  const s3b = state("racermf", "race-rm-f");
+  // 4. The player deletes the availability post her invitation came from: ON DELETE SET NULL updates the pending
+  //    invitation and holds it until her transaction ends. The host declines meanwhile: the decline waits for her, then
+  //    cancels the invitation (skipping it would leave it pending for good).
+  first = session(
+    `BEGIN; SELECT t.as_user(t.id('racermd'));
+     WITH d AS (DELETE FROM public.player_availabilities WHERE id = t.id('race-rm-post') RETURNING 1)
+     SELECT 'DELETED:' || count(*) FROM d;
+     SELECT pg_sleep(3); COMMIT;`,
+  );
+  await pause(1000);
+  second = session(decline("racermd"));
+  const r4 = await Promise.all([first, second]);
+  const s4 = state("racermd", "race-rm-d");
+  const post4 = psql(dbName, [
+    "-At",
+    "-c",
+    "SELECT availability_id IS NULL FROM public.game_invites WHERE id = t.id('race-rm-d')",
+  ]).stdout.trim();
+  // 5. The accept holds the invitation and waits for the game (another writer holds it), then gives up on its statement
+  //    timeout. The host's decline waits for the invitation meanwhile, then cancels it once the accept has rolled back.
+  const hold = session(
+    `BEGIN; SELECT 1 FROM public.hosted_games WHERE id = 'race-host-remove' FOR NO KEY UPDATE;
+     SELECT pg_sleep(4); COMMIT;`,
+  );
+  await pause(500);
+  first = session(`SET statement_timeout = '2500ms';\n${accept("racerme", "race-rm-e", false)}`);
+  await pause(1000);
+  second = session(decline("racerme"));
+  const r5 = await Promise.all([hold, first, second]);
+  const s5 = state("racerme", "race-rm-e");
+  psql(dbName, [], HOST_RACE_CLEANUP);
+  return [
+    [
+      "an accept holding its invitation, then the host's removal: the removal waits, then takes the place and declines",
+      clean(r1) && answer(r1[0]) === "accepted" && s1 === "0|rejected|accepted",
+    ],
+    [
+      "a removal in progress, then the accept: it waits and answers cancelled, writing nothing",
+      clean(r2) && answer(r2[1]) === "cancelled" && s2 === "0|none|cancelled",
+    ],
+    [
+      "an accept holding its invitation, then the host's decline: the decline yields the deadlock, the accept answers expired",
+      clean(r3) && answer(r3[0]) === "expired" && s3 === "0|rejected|expired",
+    ],
+    [
+      "an accept holding its invitation longer, then the host's decline: the accept is ended, the invitation cancelled",
+      r3b[0].code !== 0 &&
+        /deadlock detected/.test(r3b[0].out) &&
+        r3b[1].code === 0 &&
+        s3b === "0|rejected|cancelled",
+    ],
+    [
+      "a player's availability delete holding the invitation (FK set null), then the host's decline: it waits, then cancels",
+      clean(r4) && /DELETED:1/.test(r4[0].out) && post4 === "t" && s4 === "0|rejected|cancelled",
+    ],
+    [
+      "an accept holding the invitation that then times out, and the host's decline meanwhile: the invitation is cancelled",
+      r5[0].code === 0 &&
+        r5[1].code !== 0 &&
+        /statement timeout/.test(r5[1].out) &&
+        r5[2].code === 0 &&
+        s5 === "0|rejected|cancelled",
+    ],
+  ];
+}
+
 // P2-1 stage 4a: one family signs up through the old path (rsvp_tryout) and another through
 // events (register_for_event) for the last seat of the same copied tryout. Both lock the post
 // first, so the second waits for the first and is told it is full: one seat is taken, never two,
@@ -415,6 +588,7 @@ try {
       for (const [name, ok] of [
         ...(await lastSeatRace()),
         ...(await inviteLastPlaceRace()),
+        ...(await hostRemovalRaces()),
         ...(await oldVsNewSignupRace(true)),
         ...(await oldVsNewSignupRace(false)),
       ]) {
