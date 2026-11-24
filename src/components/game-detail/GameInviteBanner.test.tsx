@@ -10,6 +10,7 @@ const env = vi.hoisted(() => ({
   invite: null as Record<string, unknown> | null,
   respond: vi.fn(),
   saveReminders: vi.fn(),
+  waits: vi.fn(),
   toast: { error: vi.fn(), success: vi.fn() },
 }));
 
@@ -18,6 +19,7 @@ vi.mock("@/lib/game-invites", () => ({
   getGameInvite: async () => env.invite,
   respondToGameInvite: env.respond,
   saveDefaultRemindersOnAccept: env.saveReminders,
+  acceptWaitsForGuardian: env.waits,
   gameInviteErrorMessage: () => "nope",
 }));
 
@@ -42,6 +44,8 @@ beforeEach(() => {
   env.respond.mockReset();
   env.saveReminders.mockReset();
   env.saveReminders.mockResolvedValue(undefined);
+  env.waits.mockReset();
+  env.waits.mockResolvedValue(false);
   env.toast.error.mockReset();
   env.toast.success.mockReset();
 });
@@ -57,6 +61,46 @@ describe("GameInviteBanner", () => {
     await waitFor(() => expect(onAnswered).toHaveBeenCalled());
     expect(env.respond).toHaveBeenCalledWith("inv1", true);
     expect(screen.queryByTestId("game-invite-banner")).toBeNull();
+  });
+
+  it("a place held for the guardian says it waits for the parent, not that the player is in", async () => {
+    const res = { status: "accepted", join_request_id: "jr", on_roster: false };
+    env.respond.mockResolvedValue(res);
+    env.waits.mockResolvedValue(true);
+    const onAnswered = vi.fn();
+    render(<GameInviteBanner inviteId="inv1" viewerId="me" onAnswered={onAnswered} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
+    await waitFor(() => expect(onAnswered).toHaveBeenCalled());
+    expect(env.waits).toHaveBeenCalledWith(res, "me");
+    // The words follow the held check, after the banner closed.
+    await waitFor(() => expect(env.toast.success).toHaveBeenCalled());
+    expect(env.toast.success).toHaveBeenCalledWith(
+      "Invitation accepted. Your parent has to approve before you're in.",
+    );
+    expect(env.toast.success).not.toHaveBeenCalledWith("You're in. The host has been told.");
+  });
+
+  it("closes and tells the page at once, while the held check is still reading", async () => {
+    env.respond.mockResolvedValue({ status: "accepted", join_request_id: "jr", on_roster: false });
+    // A stalled connection: the check never settles. The accept is committed, so the banner does not wait on it.
+    env.waits.mockReturnValue(new Promise(() => {}));
+    const onAnswered = vi.fn();
+    render(<GameInviteBanner inviteId="inv1" viewerId="me" onAnswered={onAnswered} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
+    await waitFor(() => expect(onAnswered).toHaveBeenCalled());
+    expect(screen.queryByTestId("game-invite-banner")).toBeNull();
+    expect(env.toast.error).not.toHaveBeenCalled();
+  });
+
+  it("a paid game's accept that is not held keeps \"You're in. The host has been told.\"", async () => {
+    env.respond.mockResolvedValue({ status: "accepted", join_request_id: "jr", on_roster: false });
+    const onAnswered = vi.fn();
+    render(<GameInviteBanner inviteId="inv1" viewerId="me" onAnswered={onAnswered} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
+    await waitFor(() => expect(onAnswered).toHaveBeenCalled());
+    // The words follow the held check, after the banner closed.
+    await waitFor(() => expect(env.toast.success).toHaveBeenCalled());
+    expect(env.toast.success).toHaveBeenCalledWith("You're in. The host has been told.");
   });
 
   it("declining closes it", async () => {
@@ -133,6 +177,8 @@ describe("GameInviteBanner reminders (WP 5.4)", () => {
     await waitFor(() => expect(onAnswered).toHaveBeenCalled());
     await new Promise((r) => setTimeout(r, 0));
     expect(env.saveReminders).toHaveBeenCalledWith("g1");
+    // The words follow the held check, after the banner closed.
+    await waitFor(() => expect(env.toast.success).toHaveBeenCalled());
     expect(env.toast.success).toHaveBeenCalledWith("You're in. The host has been told.");
     expect(env.toast.error).not.toHaveBeenCalled();
     expect(screen.queryByTestId("game-invite-banner")).toBeNull();
@@ -145,6 +191,8 @@ describe("GameInviteBanner reminders (WP 5.4)", () => {
     render(<GameInviteBanner inviteId="inv1" viewerId="me" onAnswered={onAnswered} />);
     fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
     await waitFor(() => expect(onAnswered).toHaveBeenCalled());
+    // The words follow the held check, after the banner closed.
+    await waitFor(() => expect(env.toast.success).toHaveBeenCalled());
     expect(env.toast.success).toHaveBeenCalledWith("You're in. The host has been told.");
   });
 });
