@@ -168,7 +168,10 @@ describe("hosted games store: a read that was out when a realtime change arrived
 
   it("a read by id does not overwrite a newer realtime copy of that game", async () => {
     const store = await load();
-    renderHook(() => store.useHostedGames());
+    const hook = renderHook(() => ({
+      games: store.useHostedGames(),
+      g1: store.useHostedGameJoined("g1"),
+    }));
     await waitFor(() => expect(h.listReads).toHaveLength(1));
     // The full read stays out; the page looks the game up by id meanwhile.
     const lookup = store.fetchHostedGame("g1");
@@ -177,5 +180,9 @@ describe("hosted games store: a read that was out when a realtime change arrived
     await act(async () => h.byIdReads[0]!.resolve({ data: row("g1", 3), error: null }));
     expect((await lookup)?.joined).toBe(4);
     expect(store.getHostedGame("g1")?.joined).toBe(4);
+    // The game page's live count follows this game from the read on, though the full read is still out.
+    expect(hook.result.current.g1).toBe(4);
+    act(() => h.onChange!(update(row("g1", 5))));
+    expect(hook.result.current.g1).toBe(5);
   });
 });

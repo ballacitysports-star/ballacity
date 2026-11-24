@@ -612,9 +612,16 @@ export async function fetchHostedGame(id: string): Promise<Game | null> {
   if (!data) return null;
 
   const game = rowToGame(data as DbRow);
-  // A realtime change to this game arrived while the read was out: the copy it left is newer than this answer.
+  // A realtime change to this game arrived while the read was out: the copy it left is newer than this answer. That
+  // copy is a database row too, so useHostedGameJoined can follow this game from here on.
   const live = changedSince(game.id, since) ? cache.find((g) => g.id === game.id) : undefined;
-  if (live) return live;
+  if (live) {
+    if (!dbReadIds.has(game.id)) {
+      dbReadIds.add(game.id);
+      emit();
+    }
+    return live;
+  }
   const exists = cache.some((g) => g.id === game.id);
   cache = exists ? cache.map((g) => (g.id === game.id ? game : g)) : [game, ...cache];
   dbReadIds.add(game.id);
