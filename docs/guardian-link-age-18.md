@@ -202,10 +202,15 @@ strand it, so:
   page's manual-claim hold (#440) still applies to it (its manual claim needs the guardian's approval for the game).
 - Visible: the sweep reports `managed_waiting` (a count) and tells the managing guardian once, in the app: "A managed
   account has turned 18 ... stays linked to you for now. Contact support to plan handing it over." (once, recorded in
-  `guardian_link_age_events` with kind `managed_notice`). The preview query counts them.
+  `guardian_link_age_events` with kind `managed_notice`). The preview query counts them. Since migration
+  `20261130100000_managed_notice_points_to_handover` the sentence reads "... so you still manage it until they complete a
+  handover. You can start one from your Parent Center: open their page and choose "Start handover"." (the same notice,
+  once, to the same guardian; notices sent before keep the old words).
 - The Parent Center page says a managed account stays linked.
 
-Handover options, for the owner to choose (nothing here is built):
+Handover options. Option 1 is now built: the handover (migration `20261128100000`, `docs/managed-account-handover.md`) lets
+the managing guardian start it, and the notice above points to it (`20261130100000`). Options 2 and 3 are unchanged: 2 is
+still what the Parent Center offers for a managed child, and 3 is still not recommended. The question as it stood:
 
 1. The new adult gets their own sign-in: they set an email and password (the account is claimed), the `managed_accounts`
    row is removed, and then the link ends by the same rule. Keeps their history, games and teams.
@@ -213,7 +218,7 @@ Handover options, for the owner to choose (nothing here is built):
    account held.
 3. Leave it: the guardian keeps managing an adult. Not recommended; it is what this change is meant to stop.
 
-Needs: who may start the handover (the adult can't sign in), identity checks, what the guardian keeps afterwards.
+Needed (answered by the handover design): who may start the handover (the adult can't sign in), identity checks, what the guardian keeps afterwards.
 
 ## 4. Anything touching age of majority or legal wording
 

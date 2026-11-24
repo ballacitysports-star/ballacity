@@ -277,9 +277,10 @@ again afterwards.
 - **The stored age cohort still lags.** The handed-over adult's `profiles.age_cohort` may still read a minor cohort (it is set
   when a birthday is saved and never ages). #452 already makes the guardian's switches, the payment gates and team chat treat a
   known adult with no guardian authority as an adult; other readers of the stored cohort are the age-cohort stream's work.
-- **The #452 notice** to a managing guardian whose managed account turned 18 still says "Contact support to plan handing it
-  over". Its function is not touched here (the rollback of 20261125200000 checks its definition); the wording should change in
-  a later migration now that the Parent Center offers the handover.
+- **The #452 notice** to a managing guardian whose managed account turned 18 said "Contact support to plan handing it
+  over" when this shipped. Its function was not touched here (the rollback of 20261125200000 checks its definition); the
+  wording changed in a later migration, `20261130100000_managed_notice_points_to_handover` (see section 7, item 1). Notices
+  already sent keep the old words.
 
 ## 5. What was not built
 
@@ -382,14 +383,29 @@ npx vitest run -c vitest.realauth.config.ts e2e/local-stack/handover-browser-see
 npx playwright test --trace=off --workers=1 e2e/managed-handover-real-auth.spec.ts           # the browser journey
 ```
 
+Release order for `20261130100000_managed_notice_points_to_handover`: that migration makes the next sweep tell every managing
+guardian of a managed adult to start the handover. Nothing gates the notice on the five checks above. They were observed on
+the local Supabase stack (PR #467, merged as 45bd5586; what was and was not seen is listed above), not yet on the hosted E2E
+sandbox or production. Before applying it to production, say so in the release record: the notice goes out on local-stack
+proof only, with the "not seen" list above (the email send, hosted auth settings, the Parent Center card end to end) still
+open. After applying it, record the production `md5(pg_get_functiondef('private_sec.end_adult_guardian_links(integer)'::regprocedure))`; it
+must equal the guard value in its rollback (`c3f95d699d9cb5e23c757eea4128f055`, computed on Postgres 16).
+
 Rollback: `docs/rollbacks/20261128100000_managed_account_handover.down.sql` (guarded: needs
 `SET app.confirm_managed_account_handover_rollback = 'yes'`, stops if any of the twelve functions changed, stops while a handover
 is being finished). It cannot un-complete a handover; it cancels every pending one.
 
 ## 7. Owner decisions still open
 
-1. Whether the #452 managed notice ("Contact support to plan handing it over") should be reworded to point to the new Parent
-   Center entry (needs a later migration; see section 4).
+1. ~~Whether the #452 managed notice ("Contact support to plan handing it over") should be reworded to point to the new Parent
+   Center entry.~~ Reworded by `20261130100000_managed_notice_points_to_handover`: the notice now says the person is 18 or
+   over, that the guardian still manages the account until they complete a handover, and where to start one ("Start handover"
+   on their page in the Parent Center). Only that string changed in `private_sec.end_adult_guardian_links` (test 994 compares
+   the definition with the old one by md5); no legal, consent or age-of-majority wording. Rollback:
+   `docs/rollbacks/20261130100000_managed_notice_points_to_handover.down.sql`, which must run before the rollback of
+   20261125200000.
+   Decision 1 being done does not settle 2 and 3 below: the notice now steers guardians to the flow while they are still
+   open. The five real-auth checks in section 6 were observed on the local stack (#467), not on a hosted project.
 2. Whether a handover should need a second factor beyond the mailbox (a code the guardian reads out, a waiting period, or a
    support review for addresses on the same domain as the guardian's). Not built; the residual risk above is the trade.
 3. Whether handing over an account carries any legal consent or notice requirement. Not decided here; the issues #306-#313
