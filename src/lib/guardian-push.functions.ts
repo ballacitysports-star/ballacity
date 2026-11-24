@@ -1,24 +1,18 @@
 import { createServerFn } from "@tanstack/react-start";
-import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { parseNotifyGuardiansInput, type PendingApprovalKind } from "@/lib/guardian-approval-kinds";
 
 /**
  * Tell a child's guardians that a join request or team invite for their child
- * is waiting for approval. Best effort: it never fails the caller's own action.
+ * is waiting for approval, or that an invitation the child accepted is held for
+ * them (invite_accept). Best effort: it never fails the caller's own action.
  *
  * The caller names the request or invite; the server checks they made it and
  * works out the rest (see guardian-push.server).
  */
 export const notifyGuardiansOfPending = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { kind: string; id: string }) =>
-    z
-      .object({
-        kind: z.enum(["join_request", "team_invite"]),
-        id: z.string().min(1).max(64),
-      })
-      .parse(input),
-  )
+  .inputValidator((input: { kind: string; id: string }) => parseNotifyGuardiansInput(input))
   .handler(async ({ data, context }): Promise<{ notified: number }> => {
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -43,7 +37,7 @@ export const notifyGuardiansOfPending = createServerFn({ method: "POST" })
   });
 
 /** Fire-and-forget wrapper for client code: never throws, never awaited by the caller's flow. */
-export function pingGuardians(kind: "join_request" | "team_invite", id: unknown) {
+export function pingGuardians(kind: PendingApprovalKind, id: unknown) {
   if (typeof id !== "string" || !id) return;
   void notifyGuardiansOfPending({ data: { kind, id } }).catch(() => {});
 }
