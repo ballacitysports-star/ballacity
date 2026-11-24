@@ -72,9 +72,17 @@ const answered = new WeakSet<Page>();
  * social-login-*, child-lifecycle-*, *-refresh-protected) keep the real checks.
  */
 export async function answerSessionChecks(page: Page) {
+  await answerSessionChecksFor(page, (JSON.parse(SESSION_JSON!) as { user?: unknown }).user);
+}
+
+/**
+ * The same, for a session the spec signed in itself (helpers/fixture-session.ts, for the specs that drive two fixture
+ * accounts at once): `/auth/v1/user` answers with that session's user, and the three gate checks answer as for an adult
+ * member who has finished onboarding.
+ */
+export async function answerSessionChecksFor(page: Page, user: unknown) {
   if (answered.has(page)) return;
   answered.add(page);
-  const user = (JSON.parse(SESSION_JSON!) as { user?: unknown }).user;
   await page.route(/\/auth\/v1\/user(?:\?|$)/, async (route) => {
     if (route.request().method() !== "GET") return route.fallback();
     await route.fulfill({
