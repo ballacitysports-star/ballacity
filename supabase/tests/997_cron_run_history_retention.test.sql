@@ -1,7 +1,7 @@
 -- 20261203100000_cron_run_history_retention: pg_cron's run history is kept for 30 days. private_sec.purge_cron_run_details
 -- deletes finished runs (succeeded or failed) whose end_time, or start_time when there is no end_time, is strictly older
--- than the cut-off, and nothing else: not a younger run, not a run in progress (running, starting, ...), not a run with
--- neither time. The window is held to 14..365 days, so the Scheduled jobs card keeps its 7 days of failures whatever is
+-- than the cut-off, and nothing else: not a younger run, not a run in progress (running, starting, connecting, sending),
+-- not a run in any other status (unknown or NULL: the test is an allow list), not a run with neither time. The window is held to 14..365 days, so the Scheduled jobs card keeps its 7 days of failures whatever is
 -- passed; a call deletes at most a batch (held to 1..100000), oldest runid first, and says how many older runs remain.
 -- Nobody but the owner (and the scheduler, as the owner) runs either function: not visitors, members or the service role.
 -- Without pg_cron it says so and changes nothing. The daily job is one job, replaced (not duplicated) when scheduled again.
@@ -33,6 +33,11 @@ SELECT t.eq((SELECT count(*)::int FROM pg_proc p
                               'private_sec.schedule_cron_run_history_purge()'::regprocedure)
                 AND x.grantee <> p.proowner), 0,
             'neither function has a grant to anyone but its owner (not PUBLIC either)');
+SELECT t.ok((SELECT NOT p.prosecdef
+               AND 'search_path=""' = ANY (p.proconfig)
+               AND p.prorettype = 'boolean'::regtype
+               FROM pg_proc p WHERE p.oid = 'private_sec.schedule_cron_run_history_purge()'::regprocedure),
+            'the scheduler is not SECURITY DEFINER and has an empty search_path');
 SELECT t.ok((SELECT p.prosrc FROM pg_proc p WHERE p.oid = 'private_sec.purge_cron_run_details(integer,integer)'::regprocedure)
             !~* '\mpublic\.', 'the purge touches no app table');
 
@@ -99,6 +104,9 @@ INSERT INTO cron.job_run_details (jobid, status, return_message, start_time, end
   (1, 'running',   'running40d',   now() - interval '40 days',                   NULL),
   (1, 'starting',  'starting40d',  now() - interval '40 days',                   NULL),
   (1, 'connecting', 'connecting40d', NULL,                                       now() - interval '40 days'),
+  (1, 'sending',   'sending40d',   now() - interval '40 days',                   NULL),
+  (1, 'unknown',   'unknown40d',   now() - interval '40 days',                   now() - interval '40 days'),
+  (1, NULL,        'nostatus40d',  now() - interval '40 days',                   now() - interval '40 days'),
   (1, 'succeeded', 'longrun',      now() - interval '40 days',                   now() - interval '29 days'),
   (1, 'succeeded', 'justover',     now() - interval '30 days 1 minute',          now() - interval '30 days 1 second'),
   (1, 'succeeded', 'exactly',      now() - interval '30 days 1 minute',          now() - interval '30 days'),
@@ -124,8 +132,9 @@ BEGIN
 END $f$;
 
 SELECT t.eq(pg_temp.left997(),
-            'notime,ancient,old200,fail40d,connfail40d,noend40d,running40d,starting40d,connecting40d,longrun,justover,'
-            'exactly,day20,fail10d,day13,fail3d,ok1h,running', 'setup: eighteen runs');
+            'notime,ancient,old200,fail40d,connfail40d,noend40d,running40d,starting40d,connecting40d,sending40d,'
+            'unknown40d,nostatus40d,longrun,justover,exactly,day20,fail10d,day13,fail3d,ok1h,running',
+            'setup: twenty-one runs');
 SELECT t.eq((SELECT jsonb_build_object('failures_7d', j -> 'failures_7d', 'last_status', j -> 'last_status')
                FROM (SELECT pg_temp.card997('before') j) s),
             '{"failures_7d": 1, "last_status": "succeeded"}'::jsonb, 'setup: the card counts one failure in 7 days');
@@ -142,8 +151,8 @@ SELECT t.eq(private_sec.purge_cron_run_details(NULL, 2) - 'cutoff',
             '{"available": true, "deleted": 2, "remaining_older": 3, "keep_days": 30, "batch": 2}'::jsonb,
             'a batch of 2 deletes 2 and says 3 older runs remain');
 SELECT t.eq(pg_temp.left997(),
-            'notime,connfail40d,noend40d,running40d,starting40d,connecting40d,longrun,justover,exactly,day20,fail10d,'
-            'day13,fail3d,ok1h,running', 'the batch took the oldest runids first');
+            'notime,connfail40d,noend40d,running40d,starting40d,connecting40d,sending40d,unknown40d,nostatus40d,longrun,'
+            'justover,exactly,day20,fail10d,day13,fail3d,ok1h,running', 'the batch took the oldest runids first');
 SELECT t.eq(private_sec.purge_cron_run_details(30, 2) - 'cutoff',
             '{"available": true, "deleted": 2, "remaining_older": 1, "keep_days": 30, "batch": 2}'::jsonb,
             'the next call takes the next batch');
@@ -154,16 +163,19 @@ SELECT t.eq(private_sec.purge_cron_run_details() -> 'cutoff', to_jsonb(now() - i
             'the default cut-off is now minus 30 days');
 SELECT t.eq(private_sec.purge_cron_run_details() ->> 'deleted', '0', 'a second run deletes nothing');
 SELECT t.eq(pg_temp.left997(),
-            'notime,running40d,starting40d,connecting40d,longrun,exactly,day20,fail10d,day13,fail3d,ok1h,running',
-            'finished runs older than 30 days are gone; exactly 30 days and younger, runs in progress and runs with no '
-            'time are kept');
+            'notime,running40d,starting40d,connecting40d,sending40d,unknown40d,nostatus40d,longrun,exactly,day20,'
+            'fail10d,day13,fail3d,ok1h,running',
+            'finished runs older than 30 days are gone; exactly 30 days and younger, runs in progress, runs in any other '
+            'status and runs with no time are kept');
 SELECT t.ok((SELECT NOT EXISTS (SELECT 1 FROM cron.job_run_details WHERE return_message IN ('connfail40d', 'noend40d'))),
             'an old run with only an end_time, or only a start_time, is deleted');
 SELECT t.ok((SELECT EXISTS (SELECT 1 FROM cron.job_run_details WHERE return_message = 'longrun')),
             'a run that started 40 days ago and ended 29 days ago is timed by its end, and kept');
-SELECT t.ok((SELECT count(*) = 3 FROM cron.job_run_details
-              WHERE return_message IN ('running40d', 'starting40d', 'connecting40d')),
-            'a run still running, starting or connecting is kept however old');
+SELECT t.ok((SELECT count(*) = 4 FROM cron.job_run_details
+              WHERE return_message IN ('running40d', 'starting40d', 'connecting40d', 'sending40d')),
+            'a run still running, starting, connecting or sending is kept however old');
+SELECT t.ok((SELECT count(*) = 2 FROM cron.job_run_details WHERE return_message IN ('unknown40d', 'nostatus40d')),
+            'a run in any other status (unknown, or none) is kept however old: only succeeded and failed go');
 SELECT t.ok((SELECT EXISTS (SELECT 1 FROM cron.job_run_details WHERE return_message = 'notime')),
             'a run with neither time is kept');
 SELECT t.eq((SELECT jsonb_build_object('failures_7d', j -> 'failures_7d', 'last_status', j -> 'last_status',
@@ -181,8 +193,9 @@ SELECT t.eq(private_sec.purge_cron_run_details(NULL, 0) - 'cutoff',
             '{"available": true, "deleted": 0, "remaining_older": 0, "keep_days": 30, "batch": 1}'::jsonb,
             'NULL means 30 days; a batch of 0 is held to 1');
 SELECT t.eq(private_sec.purge_cron_run_details(30, 2000000000) ->> 'batch', '100000', 'a batch is held to 100000');
-SELECT t.eq(pg_temp.left997(), 'notime,running40d,starting40d,connecting40d,fail10d,day13,fail3d,ok1h,running',
-            'the 13-day-old run and the 10-day-old failure are kept');
+SELECT t.eq(pg_temp.left997(),
+            'notime,running40d,starting40d,connecting40d,sending40d,unknown40d,nostatus40d,fail10d,day13,fail3d,ok1h,'
+            'running', 'the 13-day-old run and the 10-day-old failure are kept');
 SELECT t.eq((SELECT j -> 'failures_7d' FROM (SELECT pg_temp.card997('after14') j) s), '1'::jsonb,
             'the shortest window still leaves the card its 7 days of failures');
 
@@ -208,14 +221,15 @@ BEGIN
   EXECUTE _cmd;
 END
 $run$;
-SELECT t.eq(pg_temp.left997(), 'notime,running40d,starting40d,connecting40d,fail10d,day13,fail3d,ok1h,running,old15d',
-            'the job''s command runs and keeps 30 days');
+SELECT t.eq(pg_temp.left997(),
+            'notime,running40d,starting40d,connecting40d,sending40d,unknown40d,nostatus40d,fail10d,day13,fail3d,ok1h,'
+            'running,old15d', 'the job''s command runs and keeps 30 days');
 
 -- ================= 9. pg_cron gone again =================
 ALTER SCHEMA cron RENAME TO cron_hidden997;
 SELECT t.eq(private_sec.purge_cron_run_details(), '{"available": false, "reason": "not_installed"}'::jsonb,
             'no cron schema: not available, nothing deleted');
 ALTER SCHEMA cron_hidden997 RENAME TO cron;
-SELECT t.eq((SELECT count(*)::int FROM cron.job_run_details), 10, 'and every run is still there');
+SELECT t.eq((SELECT count(*)::int FROM cron.job_run_details), 13, 'and every run is still there');
 
 ROLLBACK;
