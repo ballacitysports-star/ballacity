@@ -41,6 +41,16 @@ const rows = {
       status: "pending",
       idempotency_key: "guardian-only:g-open",
     },
+    // Asked on an open game the host removed the child from (20261202100000): the host answers too.
+    {
+      id: "r-removed",
+      game_id: "g-removed",
+      player_id: "kid",
+      message: null,
+      created_at: "2026-10-26T12:30:00Z",
+      status: "pending",
+      idempotency_key: "guardian-only:g-removed",
+    },
     // Asked the same way, but the host has since turned approval on: the host answers too.
     {
       id: "r-now-queue",
@@ -52,6 +62,7 @@ const rows = {
       idempotency_key: "guardian-only:g-now-queue",
     },
   ],
+  game_removals: [{ game_id: "g-removed", user_id: "kid" }],
   team_invites: [],
   teams: [],
   hosted_games: [{ id: "g1", title: "Pickup", date: "2026-10-30T18:00:00Z" }],
@@ -81,7 +92,7 @@ vi.mock("@/integrations/supabase/client", () => ({
     rpc: (name: string, args: { _game_id: string }) => {
       policyCalls.push([name, args]);
       return Promise.resolve({
-        data: [{ requires_approval: args._game_id !== "g-open" }],
+        data: [{ requires_approval: args._game_id !== "g-open" && args._game_id !== "g-removed" }],
         error: null,
       });
     },
@@ -104,29 +115,45 @@ function wrapper({ children }: { children: ReactNode }) {
 describe("useGuardianApprovals", () => {
   it("lists requests the host already approved, and says so", async () => {
     const { result } = renderHook(() => useGuardianApprovals(), { wrapper });
-    await waitFor(() => expect(result.current.requests).toHaveLength(4));
+    await waitFor(() => expect(result.current.requests).toHaveLength(5));
     const statuses = requestFilters.find((f) => f.column === "status");
     expect(statuses?.values).toEqual(["pending", "approved"]);
     expect(result.current.requests.map((r) => [r.id, r.hostApproved])).toEqual([
       ["r-waiting", false],
       ["r-host-yes", true],
       ["r-open", false],
+      ["r-removed", false],
       ["r-now-queue", false],
     ]);
   });
 
   it("says when the guardian's answer is the only one needed (an open game, task #71)", async () => {
     const { result } = renderHook(() => useGuardianApprovals(), { wrapper });
-    await waitFor(() => expect(result.current.requests).toHaveLength(4));
+    await waitFor(() => expect(result.current.requests).toHaveLength(5));
     expect(result.current.requests.map((r) => [r.id, r.guardianOnly])).toEqual([
       ["r-waiting", false],
       ["r-host-yes", false],
       ["r-open", true],
+      ["r-removed", false],
       ["r-now-queue", false],
     ]);
     // The public join policy is read only for the requests sent to the guardian alone.
     expect(policyCalls).toContainEqual(["get_game_join_policy", { _game_id: "g-open" }]);
     expect(policyCalls).not.toContainEqual(["get_game_join_policy", { _game_id: "g1" }]);
+  });
+});
+
+describe("a child the host removed from an open game (20261202100000)", () => {
+  it("is not the guardian's answer alone: the host has to agree too", async () => {
+    const { result } = renderHook(() => useGuardianApprovals(), { wrapper });
+    await waitFor(() => expect(result.current.requests).toHaveLength(5));
+    expect(result.current.requests.map((r) => [r.id, r.removedByHost])).toEqual([
+      ["r-waiting", false],
+      ["r-host-yes", false],
+      ["r-open", false],
+      ["r-removed", true],
+      ["r-now-queue", false],
+    ]);
   });
 });
 

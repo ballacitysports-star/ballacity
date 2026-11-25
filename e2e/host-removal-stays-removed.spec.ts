@@ -30,14 +30,15 @@ import {
  *      nothing but the request decides). Once the page has read the request back as 'rejected',
  *      it has not written the roster and the database still has no row for the player.
  *
- * A player with an approved request is listed by RosterPlayerRow, whose Remove declines the request
- * and deletes the roster row through PostgREST; that path predates 20261129130000. The roster's
- * other Remove (the bin on a player with no approved request, which on a game that needs approval
- * cannot happen, so the second test uses an open game) calls host_remove_player, the function
- * 20261129130000 added: the second test checks that it answers and the row goes. On an open game
- * the join gate does not read requests, so a removed player can join again there (an open item in
- * docs/product/phase-5-validation-plan.md); that is not asserted. Each test records the removal
- * calls it saw as an annotation.
+ * A player with an approved request is listed by RosterPlayerRow, whose Remove calls
+ * host_remove_player (20261129130000) in one call: the first test asserts that, and that no PATCH or
+ * DELETE goes out. The roster's other Remove (the bin on a player with no approved request, which
+ * on a game that needs approval cannot happen, so the second test uses an open game) calls it too:
+ * the second test checks that it answers and the row goes. Since 20261202100000 the removal is
+ * recorded and sticks on an open game as well: the second test then opens the game as the removed
+ * player in a fresh browser, sees the removed state ("Ask the host to let you back in"), and a
+ * roster insert the player sends straight to PostgREST is refused with REMOVED_BY_HOST. Each test
+ * records the removal calls it saw as an annotation.
  *
  * Hygiene: the games (and with them the roster, the requests and any invitation) and the
  * notifications that link to them are deleted in afterAll, which runs when a test fails too.
@@ -115,8 +116,9 @@ function recordRemovalCalls(page: Page): string[] {
   const calls: string[] = [];
   page.on("request", (r) => {
     const u = r.url();
-    if (u.includes("/rest/v1/rpc/host_remove_player")) calls.push("rpc host_remove_player");
-    else if (r.method() === "PATCH" && u.includes("/rest/v1/join_requests")) {
+    if (r.method() === "POST" && u.includes("/rest/v1/rpc/host_remove_player")) {
+      calls.push("rpc host_remove_player");
+    } else if (r.method() === "PATCH" && u.includes("/rest/v1/join_requests")) {
       calls.push("PATCH join_requests");
     } else if (r.method() === "DELETE" && u.includes("/rest/v1/game_participants")) {
       calls.push("DELETE game_participants");
@@ -225,9 +227,12 @@ test("a player the host removed is not put back on the roster when they open the
   await expect(h.page.getByRole("heading", { name: /^Roster · 0 \/ 10$/ })).toBeVisible({
     timeout: 10_000,
   });
-  // Which removal ran is reported, not asserted: the outcome above is the guarantee, whichever
-  // path gives it (today RosterPlayerRow's PATCH + DELETE).
+  // RosterPlayerRow's Remove is one host_remove_player call, with no PATCH or DELETE of its own.
   test.info().annotations.push({ type: "removal path", description: removalCalls.join(", ") });
+  expect(removalCalls[0], "the roster row's Remove calls host_remove_player").toBe(
+    "rpc host_remove_player",
+  );
+  expect(removalCalls, "and nothing else").toEqual(["rpc host_remove_player"]);
 
   // --- 4. The player opens the game again, in a fresh browser ---
   const again = await openGameAsPlayer(browser);
@@ -308,4 +313,35 @@ test("the roster's other Remove takes the player off through host_remove_player"
     "rpc host_remove_player",
   );
   test.info().annotations.push({ type: "removal path", description: removalCalls.join(", ") });
+
+  // --- The removed player opens the open game again, in a fresh browser (20261202100000) ---
+  const again = await openGameAsPlayer(browser);
+  await again.page.goto(`/games/${OPEN_ID}`, { waitUntil: "domcontentloaded" });
+  await expect(again.page.getByTestId("removed-by-host")).toBeVisible({ timeout: 30_000 });
+  await expect(again.page.getByTestId("removed-by-host")).toContainText(
+    "The host removed you from this game",
+  );
+  await expect(
+    again.page.getByRole("button", { name: /^ask the host to let you back in$/i }),
+  ).toBeVisible();
+  await expect(again.page.getByRole("button", { name: /^join game/i })).toHaveCount(0);
+  expect(again.rosterWrites, "opening the page writes no roster row").toEqual([]);
+  // The database refuses the removed player's own roster insert, whatever the page shows.
+  const direct = await player.db
+    .from("game_participants")
+    .insert({ game_id: OPEN_ID, user_id: player.id });
+  expect(direct.error?.message ?? "", "a direct insert is refused").toMatch(/^REMOVED_BY_HOST/);
+  await expect
+    .poll(
+      async () => {
+        const { data } = await host.db
+          .from("game_participants")
+          .select("id")
+          .eq("game_id", OPEN_ID)
+          .eq("user_id", player.id);
+        return (data ?? []).length;
+      },
+      { timeout: 5_000, message: "the removed player stays off the roster" },
+    )
+    .toBe(0);
 });

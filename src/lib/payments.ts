@@ -741,6 +741,25 @@ type HostRemovePlayerRpc = (
 ) => PromiseLike<{ data: unknown; error: { code?: string; message?: string } | null }>;
 
 /**
+ * host_remove_player (20261129130000) for the game's host: in one transaction it takes the player's roster row, declines
+ * their request ("Removed by host"), cancels their pending invitation and (since 20261202100000) records the removal, so
+ * the join gate keeps them out until the host lets them back. A deadlock (40P01: the payment-hold sweep or a guardian's
+ * cancel on the same player at that moment) undoes the whole call, and the call can be repeated safely: it is tried
+ * once more. Answers the error left after that, or null; never throws. Shared by the roster row's Remove
+ * (RosterPlayerRow) and the bin's (hostRemoveParticipant).
+ */
+export async function hostRemovePlayer(
+  gameId: string,
+  playerId: string,
+): Promise<{ code?: string; message?: string } | null> {
+  const rpc = supabase.rpc.bind(supabase) as unknown as HostRemovePlayerRpc;
+  const remove = () => rpc("host_remove_player", { _game: gameId, _player: playerId });
+  let { error } = await remove();
+  if (error?.code === "40P01") ({ error } = await remove());
+  return error ?? null;
+}
+
+/**
  * Host-side removal of a player from a game, through host_remove_player (20261129130000): in one transaction it takes
  * the player's roster row, declines their join request for the game (as a host's decline, "Removed by host", so the
  * game page's auto-join cannot put them back) and cancels their pending invitation to it. Only the game's host may call
@@ -757,12 +776,7 @@ export async function hostRemoveParticipant(params: {
   playerId: string;
 }): Promise<void> {
   const { gameId, playerId } = params;
-  const rpc = supabase.rpc.bind(supabase) as unknown as HostRemovePlayerRpc;
-  const remove = () => rpc("host_remove_player", { _game: gameId, _player: playerId });
-  let { error: rpcErr } = await remove();
-  // A deadlock (the payment-hold sweep or a guardian's cancel on the same player at that moment) undoes the whole call,
-  // and the call can be repeated safely: try once more before telling the host.
-  if (rpcErr?.code === "40P01") ({ error: rpcErr } = await remove());
+  const rpcErr = await hostRemovePlayer(gameId, playerId);
   if (rpcErr && !isMissingFunctionError(rpcErr)) throw rpcErr;
   if (!rpcErr) {
     await deletePaymentResidue(gameId, playerId);
@@ -802,6 +816,53 @@ async function deletePaymentResidue(gameId: string, playerId: string): Promise<v
     );
 }
 
+/** public.game_removals (20261202100000) is not in the generated types yet. */
+const removalsTable = () => supabase.from("game_removals" as never);
+
+/**
+ * Whether the host removed the signed-in viewer from this game and has not let them back (their own row in
+ * public.game_removals, 20261202100000; row level security shows a player only their own). Best effort: a missing
+ * table (the migration not applied yet) or a failed read counts as not removed, and the database still refuses the
+ * place itself (REMOVED_BY_HOST).
+ */
+export async function getMyGameRemoval(gameId: string): Promise<boolean> {
+  const userId = await getCurrentUserId();
+  if (!userId) return false;
+  try {
+    const { data, error } = await removalsTable()
+      .select("game_id")
+      .eq("game_id", gameId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) return false;
+    return !!data;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Which of these games the host removed the signed-in viewer from (their own rows in public.game_removals,
+ * 20261202100000). Best effort, as getMyGameRemoval: a missing table or a failed read answers none.
+ */
+export async function listMyGameRemovals(gameIds: string[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  if (gameIds.length === 0) return out;
+  const userId = await getCurrentUserId();
+  if (!userId) return out;
+  try {
+    const { data, error } = await removalsTable()
+      .select("game_id")
+      .eq("user_id", userId)
+      .in("game_id", [...new Set(gameIds)]);
+    if (error) return out;
+    for (const r of (data ?? []) as { game_id: string }[]) out.add(r.game_id);
+  } catch {
+    // None.
+  }
+  return out;
+}
+
 export async function getMyJoinRequest(gameId: string): Promise<JoinRequest | null> {
   const userId = await getCurrentUserId();
   if (!userId) return null;
@@ -837,9 +898,12 @@ export async function listHostJoinRequests(
  * Leaves out the requests a host does not answer: a guarded minor's request to their guardian on a game that is
  * open (requires_approval false). One read of the settings, and only when such a request is in the list. If the
  * read fails the requests are kept: showing the host one too many is harmless, hiding one they must answer is not.
+ * A minor the host removed from that game is the exception (20261202100000): only the host's approval lets them back,
+ * so their request (sent again with its old guardian-only key) is kept. The host reads the removals for their own
+ * games; if that read fails, or the table is not there yet, the request is left out as before.
  */
 export async function withoutGuardianOnly<
-  T extends { game_id: string; idempotency_key?: string | null },
+  T extends { game_id: string; idempotency_key?: string | null; player_id?: string | null },
 >(rows: T[]): Promise<T[]> {
   const gameIds = [...new Set(rows.filter(isGuardianOnlyRequest).map((r) => r.game_id))];
   if (gameIds.length === 0) return rows;
@@ -854,7 +918,26 @@ export async function withoutGuardianOnly<
       s.requires_approval,
     ]),
   );
-  return rows.filter((r) => hostAnswersRequest(r, requires.get(r.game_id)));
+  const hidden = rows.filter((r) => !hostAnswersRequest(r, requires.get(r.game_id)) && r.player_id);
+  const removed = new Set<string>();
+  if (hidden.length > 0) {
+    try {
+      const { data: rm, error: rmErr } = await removalsTable()
+        .select("game_id, user_id")
+        .in("game_id", [...new Set(hidden.map((r) => r.game_id))]);
+      if (!rmErr) {
+        for (const x of (rm ?? []) as { game_id: string; user_id: string }[]) {
+          removed.add(`${x.game_id}:${x.user_id}`);
+        }
+      }
+    } catch {
+      // Left out as before.
+    }
+  }
+  return rows.filter(
+    (r) =>
+      hostAnswersRequest(r, requires.get(r.game_id)) || removed.has(`${r.game_id}:${r.player_id}`),
+  );
 }
 
 export async function listMyJoinRequests(

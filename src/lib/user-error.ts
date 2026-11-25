@@ -30,6 +30,7 @@ import {
   type PaymentClaimRefusalCode,
 } from "@/lib/payments-policy";
 import { POST_BLOCKED_MESSAGE } from "@/lib/post-moderation";
+import { REMOVED_BY_HOST_MESSAGE } from "@/lib/host-removal";
 
 /**
  * Every code the database (or a server function) raises at a member, with the one sentence it reads as.
@@ -313,13 +314,16 @@ export const USER_ERROR_MESSAGES = {
   REEL_MEDIA_PATH_FORBIDDEN: "This video couldn't be attached. Upload it again.",
   REEL_MEDIA_PATH_INVALID: "This video couldn't be attached. Upload it again.",
   RELATIONSHIP_REQUIRED: "Say how you're connected to this listing.",
+  // The join gate (20261202100000): a player the host removed from the game, until the host lets them back.
+  REMOVED_BY_HOST: REMOVED_BY_HOST_MESSAGE,
   REPORT_FIELDS_FIXED: "Only the review status and notes of a report can be changed.",
   REQUEST_NOT_FOUND: "This join request no longer exists.",
   REQUEST_NOT_PENDING: "This join request is already closed.",
   REQUEST_PENDING: "You already have a date of birth correction waiting for review.",
   REVIEW_HELD_FOR_SCREENING: "Your review will be published after screening.",
   ROLE_WRITE_FORBIDDEN: "You don't have access to that.",
-  // A waitlist entry or payment submission keeps who and which game it is about (20261125100000).
+  // A waitlist entry or payment submission (20261125100000), or a roster place (20261202100000), keeps who and which
+  // game it is about.
   ROW_IDENTITY_FIXED: "This can't be moved to another person or game.",
   SELF_INVITE: "You can't invite yourself.",
   // Hint-coded (20261122100000), in the database's own words like GAME_TEAM_NOT_MANAGED.
@@ -434,6 +438,7 @@ export const USER_ERROR_VARIANTS: readonly UserErrorVariant[] = [
       "GAME_FULL",
       "GAME_PARTICIPATION_BLOCKED",
       "BLOCKED_BY_HOST",
+      "REMOVED_BY_HOST",
     ] as const
   ).map((code) => ({ code, when: /payment/i, message: paymentClaimRefusalMessage(code) })),
   {

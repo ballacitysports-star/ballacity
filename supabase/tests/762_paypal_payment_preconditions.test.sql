@@ -241,13 +241,15 @@ SELECT t.reset();
 -- PAYMENT_DESTINATION_INVALID). enforce_child_game_participation has a third, from 20261111160000 (guarded minors on
 -- open games, #71): a minor with a guardian needs a valid guardian approval for a place in any game, which for a paid
 -- game paypal_payment_block already asks (GUARDIAN_APPROVAL_REQUIRED, through game_payment_guardian_ready).
+-- enforce_game_join_gate has a second, from 20261202100000 (removal sticks): a player the host removed from the game is
+-- refused (REMOVED_BY_HOST), which paypal_payment_block answers through payment_claim_block, replaced with it.
 SELECT t.ok(md5(pg_get_functiondef(p.oid)) = ANY (w.hashes), 'unchanged: ' || w.fn)
   FROM (VALUES ('enforce_approval_before_payment',  ARRAY['3ffff8c3b95ae10ce43cdc4197cc886a']),
                ('enforce_game_payment_cohort',      ARRAY['aadeafedb16085a27b6e67f46fc4abfa', '1dc979d906a05301645d9a67f42262c5']),
                ('enforce_payment_destination',      ARRAY['9966e4bbbab1c529c669a5f0d0b4a6f8']),
                ('enforce_guardian_before_payment',  ARRAY['e75b6f828c5626f77418f279a2abcdc0']),
                ('payment_submissions_state_guard',  ARRAY['16e42f30df68ac4be5298e1370883c72']),
-               ('enforce_game_join_gate',           ARRAY['9d4924a2d53915fca8fa245e15281a25']),
+               ('enforce_game_join_gate',           ARRAY['9d4924a2d53915fca8fa245e15281a25', '2bdfe7df2e0abbedc2dd5045e8099165']),
                ('enforce_game_age_requirement',     ARRAY['a978b62c4004040d8388fe5a87803788']),
                ('enforce_child_game_participation', ARRAY['81eec75a132cc28db4fc4926980e283b', '918954dc17f017a0133454fddecea1c4',
                                                     '98f6998a6034f5b0263b0793648d8ef7']),

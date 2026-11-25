@@ -56,6 +56,7 @@ export const PAYMENT_CLAIM_REFUSAL_CODES = [
   "GAME_PARTICIPATION_BLOCKED",
   "BLOCKED_BY_HOST",
   "AGE_REQUIREMENT_NOT_MET",
+  "REMOVED_BY_HOST",
 ] as const;
 export type PaymentClaimRefusalCode = (typeof PAYMENT_CLAIM_REFUSAL_CODES)[number];
 
@@ -126,6 +127,9 @@ export const PAYMENT_PRECONDITION_MESSAGES: Readonly<Record<string, string>> = {
     "This game has an age requirement, so the host has to approve your request for a spot first. You weren't charged.",
   GAME_JOINS_CLOSED: "Joining is closed for this game. You weren't charged.",
   GAME_FULL: "This game is full. You weren't charged.",
+  // payment_claim_block (20261202100000): the host removed the player from this game and has not let them back.
+  REMOVED_BY_HOST:
+    "The host removed you from this game. Ask them to let you back in before you pay. You weren't charged.",
 };
 
 /**
@@ -163,10 +167,12 @@ export const PAYMENT_TRIGGER_REFUSALS: readonly { when: RegExp; message: string 
 
 /**
  * The host verified a payment and the player could not be given a roster place (cancelled game, request not approved,
- * full, ended, closed...). The server sent both of them a "payment_not_placed" notice with the reason.
+ * full, ended, closed, removed by the host...). The server sent both of them a "payment_not_placed" notice with the reason
+ * and what to do, which depends on the reason (for a player the host removed it is not "give them a spot"), so this
+ * toast stays neutral.
  */
 export const PAID_NOT_PLACED_MESSAGE =
-  "Payment verified, but the player couldn't be added to the roster. We've sent you both a notice with the reason: give them a spot if you can, or send their money back.";
+  "Payment verified, but the player couldn't be added to the roster. We've sent you both a notice with the reason and what you can do.";
 
 /** The payment check itself failed (or gave an answer the server does not know): checkout refuses. */
 export const PAYMENT_CHECK_FAILED_MESSAGE =

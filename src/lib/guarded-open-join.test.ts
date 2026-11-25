@@ -272,6 +272,23 @@ describe("the child's request card", () => {
     ).toBe("Your parent said yes. Open the game to join.");
   });
 
+  it("a child the host removed waits on the host too (20261202100000), so the parent's yes is not the end", () => {
+    const opts = { removedByHost: true };
+    expect(playerRequestLine({ status: "pending", idempotency_key: key }, opts)).toBe(
+      "Waiting for your parent and the host",
+    );
+    expect(
+      playerRequestLine(
+        { status: "pending", idempotency_key: key, guardian_approved_at: "2026-11-11T00:00:00Z" },
+        opts,
+      ),
+    ).toBe("Your parent said yes. Waiting for the host to let you back in.");
+    // An ordinary request already reads as waiting on the host.
+    expect(playerRequestLine({ status: "pending", idempotency_key: "k" }, opts)).toBe(
+      "Waiting for host approval",
+    );
+  });
+
   it("a guardian's no is the parent's, not the host's", () => {
     expect(
       playerRequestLine({

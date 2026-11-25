@@ -84,7 +84,8 @@ export const EXPORT_CATEGORIES: Array<{
   {
     id: "games_joined",
     label: "Games joined",
-    description: "Your join records, join requests and position waitlist entries.",
+    description:
+      "Your join records, join requests, games a host removed you from, and position waitlist entries.",
   },
   {
     id: "availability",
@@ -169,4 +170,17 @@ export function formatBytes(bytes: number | null | undefined): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * Whether a failed read of one export query fails the whole export. A table a newer migration adds (the query's
+ * optionalTable, e.g. game_removals, 20261202100000) that is not in the database yet (PostgREST PGRST205, Postgres
+ * 42P01) lists nothing instead, so the app can be published before the migration is applied. Any other error fails.
+ */
+export function exportReadFails(
+  error: { code?: string } | null | undefined,
+  optionalTable?: boolean,
+): boolean {
+  if (!error) return false;
+  return !(optionalTable && (error.code === "PGRST205" || error.code === "42P01"));
 }

@@ -47,9 +47,11 @@ SELECT t.eq(has_function_privilege('anon', 'public.profile_visibility_of(uuid)',
 SELECT t.eq(has_function_privilege('authenticated', 'public.profile_visibility_of(uuid)', 'EXECUTE'), true, 'members can');
 SELECT t.eq((SELECT string_agg(pg_get_triggerdef(oid), E'\n' ORDER BY tgname) FROM pg_trigger
               WHERE tgfoid = 'private_sec.lock_row_identity()'::regprocedure AND NOT tgisinternal),
+  -- 20261202100000 adds the roster's lock (996 tests it).
+  'CREATE TRIGGER a0_game_participants_identity_locked BEFORE UPDATE ON public.game_participants FOR EACH ROW EXECUTE FUNCTION private_sec.lock_row_identity(''user_id'', ''game_id'')' || E'\n' ||
   'CREATE TRIGGER a0_game_position_waitlist_identity_locked BEFORE UPDATE ON public.game_position_waitlist FOR EACH ROW EXECUTE FUNCTION private_sec.lock_row_identity(''user_id'', ''game_id'')' || E'\n' ||
   'CREATE TRIGGER a0_payment_submissions_identity_locked BEFORE UPDATE ON public.payment_submissions FOR EACH ROW EXECUTE FUNCTION private_sec.lock_row_identity(''player_id'', ''game_id'', ''host_id'', ''submitted_at'')',
-  'waitlist entries and payment submissions keep who they are about, with exactly these columns');
+  'waitlist entries, payment submissions and roster places keep who they are about, with exactly these columns');
 SELECT t.eq((SELECT array_agg(tgrelid::regclass::text || ':' || tgname ORDER BY tgname)::text FROM pg_trigger
               WHERE tgfoid = 'private_sec.lock_closed_relationship()'::regprocedure AND NOT tgisinternal
                 AND tgtype = 19),

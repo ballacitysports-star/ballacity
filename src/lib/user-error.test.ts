@@ -283,6 +283,8 @@ const DB_RAISES: readonly string[] = [
   "REEL_MEDIA_PATH_FORBIDDEN: reel media must live in the owner's own folder.",
   'REEL_MEDIA_PATH_INVALID: media paths cannot contain "..".',
   "RELATIONSHIP_REQUIRED",
+  "REMOVED_BY_HOST: the host removed you from this game.",
+  "REMOVED_BY_HOST: the host removed you from this game, so a payment for it cannot be recorded.",
   "REPORT_FIELDS_FIXED: only the review status and notes of a report can be changed.",
   "REQUEST_NOT_FOUND",
   "REQUEST_NOT_PENDING",

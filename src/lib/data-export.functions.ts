@@ -6,6 +6,7 @@ import {
   EXPORT_BUCKET,
   EXPORT_SIGNED_URL_SECONDS,
   EXPORT_TTL_HOURS,
+  exportReadFails,
   type ExportCategory,
 } from "@/lib/data-export";
 
@@ -34,7 +35,17 @@ const SELECT_COLUMNS =
  */
 const CATEGORY_QUERIES: Record<
   ExportCategory,
-  Array<{ key: string; table: string; columns: string; column: string }>
+  Array<{
+    key: string;
+    table: string;
+    columns: string;
+    column: string;
+    /**
+     * A table a newer migration adds: while it is not in the database yet the export lists nothing for it instead of
+     * failing (the app can be published before the migration is applied).
+     */
+    optionalTable?: boolean;
+  }>
 > = {
   profile: [
     {
@@ -126,6 +137,14 @@ const CATEGORY_QUERIES: Record<
       table: "join_requests",
       column: "player_id",
       columns: "game_id, status, message, created_at, reviewed_at",
+    },
+    {
+      // Games a host removed you from and has not let you back into (20261202100000).
+      key: "game_removals",
+      table: "game_removals",
+      column: "user_id",
+      columns: "game_id, removed_at",
+      optionalTable: true,
     },
     {
       key: "position_waitlist",
@@ -302,7 +321,9 @@ export const requestDataExport = createServerFn({ method: "POST" })
             .from(q.table as never)
             .select(q.columns)
             .eq(q.column, userId);
-          if (error) throw new Error(`${q.key}: ${error.message}`);
+          if (error && exportReadFails(error, q.optionalTable)) {
+            throw new Error(`${q.key}: ${error.message}`);
+          }
           const list = (rows ?? []) as unknown[];
           payload[q.key] = list;
           rowCounts[q.key] = list.length;
