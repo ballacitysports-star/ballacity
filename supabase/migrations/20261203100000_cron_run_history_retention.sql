@@ -4,7 +4,7 @@
 -- rows (348 MB), most of them from process-highlight-reels, which runs every minute; flush-held-notifications and
 -- send-game-reminders add two rows every 5 minutes. That is about 2,000 rows a day, growing without end. Nothing reads
 -- history that old: the Scheduled jobs card (20261201100000_scheduled_jobs_health) counts failures over 7 days and reads
--- the newest 100,000 runs. The owner approved a retention job (2026-11-25, "continue as you recommend").
+-- the newest 100,000 runs. A retention job was recommended when that card shipped; applying this one waits for the owner.
 --
 -- WHAT.
 -- 1. private_sec.purge_cron_run_details(_keep_days integer DEFAULT 30, _batch integer DEFAULT 20000) -> jsonb.
