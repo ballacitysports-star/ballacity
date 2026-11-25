@@ -168,14 +168,27 @@ test.describe("managed child, end to end", () => {
       leftovers,
       `${leftovers} "${CHILD_FIRST}" cards, more than a guardian can have: the card locator matches something else`,
     ).toBeLessThanOrEqual(MAX_MANAGED);
-    // Each leftover is a real delete round trip: budget for it.
-    if (leftovers > 0) test.setTimeout(test.info().timeout + leftovers * 20_000);
+    // Each leftover is a real delete round trip (the server function, the account purge, then the
+    // roster refetch): budget for it.
+    if (leftovers > 0) test.setTimeout(test.info().timeout + leftovers * 70_000);
     for (let left = leftovers; left > 0; left -= 1) {
       await cards.first().click();
       page.once("dialog", (d) => void d.accept(CHILD_FIRST));
       await page
         .getByRole("button", { name: new RegExp(`delete ${CHILD_FIRST}'s profile`, "i") })
         .click();
+      // Wait on the server's answer, not on a fixed time: the Parent Center shows its toast only when
+      // deleteManagedChild returns. On a loaded sandbox that round trip has taken up to ~19 s of the old
+      // 20 s card wait in passing runs and just over it twice (#477, 2026-11-25; the delete itself
+      // completed both times). A refusal fails here at once with the app's own message.
+      const answer = page.getByText(
+        new RegExp(`${CHILD_FIRST}.*profile was deleted|couldn't delete that profile`, "i"),
+      );
+      await expect(answer.first()).toBeVisible({ timeout: 60_000 });
+      await expect(
+        page.getByText(/couldn't delete that profile/i),
+        "the Parent Center reported the delete failed",
+      ).toHaveCount(0);
       await expect(cards).toHaveCount(left - 1, { timeout: 20_000 });
     }
   }
