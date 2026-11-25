@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FunnelCard } from "./FunnelCard";
+import { ScheduledJobsCard } from "./ScheduledJobsCard";
 
 function Stat({ label, value, hint }: { label: string; value: number | string; hint?: string }) {
   return (
@@ -56,6 +57,8 @@ export function OverviewTab() {
 
       <div className="grid gap-3 lg:grid-cols-2">
         <FunnelCard />
+
+        <ScheduledJobsCard />
 
         <Card>
           <CardHeader className="pb-2">
