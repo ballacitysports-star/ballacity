@@ -26,6 +26,7 @@ import {
   type FunnelResult,
 } from "@/lib/funnel";
 import { isMissingFunctionError } from "@/lib/managed-profile-names";
+import { parseScheduledJobs, type ScheduledJobsResult } from "@/lib/scheduled-jobs";
 
 export const superadminCheck = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -717,6 +718,32 @@ export const superadminSetFunnelMinorCounts = createServerFn({ method: "POST" })
     );
     if (error) throw new Error(error.message || "Couldn't change the under-18 column.");
     return out as { enabled: boolean };
+  });
+
+/**
+ * Scheduled jobs health for the Scheduled jobs card (20261201100000): pg_cron jobs, their last runs and flags, and pg_net
+ * response counts. Runs as the signed-in user, so superadmin_scheduled_jobs's own superadmin check applies; the function
+ * never returns a job's command, user or database, and redacts failed-run messages. A database without the function (or
+ * without pg_cron) answers "not available" instead of failing.
+ */
+export const superadminScheduledJobs = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { runs?: number } | undefined) =>
+    z.object({ runs: z.number().int().min(1).max(20).optional() }).parse(d ?? {}),
+  )
+  .handler(async ({ context, data }): Promise<ScheduledJobsResult> => {
+    await assertSuperadmin(context);
+    const { data: raw, error } = await (context.supabase.rpc as unknown as UntypedRpc)(
+      "superadmin_scheduled_jobs",
+      data.runs ? { _runs: data.runs } : {},
+    );
+    if (error) {
+      if (isMissingFunctionError(error)) return { available: false, reason: "not_deployed" };
+      throw new Error(error.message || "Couldn't load the scheduled jobs.");
+    }
+    const result = parseScheduledJobs(raw);
+    if (!result) throw new Error("Couldn't load the scheduled jobs.");
+    return result;
   });
 
 export const superadminListPayments = createServerFn({ method: "POST" })

@@ -1,5 +1,6 @@
 import { openAlertsAndTap } from "./helpers/invite-alerts";
 import { fulfillRows } from "./helpers/invite-postgrest";
+import { PAY_FIXTURE_HOST_ID, payFixtureGameRow, serveFixtureGame } from "./helpers/pay-fixtures";
 import { mockRiskNotAcknowledged, watchRiskDialog } from "./helpers/risk-ack";
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
 import { answerSessionChecks } from "./helpers/signed-in";
@@ -22,6 +23,11 @@ import { answerSessionChecks } from "./helpers/signed-in";
  *   - the tampered/missing invite params still stick on the URL (the app
  *     doesn't silently rewrite them).
  *
+ * The game row (`g2`) is served here, as the pay specs do (helpers/pay-fixtures.ts):
+ * the CTA waits for it, and on the loaded shared sandbox the real read queues
+ * behind the thirty-odd reads the game page sends at once. Its host is the one
+ * the mocked settings name.
+ *
  * Auto-skips without a restored Supabase session.
  */
 
@@ -34,7 +40,7 @@ test.skip(
 );
 
 const GAME_ID = "g2";
-const REAL_HOST_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+const REAL_HOST_ID = PAY_FIXTURE_HOST_ID;
 const TAMPERED_HOST_ID = "ffffffff-0000-1111-2222-333333333333";
 
 async function restoreSession(page: Page) {
@@ -60,6 +66,7 @@ function sessionUserId(): string {
 const isTable = (url: string, table: string) => String(url).includes(`/rest/v1/${table}`);
 
 async function installMocks(page: Page, onJoinPost: () => void) {
+  await serveFixtureGame(page, payFixtureGameRow(GAME_ID));
   // Approval-gated settings owned by REAL_HOST_ID.
   await page.route(
     (u) => isTable(u, "game_payment_settings"),

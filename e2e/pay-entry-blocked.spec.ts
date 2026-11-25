@@ -61,6 +61,10 @@ async function mockPayScreen(
     request: string | null;
     /** When set, the viewer's join request is answered only once it resolves. */
     requestGate?: Promise<void>;
+    /** Called as each read of the viewer's join request arrives, before it is answered. */
+    onRequestRead?: () => void;
+    /** When set, the game row is served only once it resolves (every read, the one before sign-in included). */
+    gameGate?: Promise<void>;
     /** The viewer holds a place on the roster (their own game_participants row). */
     participant?: boolean;
   },
@@ -118,6 +122,7 @@ async function mockPayScreen(
     (u) => isTable(u, "join_requests"),
     async (route) => {
       if (route.request().method() !== "GET") return route.fallback();
+      opts.onRequestRead?.();
       if (opts.requestGate) await opts.requestGate;
       await fulfillJson(
         route,
@@ -177,6 +182,15 @@ async function mockPayScreen(
     });
   });
   await serveFixtureGame(page, payFixtureGameRow(GAME_ID, opts.game));
+  const gameGate = opts.gameGate;
+  if (gameGate) {
+    // Registered after serveFixtureGame, so it runs first and hands the read on once the gate opens. A read from a page
+    // that has since navigated away cannot be handed on any more; that is fine.
+    await page.route(/\/rest\/v1\/hosted_games(\?|$)/, async (route) => {
+      await gameGate;
+      await route.fallback().catch(() => {});
+    });
+  }
   await blockRealtime(page);
 }
 
@@ -248,11 +262,25 @@ test("a host-closed paid game: a host-approved viewer still gets the payment opt
   // Hold the viewer's join request: until it lands the page cannot know the host approved them.
   let releaseRequest!: () => void;
   const requestGate = new Promise<void>((resolve) => (releaseRequest = resolve));
+  // The page gives up on a read of the request after 6 seconds (src/routes/games.$gameId.pay.tsx) and then offers a
+  // retry, rightly: a read that slow has failed. The real child-status check below can itself take longer than that on
+  // a busy backend (its server function asks the auth server who is signed in, which the shared sandbox answers in
+  // 1-8 s under load), and the page reads the request as soon as it has the game. So the game row is held until the
+  // child status has answered: the page then reads the request only once every other check is in, and the hold below
+  // lasts as long as this test takes to look at the page, not as long as the backend takes to answer.
+  let releaseGame!: () => void;
+  const gameGate = new Promise<void>((resolve) => (releaseGame = resolve));
+  let childAnswered = false;
+  let requestReadsBeforeChild = 0;
   await mockPayScreen(page, {
     game: { joins_closed: true },
     requiresApproval: true,
     request: "approved",
     requestGate,
+    gameGate,
+    onRequestRead: () => {
+      if (!childAnswered) requestReadsBeforeChild += 1;
+    },
   });
   // Record the block card if it is ever drawn, however briefly.
   await page.addInitScript(() => {
@@ -278,9 +306,15 @@ test("a host-closed paid game: a host-approved viewer still gets the payment opt
   await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
 
   const childResponse = await childStatus;
+  childAnswered = true;
   expect(childResponse.ok(), "the real getMyChildStatus answers for the fixture adult").toBe(true);
   expect(await childResponse.text()).toContain("adult");
+  releaseGame();
   await guardianCheck;
+  expect(
+    requestReadsBeforeChild,
+    "the page read the viewer's request before it had the game (from a stored copy?), so the hold could outlast its 6-second limit",
+  ).toBe(0);
 
   // Every other check has answered; only the request is out. The page waits, it does not say "you can't pay".
   await expect(page.getByText("Loading payment options…")).toBeVisible({ timeout: 15_000 });
