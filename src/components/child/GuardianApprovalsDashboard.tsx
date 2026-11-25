@@ -149,9 +149,11 @@ export function GuardianApprovalsDashboard() {
                       r.gameDate ? new Date(r.gameDate).toLocaleDateString() : null,
                       r.hostApproved
                         ? "The host already said yes. It's up to you."
-                        : r.guardianOnly
-                          ? "This game doesn't need the host's approval, so it's up to you."
-                          : null,
+                        : r.removedByHost
+                          ? `The host removed ${r.childName} from this game, so the host has to agree too.`
+                          : r.guardianOnly
+                            ? "This game doesn't need the host's approval, so it's up to you."
+                            : null,
                       r.message ? `“${r.message}”` : null,
                     ]}
                     busy={busyId === r.id}

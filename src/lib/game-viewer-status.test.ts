@@ -12,6 +12,7 @@ vi.mock("@/lib/payments", () => ({
   getGamePaymentSettings: vi.fn(),
   listMySubmissionsForGame: vi.fn(),
   getMyJoinRequest: vi.fn(),
+  getMyGameRemoval: vi.fn(),
 }));
 
 const { loadGameViewerStatus } = await import("@/lib/game-viewer-status");
@@ -28,6 +29,7 @@ describe("loadGameViewerStatus", () => {
       getSettings: async () => SETTINGS,
       listMySubmissions: () => never(),
       getMyRequest: () => never(),
+      getMyRemoval: () => never(),
     });
     await vi.waitFor(() => expect(onSettings).toHaveBeenCalledWith(SETTINGS));
   });
@@ -38,8 +40,9 @@ describe("loadGameViewerStatus", () => {
       getSettings: async () => SETTINGS,
       listMySubmissions: async () => SUBS,
       getMyRequest: async () => REQ,
+      getMyRemoval: async () => false,
     });
-    expect(status).toEqual({ settings: SETTINGS, subs: SUBS, req: REQ });
+    expect(status).toEqual({ settings: SETTINGS, subs: SUBS, req: REQ, removed: false });
     expect(onSettings).toHaveBeenCalledTimes(1);
   });
 
@@ -49,6 +52,7 @@ describe("loadGameViewerStatus", () => {
       getSettings: async () => null,
       listMySubmissions: async () => [],
       getMyRequest: async () => null,
+      getMyRemoval: async () => false,
     });
     expect(onSettings).toHaveBeenCalledWith(null);
   });
@@ -62,6 +66,7 @@ describe("loadGameViewerStatus", () => {
         },
         listMySubmissions: async () => SUBS,
         getMyRequest: async () => REQ,
+        getMyRemoval: async () => false,
       }),
     ).rejects.toThrow("settings down");
     expect(onSettings).not.toHaveBeenCalled();
@@ -73,9 +78,32 @@ describe("loadGameViewerStatus", () => {
           throw new Error("subs down");
         },
         getMyRequest: async () => REQ,
+        getMyRemoval: async () => false,
       }),
     ).rejects.toThrow("subs down");
     // The settings it did read still reached the page.
     expect(onSettings).toHaveBeenCalledWith(SETTINGS);
+  });
+
+  it("reports the viewer's removal record (20261202100000)", async () => {
+    const status = await loadGameViewerStatus("g2", vi.fn(), {
+      getSettings: async () => SETTINGS,
+      listMySubmissions: async () => [],
+      getMyRequest: async () => null,
+      getMyRemoval: async () => true,
+    });
+    expect(status.removed).toBe(true);
+  });
+
+  it("reads a failed removal read as not removed, and still resolves the rest", async () => {
+    const status = await loadGameViewerStatus("g2", vi.fn(), {
+      getSettings: async () => SETTINGS,
+      listMySubmissions: async () => SUBS,
+      getMyRequest: async () => REQ,
+      getMyRemoval: async () => {
+        throw new Error("removals down");
+      },
+    });
+    expect(status).toEqual({ settings: SETTINGS, subs: SUBS, req: REQ, removed: false });
   });
 });

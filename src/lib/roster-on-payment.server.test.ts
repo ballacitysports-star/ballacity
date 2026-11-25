@@ -245,6 +245,30 @@ describe("addPaidPlayerToRoster", () => {
     expect(notPlaced()).toHaveLength(0);
   });
 
+  it("tells the host of a removed player to invite them back or refund them, not to give them a spot (20261202100000)", async () => {
+    db.rows.game_payment_settings = { requires_approval: false };
+    db.insertError = {
+      code: "P0001",
+      message: "REMOVED_BY_HOST: the host removed you from this game.",
+    };
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const result = await addPaidPlayerToRoster("g1", "p1");
+    error.mockRestore();
+    expect(result).toEqual({
+      added: false,
+      reason: "refused",
+      code: "REMOVED_BY_HOST",
+      noticeSent: true,
+    });
+    const [host, player] = notPlaced();
+    expect(host.body).toMatch(/couldn't be added to the roster: you removed them from this game\./);
+    expect(host.body).toMatch(/Invite them back or approve their request/);
+    expect(host.body).toMatch(/send their money back/);
+    expect(host.body).not.toMatch(/Give them a spot/);
+    expect(player.body).toMatch(/the host removed you from this game/);
+    expect(player.body).toMatch(/Ask them to let you back in, or for your money back\./);
+  });
+
   it("reports a refusal from the join gate (full, ended) instead of pretending", async () => {
     db.rows.game_payment_settings = { requires_approval: false };
     db.insertError = { code: "P0001", message: "GAME_FULL: the roster is full." };

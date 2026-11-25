@@ -23,6 +23,8 @@ import {
   payTermsView,
   rosterIsFull,
   ROSTER_FULL_MESSAGE,
+  REMOVED_PAID_PAY_MESSAGE,
+  REMOVED_PAY_MESSAGE,
   type PayEntryInput,
 } from "./pay-entry-gate";
 import type { GamePaymentTerms } from "./payments";
@@ -1590,5 +1592,77 @@ describe("payTermsMethodsLine", () => {
 
   it("says nothing when there is no app to name", () => {
     expect(payTermsMethodsLine({ methodNames: [] })).toBeNull();
+  });
+});
+
+describe("payEntryBlock: a player the host removed (20261202100000, owner decision 2026-11-24)", () => {
+  const removed = { kind: "removed", message: REMOVED_PAY_MESSAGE };
+
+  it("replaces the new-payment options for a removed viewer, with the way back", () => {
+    expect(payEntryBlock(input({ removed: true }))).toEqual(removed);
+    expect(REMOVED_PAY_MESSAGE).toMatch(/Ask the host to let you back in/);
+  });
+
+  it("exempts a viewer on the roster, an approved one (the approval lifted it) and the host", () => {
+    expect(payEntryBlock(input({ removed: true, holdsPlace: true }))).toBeNull();
+    expect(payEntryBlock(input({ removed: true, approved: true }))).toBeNull();
+    expect(payEntryBlock(input({ removed: true, isHost: true }))).toBeNull();
+  });
+
+  it("is not lifted by a payment already in (the place is what the host took away), and says it is recorded", () => {
+    expect(payEntryBlock(input({ removed: true, paymentIn: true }))).toEqual({
+      kind: "removed",
+      message: REMOVED_PAID_PAY_MESSAGE,
+    });
+    // A player who paid is not told they can pay once let back, nor to send money.
+    expect(REMOVED_PAID_PAY_MESSAGE).toMatch(/payment is still recorded/);
+    expect(REMOVED_PAID_PAY_MESSAGE).toMatch(/don't send another one/);
+    expect(REMOVED_PAID_PAY_MESSAGE).not.toMatch(/pay once/);
+    expect(REMOVED_PAID_PAY_MESSAGE).toMatch(/money back/);
+  });
+
+  it("comes after a cancelled or ended game, and before the parent, the lock, the roster and the age range", () => {
+    expect(payEntryBlock(input({ removed: true, gate: gateFor("cancelled") }))?.kind).toBe(
+      "locked",
+    );
+    expect(
+      payEntryBlock(
+        input({
+          removed: true,
+          guardianReady: false,
+          gate: closed,
+          rosterFull: true,
+          participation: { allowed: false, reason: null },
+        }),
+      )?.kind,
+    ).toBe("removed");
+  });
+
+  it("waits for the viewer's flow state before it is said (it could be lifted by an approval)", () => {
+    const view = payEntryView({
+      holdsPlace: false,
+      paymentIn: false,
+      approved: false,
+      flow: "loading",
+      gate: open,
+      child: {
+        state: "ready",
+        value: { participation: allowed, payments: allowed, ageUnknown: false },
+      },
+      guardian: { state: "ready", value: true },
+      paymentStarted: false,
+      roster: { state: "ready", value: { count: 3, maxPlayers: 10 } },
+      removed: true,
+    });
+    expect(view).toEqual({ kind: "checking" });
+  });
+
+  it("gives way to 'Waiting on host approval' once the removed player asked to come back", () => {
+    const block = { kind: "removed" as const, message: REMOVED_PAY_MESSAGE };
+    expect(blockOutranksApproval(block, true)).toBe(false);
+    expect(blockOutranksApproval(block, false)).toBe(true);
+    const wait = { hostRequiresApproval: false, approved: false, replaceBlock: block };
+    expect(payAwaitsApproval({ ...wait, requestPending: true })).toBe(true);
+    expect(payAwaitsApproval({ ...wait, requestPending: false })).toBe(false);
   });
 });

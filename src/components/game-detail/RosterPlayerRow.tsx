@@ -22,7 +22,12 @@ import { useReviewsFor } from "@/lib/reviews-db";
 import { subscribeGamePaymentChanges } from "@/lib/game-payment-channel";
 import { toast } from "sonner";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { reviewJoinRequest, getSignedProofUrl, type JoinRequest } from "@/lib/payments";
+import {
+  getSignedProofUrl,
+  hostRemovePlayer,
+  reviewJoinRequest,
+  type JoinRequest,
+} from "@/lib/payments";
 import { reviewPaymentAction } from "@/lib/payments.functions";
 import { PAID_NOT_PLACED_MESSAGE } from "@/lib/payments-policy";
 import { playAttentionPing } from "@/lib/attention-ping";
@@ -344,18 +349,16 @@ export function RosterPlayerRow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latestSub?.id, latestSub?.status]);
 
+  // host_remove_player in one transaction: the roster row, the request ("Removed by host"), the pending invitation and
+  // (20261202100000) the removal record that keeps the player out until the host lets them back. One retry on a
+  // deadlock (hostRemovePlayer). A payment the player sent is left as it is: a refund stays the host's call.
   const remove = async () => {
     if (!confirm(`Remove ${name} from ${gameTitle}?`)) return;
     setBusy(true);
     const rollback = onOptimistic(req.id, "rejected");
     try {
-      await reviewJoinRequest(req.id, "rejected", "Removed by host", { removing: true });
-      const { error: delErr } = await supabase
-        .from("game_participants")
-        .delete()
-        .eq("game_id", req.game_id)
-        .eq("user_id", req.player_id);
-      if (delErr) throw delErr;
+      const removeErr = await hostRemovePlayer(req.game_id, req.player_id);
+      if (removeErr) throw removeErr;
       await createNotification({
         user_id: req.player_id,
         type: "join_declined",

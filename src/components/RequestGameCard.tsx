@@ -40,6 +40,7 @@ export function RequestGameCard({
   request,
   index = 0,
   isHost,
+  removedByHost,
   onCancel,
   onWithdraw,
   onApprove,
@@ -49,6 +50,8 @@ export function RequestGameCard({
   request: JoinRequest;
   index?: number;
   isHost?: boolean;
+  /** The host removed the viewer (the player) from this game: their request waits for the host too. */
+  removedByHost?: boolean;
   onCancel?: () => void;
   onWithdraw?: () => void;
   onApprove?: () => void;
@@ -60,6 +63,7 @@ export function RequestGameCard({
       request={request}
       index={index}
       isHost={isHost}
+      removedByHost={removedByHost}
       onCancel={onCancel}
       onWithdraw={onWithdraw}
       onApprove={onApprove}
@@ -118,6 +122,7 @@ function RequestGameCardInner({
   request,
   index = 0,
   isHost,
+  removedByHost,
   onCancel,
   onWithdraw,
   onApprove,
@@ -127,6 +132,7 @@ function RequestGameCardInner({
   request: JoinRequest;
   index?: number;
   isHost?: boolean;
+  removedByHost?: boolean;
   onCancel?: () => void;
   onWithdraw?: () => void;
   onApprove?: () => void;
@@ -253,7 +259,7 @@ function RequestGameCardInner({
                   : isApproved
                     ? "You approved this player."
                     : "You declined this player."
-                : playerRequestLine(request)}
+                : playerRequestLine(request, { removedByHost })}
             </p>
             <RequestTimeline request={request} />
           </div>

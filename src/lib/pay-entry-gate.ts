@@ -35,6 +35,11 @@
  *     not on the roster (GAME_FULL, 20261119200000), whatever the host approved, so only a viewer on the roster (and
  *     the host) is exempt. Owner decision 2026-11-20 ("Continue session as you recommend"): it replaces the pay page's
  *     soft "This game just filled up" warning, which showed the host's handles under it.
+ *   - removed: the host removed the viewer from this game (public.game_removals, 20261202100000). payment_claim_block
+ *     refuses a manual claim and PayPal checkout from them (REMOVED_BY_HOST) until a request of theirs is approved (an
+ *     accepted invitation or the host's approval of their ask), which deletes the record. Owner decision 2026-11-24
+ *     ("Removal sticks on open games"). A viewer on the roster, an approved one and the host are exempt. The block only
+ *     replaces the new-payment options: a claim already sent keeps its status and its withdraw (PaymentStatusTimeline).
  *
  * payRiskAckView (below) decides "Before you join" on the pay page (docs/paid-path-gates.md section 7, Option B).
  */
@@ -61,7 +66,14 @@ import {
  * when PayPal is not there to take the payment instead.
  */
 export type PayEntryBlockKind =
-  "payments" | "participation" | "guardian" | "locked" | "age" | "full" | "manual_guardian";
+  | "payments"
+  | "participation"
+  | "guardian"
+  | "locked"
+  | "age"
+  | "full"
+  | "removed"
+  | "manual_guardian";
 
 export type PayEntryBlock = {
   kind: PayEntryBlockKind;
@@ -109,7 +121,19 @@ export type PayEntryInput = {
    * count says there is room.
    */
   rosterFull?: boolean;
+  /** The host removed the viewer from this game and has not let them back (getMyGameRemoval). */
+  removed?: boolean;
 };
+
+/** What a removed viewer reads in place of the payment options. */
+export const REMOVED_PAY_MESSAGE =
+  "The host removed you from this game. Ask the host to let you back in from the game page; you can pay once they do.";
+/**
+ * The same for a removed viewer whose payment is already in (pending, verified or disputed): they need not pay again,
+ * and if the host lets them back a verified payment seats them.
+ */
+export const REMOVED_PAID_PAY_MESSAGE =
+  "The host removed you from this game. Your payment is still recorded, so don't send another one: ask the host to let you back in from the game page, or ask them for your money back.";
 
 /** The game page's own words for a full roster (its viewerGate 'roster_full' reason). */
 export const ROSTER_FULL_MESSAGE = "The roster is full — no spots left.";
@@ -177,6 +201,13 @@ export function payEntryBlock(input: PayEntryInput): PayEntryBlock | null {
     const block = lockBlock(input);
     if (block) return block;
   }
+  // Nor would it help a player the host removed: only the host lets them back.
+  if (input.removed && !input.holdsPlace && !input.approved && !input.isHost) {
+    return {
+      kind: "removed",
+      message: input.paymentIn ? REMOVED_PAID_PAY_MESSAGE : REMOVED_PAY_MESSAGE,
+    };
+  }
   if (!input.participation.allowed && !input.holdsPlace) {
     return {
       kind: "participation",
@@ -234,7 +265,13 @@ export type PayEntryView =
  * only ever lift a block, so a block that is none of these stands whatever they turn out to be.
  */
 function dependsOnFlow(block: PayEntryBlock): boolean {
-  if (block.kind === "participation" || block.kind === "age" || block.kind === "full") return true;
+  if (
+    block.kind === "participation" ||
+    block.kind === "age" ||
+    block.kind === "full" ||
+    block.kind === "removed"
+  )
+    return true;
   return block.kind === "locked" && block.joinState !== "cancelled";
 }
 
@@ -293,6 +330,8 @@ export function payEntryView(input: {
    * handles; a viewer on the roster and the host never wait for it.
    */
   roster: CheckState<{ count: number; maxPlayers: number }>;
+  /** The host removed the viewer from this game (getMyGameRemoval; a failed read counts as not removed). */
+  removed?: boolean;
 }): PayEntryView {
   const { child, guardian, roster } = input;
   if (child.state === "error" || guardian.state === "error") return { kind: "check_failed" };
@@ -327,6 +366,7 @@ export function payEntryView(input: {
     age,
     // A count not known yet counts as full: the worst the real count can give.
     rosterFull: roster.state === "ready" ? rosterIsFull(roster.value) : true,
+    removed: input.removed,
   });
   if (!block) return { kind: "clear" };
   if (block.kind === "full" && roster.state !== "ready") {
@@ -347,14 +387,15 @@ export function payEntryView(input: {
 
 /**
  * Whether the block card comes before the "Waiting on host approval" card. It does, except for a lock the host's
- * approval lifts (in progress, closed by the host, past the cutoff), or the game's age range, while the viewer's
- * request is still pending: there
+ * approval lifts (in progress, closed by the host, past the cutoff), the game's age range, or a removal by the host
+ * (the removed player's ask to come back), while the viewer's request is still pending: there
  * "Payment unlocks after the host approves you" is true. A 13-15 or consent-locked account, a cancelled or ended game,
  * a guardian's switch or a missing guardian approval is never lifted by the host, so it is said first.
  */
 export function blockOutranksApproval(block: PayEntryBlock, requestPending: boolean): boolean {
   if (!requestPending) return true;
-  if (block.kind === "age") return false;
+  // The host's approval lifts the age range, and a removal (the removed player's ask to come back).
+  if (block.kind === "age" || block.kind === "removed") return false;
   if (block.kind !== "locked") return true;
   return !(block.joinState && IN_FLOW_EXEMPT.has(block.joinState));
 }
@@ -601,7 +642,8 @@ export function payRiskAckStep(input: {
  * the age range and whose request is pending waits on the host: their approval lifts the age rule
  * (enforce_game_age_requirement and AGE_REQUIREMENT_NOT_MET skip approved players), so "Payment unlocks after the
  * host approves you" is true, and "You can't pay for this game" would not be. With no request, or a declined one, the
- * age block card stays.
+ * age block card stays. The same for a player the host removed who asked to come back: the host's approval deletes
+ * the removal (20261202100000).
  */
 export function payAwaitsApproval(input: {
   /** The host's payment settings require approval (game_payment_settings.requires_approval). */
@@ -613,7 +655,10 @@ export function payAwaitsApproval(input: {
 }): boolean {
   if (input.approved) return false;
   if (input.hostRequiresApproval) return true;
-  return input.requestPending && input.replaceBlock?.kind === "age";
+  return (
+    input.requestPending &&
+    (input.replaceBlock?.kind === "age" || input.replaceBlock?.kind === "removed")
+  );
 }
 
 /**

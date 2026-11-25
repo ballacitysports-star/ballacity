@@ -49,14 +49,19 @@ export function useNeedsAction(): { items: NeedsActionItem[]; isLoading: boolean
     queryFn: async () => {
       const { data } = await supabase
         .from("join_requests")
-        .select("game_id, created_at, idempotency_key")
+        .select("game_id, player_id, created_at, idempotency_key")
         .eq("host_id", uid!)
         .eq("status", "pending")
         .order("created_at", { ascending: true })
         .limit(100);
-      // A guarded minor's request on an open game is for their guardian, not the host.
+      // A guarded minor's request on an open game is for their guardian, not the host (unless the host removed them).
       const rows = await withoutGuardianOnly(
-        (data ?? []) as { game_id: string; created_at: string; idempotency_key: string | null }[],
+        (data ?? []) as {
+          game_id: string;
+          player_id: string;
+          created_at: string;
+          idempotency_key: string | null;
+        }[],
       );
       const ids = [...new Set(rows.map((r) => r.game_id))];
       if (ids.length === 0) return { count: 0, oldestGameId: null, oldestGameTitle: null };

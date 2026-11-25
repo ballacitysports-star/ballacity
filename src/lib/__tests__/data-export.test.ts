@@ -8,6 +8,7 @@ import {
   EXPORT_TTL_HOURS,
   effectiveExportStatus,
   exportCategoryLabel,
+  exportReadFails,
   formatBytes,
   isExportExpired,
 } from "@/lib/data-export";
@@ -126,5 +127,21 @@ describe("retention rules", () => {
   it("has unique categories", () => {
     const ids = RETENTION_RULES.map((r) => r.category);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+describe("exportReadFails: a table a newer migration adds (game_removals, 20261202100000)", () => {
+  it("lists nothing for an optional table that is not there yet", () => {
+    expect(exportReadFails({ code: "PGRST205" }, true)).toBe(false);
+    expect(exportReadFails({ code: "42P01" }, true)).toBe(false);
+  });
+  it("fails the export for any other error, and for a missing table that is not optional", () => {
+    expect(exportReadFails({ code: "42501" }, true)).toBe(true);
+    expect(exportReadFails({ code: "PGRST205" }, false)).toBe(true);
+    expect(exportReadFails({ code: "PGRST205" })).toBe(true);
+  });
+  it("passes a read without an error", () => {
+    expect(exportReadFails(null, true)).toBe(false);
+    expect(exportReadFails(null)).toBe(false);
   });
 });

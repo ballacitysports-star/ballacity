@@ -36,6 +36,11 @@ export type GuardianJoinRequest = {
   hostApproved: boolean;
   /** The game is open (no host approval): the guardian's answer is the only one needed. */
   guardianOnly: boolean;
+  /**
+   * The host removed the child from this open game (public.game_removals, 20261202100000) and the child asked to come
+   * back with this request: the host has to agree too, so it is not guardianOnly.
+   */
+  removedByHost: boolean;
 };
 
 /**
@@ -112,6 +117,26 @@ export function useGuardianApprovals() {
           if (row && row.requires_approval === false) openGames.add(id);
         }),
       );
+      // A child the host removed from an open game asks the host to let them back (20261202100000): the host answers
+      // that request as well. A guardian in force reads their child's removals ("Guardians see their children's
+      // removals"). Best effort: a failed read, or no table yet, leaves the request as the guardian's alone.
+      const removed = new Set<string>();
+      if (openGames.size > 0) {
+        try {
+          const { data: rm, error: rmErr } = await supabase
+            .from("game_removals" as never)
+            .select("game_id, user_id")
+            .in("game_id", [...openGames])
+            .in("user_id", ids);
+          if (!rmErr) {
+            for (const x of (rm ?? []) as { game_id: string; user_id: string }[]) {
+              removed.add(`${x.game_id}:${x.user_id}`);
+            }
+          }
+        } catch {
+          // Left as the guardian's alone.
+        }
+      }
       const teamName = new Map((teams.data ?? []).map((t) => [t.id, t.name]));
       const game = new Map((games.data ?? []).map((g) => [g.id, g]));
 
@@ -126,19 +151,24 @@ export function useGuardianApprovals() {
         expiresAt: r.expires_at,
         createdAt: r.created_at,
       }));
-      const requests: GuardianJoinRequest[] = (req.data ?? []).map((r) => ({
-        id: r.id,
-        childUserId: r.player_id,
-        childName: names.get(r.player_id) ?? "Your child",
-        gameId: r.game_id,
-        gameTitle: game.get(r.game_id)?.title ?? "A game",
-        gameDate: game.get(r.game_id)?.date ?? null,
-        message: r.message ?? null,
-        createdAt: r.created_at,
-        hostApproved: r.status === "approved",
-        guardianOnly:
-          r.status === "pending" && isGuardianOnlyRequest(r) && openGames.has(r.game_id),
-      }));
+      const requests: GuardianJoinRequest[] = (req.data ?? []).map((r) => {
+        const sentToGuardian =
+          r.status === "pending" && isGuardianOnlyRequest(r) && openGames.has(r.game_id);
+        const removedByHost = sentToGuardian && removed.has(`${r.game_id}:${r.player_id}`);
+        return {
+          id: r.id,
+          childUserId: r.player_id,
+          childName: names.get(r.player_id) ?? "Your child",
+          gameId: r.game_id,
+          gameTitle: game.get(r.game_id)?.title ?? "A game",
+          gameDate: game.get(r.game_id)?.date ?? null,
+          message: r.message ?? null,
+          createdAt: r.created_at,
+          hostApproved: r.status === "approved",
+          guardianOnly: sentToGuardian && !removedByHost,
+          removedByHost,
+        };
+      });
       return { invites, requests };
     },
   });

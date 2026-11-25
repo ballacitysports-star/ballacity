@@ -40,6 +40,7 @@ import {
   uploadProofScreenshot,
   createPaymentSubmission,
   listMySubmissionsForGame,
+  getMyGameRemoval,
   getMyJoinRequest,
   cancelMyPaymentSubmission,
   disputeMyPaymentSubmission,
@@ -313,6 +314,8 @@ function PayPage() {
   const [rosterReloadFor, setRosterReloadFor] = useState<string | null>(null);
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
+  // The host removed the viewer from this game (public.game_removals; payEntryBlock's 'removed').
+  const [myRemoved, setMyRemoved] = useState(false);
   // Read by the settings fetch (below) without restarting it on every change of the request.
   const approvedNow = myReq?.status === "approved";
   const approvedRef = useRef(approvedNow);
@@ -522,6 +525,7 @@ function PayPage() {
       lastViewerKeyRef.current = key;
       setMySubs([]);
       setMyReq(null);
+      setMyRemoved(false);
       setViewerLookup({ key, req: "loading", subs: "loading" });
     }
     let cancelled = false;
@@ -533,11 +537,15 @@ function PayPage() {
         ),
       ]);
     void (async () => {
-      const [subsResult, reqResult] = await Promise.allSettled([
+      const [subsResult, reqResult, removedResult] = await Promise.allSettled([
         withTimeout(listMySubmissionsForGame(gameId), "listMySubmissionsForGame"),
         withTimeout(getMyJoinRequest(gameId), "getMyJoinRequest"),
+        // Best effort, never rejects: a missing table or a failed read counts as not removed (the database refuses a
+        // removed player's claim and PayPal checkout either way).
+        withTimeout(getMyGameRemoval(gameId), "getMyGameRemoval"),
       ]);
       if (cancelled) return;
+      setMyRemoved(removedResult.status === "fulfilled" && removedResult.value);
       if (subsResult.status === "fulfilled") {
         setMySubs(subsResult.value);
       } else {
@@ -718,6 +726,7 @@ function PayPage() {
     paymentStarted: paymentStartedHere || paypalPaidFor === gameId,
     isHost,
     roster: rosterCheck,
+    removed: myRemoved,
     ageReq: game ? { minAge: game.minAge ?? null, maxAge: game.maxAge ?? null } : null,
     viewerAge: myAge.loading
       ? { state: "loading" }

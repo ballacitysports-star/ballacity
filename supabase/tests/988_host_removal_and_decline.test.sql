@@ -181,11 +181,14 @@ SELECT t.eq(public.host_remove_player('grm', t.id('jon')),
   'a player with nothing in the game: nothing changes');
 SELECT t.reset();
 
--- The open game: the gate never reads the request there, so a removed player can join again (not closed here).
+-- The open game: the gate never reads the request there. Closed by 20261202100000 (removal sticks): the removal is
+-- recorded and the gate refuses the player until the host lets them back (supabase/tests/996_removal_sticks.test.sql).
 SELECT t.as_user(t.id('host'));
 SELECT public.host_remove_player('gopen', t.id('cal'));
 SELECT t.reset();
-SELECT t.eq(pg_temp.join_as('gopen', 'cal'), 'joined 1', 'NOT CLOSED: on an open game a removed player can join again');
+SELECT t.eq(pg_temp.join_as('gopen', 'cal'), 'REMOVED_BY_HOST',
+  'CLOSED: on an open game a removed player cannot join again (20261202100000)');
+SELECT t.eq(pg_temp.seats('gopen', 'cal'), 0, 'CLOSED: and stays off the roster');
 
 -- ================= 3. who may remove =================
 -- Exactly the roster DELETE rule: the game's host. Not a player, a moderator, another host, or a visitor.

@@ -87,14 +87,21 @@ export function notPlacedNotices(input: {
   const type = "payment_not_placed";
   const why =
     input.reason === "cancelled" ? notPlacedWhy("GAME_CANCELLED") : notPlacedWhy(input.code);
+  // A player the host removed (20261202100000): the host cannot seat them directly, only let them back (an invitation,
+  // or approving their request), so "give them a spot" would be wrong.
+  const removed = input.reason === "refused" && input.code === "REMOVED_BY_HOST";
   const host =
     input.reason === "approval_required"
       ? `${who}'s payment for ${game} is confirmed, but you haven't approved their request for a spot yet. Approve it to give them their spot, or send their money back in your payment app.`
-      : `${who}'s payment for ${game} is confirmed, but they couldn't be added to the roster: ${why}. Give them a spot if you can, or send their money back in your payment app.`;
+      : removed
+        ? `${who}'s payment for ${game} is confirmed, but they couldn't be added to the roster: you removed them from this game. Invite them back or approve their request if you want them in, or send their money back in your payment app.`
+        : `${who}'s payment for ${game} is confirmed, but they couldn't be added to the roster: ${why}. Give them a spot if you can, or send their money back in your payment app.`;
   const player =
     input.reason === "approval_required"
       ? `Your payment for ${game} is confirmed, but the host still has to approve your request for a spot. They've been told.`
-      : `Your payment for ${game} is confirmed, but you couldn't be added to the roster: ${why}. The host has been told. Ask them for your spot or your money back.`;
+      : removed
+        ? `Your payment for ${game} is confirmed, but you couldn't be added to the roster: the host removed you from this game. The host has been told. Ask them to let you back in, or for your money back.`
+        : `Your payment for ${game} is confirmed, but you couldn't be added to the roster: ${why}. The host has been told. Ask them for your spot or your money back.`;
   return [
     {
       user_id: input.hostId,

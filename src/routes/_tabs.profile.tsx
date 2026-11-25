@@ -47,6 +47,7 @@ import { ProfileLinksList } from "@/components/ProfileLinks";
 import {
   listMyJoinRequests,
   listHostJoinRequests,
+  listMyGameRemovals,
   cancelMyJoinRequest,
   reviewJoinRequest,
   type JoinRequest,
@@ -202,6 +203,31 @@ function PlayerProfile() {
   const [myRequests, setMyRequests] = useState<JoinRequest[]>([]);
   const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(true);
+  // The games the host removed the viewer from, among their pending requests to the parent (20261202100000): those
+  // wait for the host too, so their line must not say the parent's yes is enough (playerRequestLine).
+  const [myRemovedGameIds, setMyRemovedGameIds] = useState<Set<string>>(() => new Set());
+  const guardianOnlyPendingKey = useMemo(
+    () =>
+      myRequests
+        .filter((r) => r.status === "pending" && isGuardianOnlyRequest(r))
+        .map((r) => r.game_id)
+        .sort()
+        .join(","),
+    [myRequests],
+  );
+  useEffect(() => {
+    if (!guardianOnlyPendingKey) {
+      setMyRemovedGameIds(new Set());
+      return;
+    }
+    let cancelled = false;
+    void listMyGameRemovals(guardianOnlyPendingKey.split(",")).then((ids) => {
+      if (!cancelled) setMyRemovedGameIds(ids);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [guardianOnlyPendingKey]);
   const search = Route.useSearch();
   const profileNav = useNavigate({ from: "/profile" });
   const requestFilter: "all" | "host" | "player" =
@@ -689,6 +715,7 @@ function PlayerProfile() {
                       request={r}
                       index={i}
                       isHost={isHost}
+                      removedByHost={!isHost && myRemovedGameIds.has(r.game_id)}
                       onCancel={
                         isHost
                           ? undefined

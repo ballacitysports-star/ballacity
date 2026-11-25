@@ -122,19 +122,30 @@ export function guardedOpenCopy(
 /**
  * The player's own line on a request card (Me tab, "My sent requests"). A request to the parent on an open game is
  * never answered by the host, so it must not say "Waiting for host approval"; a guardian's no is the parent's, not
- * the host's.
+ * the host's. The exception is a player the host removed from the game (opts.removedByHost): the host answers too.
  */
-export function playerRequestLine(r: {
-  status: "pending" | "approved" | "rejected";
-  idempotency_key?: string | null;
-  guardian_approved_at?: string | null;
-  reviewer_notes?: string | null;
-}): string {
+export function playerRequestLine(
+  r: {
+    status: "pending" | "approved" | "rejected";
+    idempotency_key?: string | null;
+    guardian_approved_at?: string | null;
+    reviewer_notes?: string | null;
+  },
+  /**
+   * The host removed the player from this game (public.game_removals, 20261202100000): their request, sent again with
+   * its guardian-only key, waits for the host as well as the parent, so the parent's yes alone does not let them in.
+   */
+  opts?: { removedByHost?: boolean },
+): string {
   if (r.status === "rejected")
     return r.reviewer_notes === "Declined by guardian"
       ? "Declined by your parent."
       : "Declined by host.";
   if (r.status === "approved") return "Approved — you're on the roster.";
+  if (isGuardianOnlyRequest(r) && opts?.removedByHost)
+    return r.guardian_approved_at
+      ? "Your parent said yes. Waiting for the host to let you back in."
+      : "Waiting for your parent and the host";
   if (isGuardianOnlyRequest(r))
     return r.guardian_approved_at
       ? "Your parent said yes. Open the game to join."

@@ -206,6 +206,15 @@ import { GamePaymentTerms } from "@/components/game-detail/GameInfoSections";
 import { GameHostSection } from "@/components/game-detail/GameHostSection";
 import { GamePlayersSection } from "@/components/game-detail/GamePlayersSection";
 import { GameApprovalBanner } from "@/components/game-detail/GameApprovalBanner";
+import { GameRemovedBanner } from "@/components/game-detail/GameRemovedBanner";
+import {
+  REMOVED_ASK_LABEL,
+  removedAskNotice,
+  removedFlowStatus,
+  viewerJoinFlags,
+  viewerRemoved,
+  viewerRequiresApproval,
+} from "@/lib/host-removal";
 import { GameInviteBanner } from "@/components/game-detail/GameInviteBanner";
 import { pluralize } from "@/lib/pluralize";
 import { GameInvitesPanel } from "@/components/game-detail/GameInvitesPanel";
@@ -398,6 +407,8 @@ function GameDetail() {
   });
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
+  // The host removed the viewer from this game (public.game_removals; src/lib/host-removal.ts).
+  const [removedRecorded, setRemovedRecorded] = useState(false);
   // A status read that answers after the page wrote the viewer's own rows (the
   // Request Spot tap, cancel, leave) must not put back what it read before that
   // write (src/lib/local-write-guard.ts).
@@ -616,11 +627,13 @@ function GameDetail() {
         settings: s,
         subs,
         req,
+        removed,
       } = await loadGameViewerStatus(game.id, (early) => {
         if (!leavingRef.current) setSettings(early);
       });
       if (leavingRef.current) return;
       setSettings(s);
+      setRemovedRecorded(removed);
       // The viewer's own rows land only if the page has not written them since
       // this read went out: a read sent before a Request Spot tap would answer
       // "no request" and wipe the pending request the tap just showed.
@@ -984,7 +997,20 @@ function GameDetail() {
   const ageReq = { minAge: game.minAge ?? null, maxAge: game.maxAge ?? null };
   const ageGate = ageGateState({ req: ageReq, viewerAge: myAge });
   const ageNeedsApproval = ageGate === "needs_approval" || ageGate === "unknown_age";
-  const requiresApproval = hostRequiresApproval || (!isHost && ageNeedsApproval);
+  // A player the host removed goes through the host too, whatever the game's setting: their way back is a request the
+  // host approves, or an invitation (src/lib/host-removal.ts).
+  const removedByHost = viewerRemoved({
+    recorded: removedRecorded,
+    isHost,
+    joined,
+    requestStatus: myReq?.status,
+  });
+  const requiresApproval = viewerRequiresApproval({
+    hostRequiresApproval,
+    isHost,
+    ageNeedsApproval,
+    removed: removedByHost,
+  });
   // A minor with a linked guardian on a game that needs no host approval asks their parent instead: the database
   // gives them a place, or takes their payment, only on a request their guardian approved, and the host never answers
   // it (20261111160000).
@@ -1012,24 +1038,25 @@ function GameDetail() {
   const parentAsk = asksParent(parentStep, mySubs[0]?.status);
   const ageNotice = !isHost && ageNeedsApproval ? ageGateMessage(ageGate, ageReq) : null;
   const latestSub = mySubs[0];
-  const isApproved = myReq?.status === "approved";
-  // On an open game a guarded minor's request waits on the parent (myWait), not the host.
-  const isRequestPending = myReq?.status === "pending" && !guardianOnly;
-  const isPaymentVerified = latestSub?.status === "verified";
-  const isPaymentPending = latestSub?.status === "pending";
-  // Approval-gated games treat approval as the *first* gate. Payment (if any)
-  // becomes actionable only after the host approves the request.
-  const approvalCleared = !requiresApproval || isApproved;
-  const paymentCleared = !isPaid || isPaymentVerified;
-  // A minor whose guardian has not approved is not confirmed, whatever the host said.
-  const isConfirmed =
-    approvalCleared &&
-    paymentCleared &&
-    (requiresApproval || isPaid ? true : false) &&
-    !myWait?.onParent;
-  // Only surface "payment pending" once approval is cleared, so players
-  // don't see a payment-pending state before they've been approved.
-  const isPending = isRequestPending || (approvalCleared && isPaymentPending);
+  // Approval-gated games treat approval as the *first* gate; payment (if any) becomes actionable only after the host
+  // approves. On an open game a guarded minor's request waits on the parent (myWait), not the host. A removed player is
+  // never "Confirmed", and keeps a pending payment's withdraw (viewerJoinFlags states the order).
+  const { isApproved, isPaymentVerified, approvalCleared, paymentCleared, isConfirmed, isPending } =
+    viewerJoinFlags({
+      requiresApproval,
+      removed: removedByHost,
+      isPaid,
+      requestStatus: myReq?.status,
+      guardianOnly,
+      latestPaymentStatus: latestSub?.status,
+      waitingOnParent: !!myWait?.onParent,
+    });
+  // The shared flow status knows nothing of a removal: a removed player is not "in", whatever they paid.
+  const viewerFlowStatus: typeof myFlowStatus = removedFlowStatus(
+    myFlowStatus,
+    removedByHost,
+    myReq?.status,
+  );
 
   // The viewer counts as a roster player only when:
   //  - they're not the host (hosts run the game, they don't take a player slot), AND
@@ -1311,24 +1338,29 @@ function GameDetail() {
         // Swap synthetic row for the authoritative one.
         setMyReq(created);
         const isResubmit = wasRejected || (created.attempt_count ?? 1) > 1;
+        const askBack = removedByHost ? removedAskNotice(game.title) : null;
         // Fire notification off the critical path — failure must not stall the UI.
         void createNotification({
           user_id: requestHostId,
           type: isResubmit ? "join_resubmitted" : "join_request",
-          title: isResubmit
-            ? `Resubmitted request: ${game.title}`
-            : `New spot request: ${game.title}`,
-          body: isResubmit
-            ? "A player resubmitted their request — pending your review."
-            : "Tap to review.",
+          title:
+            askBack?.title ??
+            (isResubmit ? `Resubmitted request: ${game.title}` : `New spot request: ${game.title}`),
+          body:
+            askBack?.body ??
+            (isResubmit
+              ? "A player resubmitted their request — pending your review."
+              : "Tap to review."),
           link: `/games/${game.id}`,
         }).catch(() => {});
         void saveMyGameReminderOffsets(game.id, reminderOffsets).catch(() => {});
         trackEvent("join_game", { game_id: game.id, kind: "request" });
         toast.success(
-          isResubmit
-            ? "Request resubmitted. The host will review it."
-            : "Request sent. The host will review it.",
+          askBack
+            ? "Asked the host to let you back in. You'll be told when they answer."
+            : isResubmit
+              ? "Request resubmitted. The host will review it."
+              : "Request sent. The host will review it.",
         );
       } catch (e: any) {
         setMyReq(prevReq);
@@ -1358,7 +1390,11 @@ function GameDetail() {
     // answers with its own message, and neither the "You're in!" toast nor the
     // host's notification should go out for a join that did not happen.
     const joinedOk = await joinGame(game.id, preselectedPosition, viewerPolicy);
-    if (!joinedOk) return;
+    if (!joinedOk) {
+      // A refusal may be a removal this page has not read yet (REMOVED_BY_HOST): read the status again.
+      void refreshStatus();
+      return;
+    }
     void saveMyGameReminderOffsets(game.id, reminderOffsets).catch(() => {});
     trackEvent("join_game", { game_id: game.id, kind: "instant" });
     toast.success(`You're in! See you at ${game.location}.`);
@@ -1888,11 +1924,13 @@ function GameDetail() {
                   The host invited you personally{inviteFrom ? "" : ""}. Tap{" "}
                   {parentAsk
                     ? `“${ASK_PARENT_LABEL}”`
-                    : requiresApproval
-                      ? "“Request Spot”"
-                      : isPaid
-                        ? "“Pay Host”"
-                        : "“Join Game”"}{" "}
+                    : removedByHost
+                      ? `“${REMOVED_ASK_LABEL}”`
+                      : requiresApproval
+                        ? "“Request Spot”"
+                        : isPaid
+                          ? "“Pay Host”"
+                          : "“Join Game”"}{" "}
                   below to confirm your spot.
                 </p>
               </div>
@@ -1945,19 +1983,30 @@ function GameDetail() {
           <PaymentRequiredBanner
             gameId={gameId}
             settings={flowSettings ?? settings}
-            status={myFlowStatus}
+            status={viewerFlowStatus}
             takesPayment={!gameTakesNoPayment(gate.joinState, joined)}
           />
         )}
 
         {/* Compact flow status pill for the viewer */}
-        {!isHost && myFlowStatus !== "none" && (
+        {!isHost && viewerFlowStatus !== "none" && (
           <div className="flex items-center gap-2 text-xs">
             <span className="font-bold uppercase tracking-wider text-muted-foreground">
               Your status
             </span>
-            <PlayerFlowPill status={myFlowStatus} />
+            <PlayerFlowPill status={viewerFlowStatus} />
           </div>
+        )}
+
+        {/* A player the host removed: what happened, and the way back (the request the main button sends). */}
+        {!isHost && removedByHost && !myWait && (
+          <GameRemovedBanner
+            myReq={myReq}
+            capReached={capReached}
+            paymentVerified={isPaymentVerified}
+            locked={gate.locked}
+            full={spotsLeft <= 0}
+          />
         )}
 
         <GameApprovalBanner
@@ -1967,7 +2016,7 @@ function GameDetail() {
           isHost={isHost}
           isPaid={isPaid}
           isPaymentVerified={isPaymentVerified}
-          myFlowStatus={myFlowStatus}
+          myFlowStatus={viewerFlowStatus}
           myHoldLabel={myHoldLabel}
           myReq={myReq}
           myWait={myWait}
@@ -1983,7 +2032,7 @@ function GameDetail() {
               : null
           }
           refreshStatus={refreshStatus}
-          requiresApproval={requiresApproval}
+          requiresApproval={requiresApproval && !removedByHost}
         />
 
         {/* Compact "Your status" strip for paid games — driven by shared flow
@@ -2013,7 +2062,7 @@ function GameDetail() {
               payment_verified: { text: "You're in! Payment confirmed", tone: "ok" },
               confirmed: { text: "You're in! Payment confirmed", tone: "ok" },
             };
-            const entry = stripCopy[myFlowStatus];
+            const entry = stripCopy[viewerFlowStatus];
             if (!entry) return null;
             const toneClass =
               entry.tone === "ok"
@@ -2029,7 +2078,7 @@ function GameDetail() {
                 role="status"
                 aria-live="polite"
                 data-testid="your-status-strip"
-                data-status={myFlowStatus}
+                data-status={viewerFlowStatus}
               >
                 <span className="font-bold uppercase tracking-wider">Your status</span>
                 <span className="text-foreground/80">·</span>
@@ -3276,9 +3325,13 @@ function GameDetail() {
                         <LiveSpots />
                       </>
                     ) : requiresApproval && !isApproved ? (
-                      <>
-                        Request Spot · <LiveSpots />
-                      </>
+                      removedByHost ? (
+                        <>{REMOVED_ASK_LABEL}</>
+                      ) : (
+                        <>
+                          Request Spot · <LiveSpots />
+                        </>
+                      )
                     ) : isPaid ? (
                       <>
                         <Wallet className="h-4 w-4" /> Pay Host · ${fee.toFixed(2)}

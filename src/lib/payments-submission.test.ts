@@ -107,14 +107,14 @@ describe("paymentSubmissionErrorMessage (20261111120000)", () => {
   });
 });
 
-describe("paymentSubmissionErrorMessage: the roster rules on a manual claim (20261119200000)", () => {
-  /** Each code the trigger raises, with the sentence it raises it with, read from the migration itself. */
+describe("paymentSubmissionErrorMessage: the roster rules on a manual claim (20261119200000, 20261202100000)", () => {
+  /**
+   * Each code the trigger raises, with the sentence it raises it with, read from the migration that last defines it
+   * (20261202100000_removal_sticks added REMOVED_BY_HOST to 20261119200000's list).
+   */
   const raised = [
     ...readFileSync(
-      new URL(
-        "../../supabase/migrations/20261119200000_payment_claim_preconditions.sql",
-        import.meta.url,
-      ),
+      new URL("../../supabase/migrations/20261202100000_removal_sticks.sql", import.meta.url),
       "utf8",
     ).matchAll(/WHEN '([A-Z_]+)' THEN '((?:[^']|'')*)'/g),
   ].map(([, code, sentence]) => ({
