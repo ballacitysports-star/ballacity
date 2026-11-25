@@ -196,14 +196,15 @@ export function NotificationsPanel() {
   const loadedUnread = useMemo(() => items.filter((n) => !n.read_at).length, [items]);
   const unreadCount = Math.max(serverUnread ?? 0, loadedUnread);
 
-  const handleClick = async (n: Notification) => {
+  const handleClick = (n: Notification) => {
     if (!n.read_at) {
-      try {
-        await markNotificationRead(n.id);
-        refreshUnread();
-      } catch {
-        // Opening the alert matters more than its read mark; it stays unread and can be marked later.
-      }
+      // Opening the alert does not wait for its read mark: on a slow connection that save took seconds, and the
+      // tap did nothing until it answered. Opening matters more than the mark; if it fails, the alert stays unread
+      // and can be marked later.
+      markNotificationRead(n.id).then(
+        () => refreshUnread(),
+        () => {},
+      );
     }
     nav({ href: resolveNotificationTarget(n) } as any);
   };

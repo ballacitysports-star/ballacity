@@ -1,4 +1,5 @@
 import { fulfillRows } from "./helpers/invite-postgrest";
+import { PAY_FIXTURE_HOST_ID, payFixtureGameRow, serveFixtureGame } from "./helpers/pay-fixtures";
 import { stubRiskAcknowledged } from "./helpers/risk-ack";
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
 import { answerSessionChecks } from "./helpers/signed-in";
@@ -13,6 +14,19 @@ import { answerSessionChecks } from "./helpers/signed-in";
  * every POST carries the same idempotency_key and that only one pending row
  * exists at the end.
  *
+ * The mock server answers no POST until the whole burst has been tapped, so every
+ * tap lands while the first request is still out, which is what "rapid" means
+ * here. With a fixed answer delay instead (400 ms), a tap that a slow runner
+ * delivered after the request had settled met "Request pending · tap to cancel"
+ * and cancelled the request: the page then showed "Request Spot" again (seen
+ * locally, 1 run in 10, with no added latency).
+ *
+ * The game row (`g2`) is served here too, as the pay specs do
+ * (helpers/pay-fixtures.ts): the invite banner and the CTA wait for it, and the
+ * real read queues behind the thirty-odd reads the game page sends at once,
+ * which on the loaded shared sandbox took longer than the 10 seconds the
+ * banner is given (CI run 45454024636, attempt 1).
+ *
  * Auto-skips without a restored Supabase session.
  */
 
@@ -25,10 +39,11 @@ test.skip(
 );
 
 const GAME_ID = "g2";
-const FAKE_HOST_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+const FAKE_HOST_ID = PAY_FIXTURE_HOST_ID;
 const FUTURE_MS = Date.now() + 24 * 60 * 60 * 1000;
 const INVITE_URL = `/games/${GAME_ID}?invite=1&from=${FAKE_HOST_ID}&exp=${FUTURE_MS}`;
-const POST_DELAY_MS = 400;
+/** After the burst, how long a request still on its way may take to reach the mock server and be counted. */
+const LATE_POST_GRACE_MS = 700;
 
 async function restoreSession(page: Page) {
   // Answer the session checks every load starts (GET /auth/v1/user and the root gate's
@@ -96,6 +111,9 @@ test("rapid taps on Request-to-join create exactly one pending row (server-side 
 
   // Server-side row store keyed by (player_id, idempotency_key).
   const rowsByKey = new Map<string, any>();
+  // Opened once every tap of the burst has been delivered; no POST is answered before.
+  let endBurst!: () => void;
+  const burstDone = new Promise<void>((resolve) => (endBurst = resolve));
   const joinPosts: Array<{ idempotency_key: string | null; game_id: string | null }> = [];
 
   const makeRow = (idempotency_key: string) => ({
@@ -141,8 +159,8 @@ test("rapid taps on Request-to-join create exactly one pending row (server-side 
           game_id: body?.game_id ?? null,
         });
 
-        // Simulate network latency so multiple rapid taps overlap.
-        await new Promise((r) => setTimeout(r, POST_DELAY_MS));
+        // Keep the request out until the burst is over, so every tap overlaps it.
+        await burstDone;
 
         // Server-side dedupe by (player_id, idempotency_key). Missing key = reject
         // (mirrors the DB trigger which requires idempotency_key).
@@ -172,6 +190,7 @@ test("rapid taps on Request-to-join create exactly one pending row (server-side 
     },
   );
 
+  await serveFixtureGame(page, payFixtureGameRow(GAME_ID));
   await stubRiskAcknowledged(page);
   await restoreSession(page);
   await page.goto(INVITE_URL, { waitUntil: "domcontentloaded" });
@@ -186,14 +205,16 @@ test("rapid taps on Request-to-join create exactly one pending row (server-side 
   await expect(cta).toBeVisible({ timeout: 10_000 });
 
   // Fire a burst of rapid taps. Even if the client's in-flight guard swallows
-  // most of them, any POST that DOES reach the server must dedupe.
-  await Promise.all([
-    cta.click({ force: true, noWaitAfter: true }).catch(() => {}),
-    cta.click({ force: true, noWaitAfter: true }).catch(() => {}),
-    cta.click({ force: true, noWaitAfter: true }).catch(() => {}),
-    cta.click({ force: true, noWaitAfter: true }).catch(() => {}),
-    cta.click({ force: true, noWaitAfter: true }).catch(() => {}),
-  ]);
+  // most of them, any POST that DOES reach the server must dedupe. The taps go
+  // to the button element itself: its label changes after the first tap, and a
+  // locator by label would stop finding it.
+  const button = await cta.elementHandle();
+  expect(button, "the Request Spot button").not.toBeNull();
+  await Promise.all(
+    Array.from({ length: 5 }, () =>
+      button!.click({ force: true, noWaitAfter: true, timeout: 5_000 }).catch(() => {}),
+    ),
+  );
 
   // The pending UI shows at once (optimistic), before the POST is sent.
   await expect(page.getByText(/request pending · tap to cancel/i).first()).toBeVisible({
@@ -207,8 +228,15 @@ test("rapid taps on Request-to-join create exactly one pending row (server-side 
     .poll(() => joinPosts.length, { timeout: 10_000, message: "no join_requests POST was sent" })
     .toBeGreaterThanOrEqual(1);
 
-  // Give any late in-flight POSTs a moment to settle.
-  await page.waitForTimeout(POST_DELAY_MS + 300);
+  // Every tap is in: answer the request(s) now, and wait for the page to say it was sent.
+  endBurst();
+  await expect(page.getByText(/request sent\. the host will review it\./i).first()).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect(page.getByText(/request pending · tap to cancel/i).first()).toBeVisible();
+
+  // Give a POST still on its way from the burst the moment it needs to be counted.
+  await page.waitForTimeout(LATE_POST_GRACE_MS);
 
   // Every POST that hit the server must have carried an idempotency_key
   // for the same game, and they must all share the same key.

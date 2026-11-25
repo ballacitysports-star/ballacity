@@ -19,6 +19,18 @@ let dbLoadedOnce = false;
 // `joined` is the database's, not a copy restored from localStorage, so useHostedGameJoined can answer for them.
 const dbReadIds = new Set<string>();
 let dbHydratePromise: Promise<void> | null = null;
+// Realtime changes, counted as they arrive, and the count at each game's latest one. A read from the database that was
+// already out when a change arrived may have been answered from before it (a slow or busy backend), so it must not put
+// back what it read for that game: the change is newer (keepLaterChanges). Later changes still arrive on the channel.
+let changeCount = 0;
+const lastChangeAt = new Map<string, number>();
+function noteChange(id: string) {
+  changeCount += 1;
+  lastChangeAt.set(id, changeCount);
+}
+function changedSince(id: string, count: number): boolean {
+  return (lastChangeAt.get(id) ?? 0) > count;
+}
 
 /** Where the first load from the database stands, so a screen can say so. */
 export type HostedGamesLoad = "loading" | "ready" | "error";
@@ -282,7 +294,31 @@ function gameToInsertRow(g: Game): TablesInsert<"hosted_games"> {
 
 // ---------- DB hydration + realtime ----------
 
+/**
+ * The games a full read answered, with every game a realtime change touched after `since` (the change count when the
+ * read went out) as that change left it: kept in its changed form, left out when the change deleted or hid it, and
+ * added when the change brought it in after the read was answered. Every other game is as the read answered it.
+ */
+function keepLaterChanges(read: Game[], since: number): Game[] {
+  const out: Game[] = [];
+  const inRead = new Set<string>();
+  for (const g of read) {
+    inRead.add(g.id);
+    if (!changedSince(g.id, since)) {
+      out.push(g);
+      continue;
+    }
+    const live = cache.find((x) => x.id === g.id);
+    if (live) out.push(live);
+  }
+  for (const g of cache) {
+    if (!inRead.has(g.id) && g.hostUserId && changedSince(g.id, since)) out.push(g);
+  }
+  return out;
+}
+
 async function fetchAll(): Promise<void> {
+  const since = changeCount;
   const { data, error } = await supabase
     .from("hosted_games")
     .select("*")
@@ -290,7 +326,7 @@ async function fetchAll(): Promise<void> {
     .is("hidden_at", null)
     .order("date", { ascending: true });
   if (error) throw error;
-  const games = (data as DbRow[] | null)?.map(rowToGame) ?? [];
+  const games = keepLaterChanges((data as DbRow[] | null)?.map(rowToGame) ?? [], since);
   // Preserve any unclaimed local-only games (no hostUserId, not in DB) as pending.
   const dbIds = new Set(games.map((g) => g.id));
   const pending = cache.filter((g) => !dbIds.has(g.id) && !g.hostUserId);
@@ -337,6 +373,8 @@ function ensureRealtime() {
     .on("postgres_changes", { event: "*", schema: "public", table: "hosted_games" }, (payload) => {
       const newRow = payload.new as DbRow | null;
       const oldRow = payload.old as DbRow | null;
+      const changedId = newRow?.id ?? oldRow?.id;
+      if (changedId) noteChange(changedId);
       if (payload.eventType === "DELETE" && oldRow) {
         cache = cache.filter((g) => g.id !== oldRow.id);
         emit();
@@ -562,6 +600,7 @@ export async function fetchHostedGame(id: string): Promise<Game | null> {
   const local = cache.find((g) => g.id === id);
   if (local) return local;
 
+  const since = changeCount;
   const { data, error } = await supabase
     .from("hosted_games")
     .select("*")
@@ -573,6 +612,16 @@ export async function fetchHostedGame(id: string): Promise<Game | null> {
   if (!data) return null;
 
   const game = rowToGame(data as DbRow);
+  // A realtime change to this game arrived while the read was out: the copy it left is newer than this answer. That
+  // copy is a database row too, so useHostedGameJoined can follow this game from here on.
+  const live = changedSince(game.id, since) ? cache.find((g) => g.id === game.id) : undefined;
+  if (live) {
+    if (!dbReadIds.has(game.id)) {
+      dbReadIds.add(game.id);
+      emit();
+    }
+    return live;
+  }
   const exists = cache.some((g) => g.id === game.id);
   cache = exists ? cache.map((g) => (g.id === game.id ? game : g)) : [game, ...cache];
   dbReadIds.add(game.id);
