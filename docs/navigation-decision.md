@@ -90,6 +90,10 @@ Whatever is chosen is implemented once:
     (`src/components/AnalyticsHost.tsx`); `.env.production` does not need the variable. Dev, E2E and
     preview builds loaded it too until #395 (merged 2026-11-12), which limits it to the published build from
     the next publish on.
+  - _Off switch, 2026-11-24._ `GOOGLE_ANALYTICS_MEASUREMENT_ID="off"` (also `none` or `disabled`) now
+    builds with no measurement id, so the tag never loads (`build/ga-measurement-id.ts`). The deploy
+    build may not receive secrets, so the reliable place for it is `.env.production`; it takes effect
+    from the next publish.
   - Whether the property has received data, and so when the four-week clock below started, cannot
     be read from the repository. The owner checks it in Google Analytics and records the date here.
 - **Decision rule: accepted as written above.** No tab change is made before it is met.

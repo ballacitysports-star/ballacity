@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/tanstack/vite";
 import { manualChunks } from "./build/manual-chunks";
+import { resolveGaMeasurementId } from "./build/ga-measurement-id";
 
 // `.env.production` holds the publishable backend URL and key, committed
 // because the managed .env is not available to the deploy build. Vite only
@@ -45,11 +46,15 @@ const publicBackendDefine = {
   "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(
     publicValue("VITE_SUPABASE_PUBLISHABLE_KEY"),
   ),
-  "import.meta.env.VITE_SUPABASE_PROJECT_ID": JSON.stringify(publicValue("VITE_SUPABASE_PROJECT_ID")),
+  "import.meta.env.VITE_SUPABASE_PROJECT_ID": JSON.stringify(
+    publicValue("VITE_SUPABASE_PROJECT_ID"),
+  ),
   // GA4 measurement IDs are public identifiers; bake in at build time, with a
   // literal fallback because the deploy build may not receive the variable.
+  // GOOGLE_ANALYTICS_MEASUREMENT_ID="off" builds with no analytics at all
+  // (build/ga-measurement-id.ts says how to switch it off reliably).
   "import.meta.env.VITE_GA_MEASUREMENT_ID": JSON.stringify(
-    (process.env.GOOGLE_ANALYTICS_MEASUREMENT_ID ?? "").trim() || "G-MEWLGXSWXC",
+    resolveGaMeasurementId(process.env.GOOGLE_ANALYTICS_MEASUREMENT_ID),
   ),
 };
 
