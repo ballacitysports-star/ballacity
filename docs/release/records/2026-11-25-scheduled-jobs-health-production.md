@@ -1,4 +1,4 @@
-# Release record: scheduled jobs health (#475) and flaky E2E fixes (#476), 2026-11-25
+# Release record: scheduled jobs health (#475) and flaky E2E fixes (#476), 2026-11-25/26
 
 Owner approvals in the session:
 
@@ -57,14 +57,20 @@ Ledger text md5 `d1bd3f0495b597b9d48767329ba52eb5` equals the file; function md5
 owned by the migration role, so the function sees all of them; the run-history read (newest 100,000 runs) took 0.2 s in a
 read-only check on 2026-11-24.
 
-## Publish: not yet
+## Publish
 
-Not published. After the merges main moved on to `cb250b86` (the other session's #477), and main's E2E for that commit
-(run 1421) is red after its one re-run, with causes outside the new code (a fixture player left on a game's roster by an
-earlier failure; a realtime catch-up gap that production already has). The other session's fix is in progress. Main will
-be published once its E2E is green, by whichever session gets there first, with the deployment recorded. Until then the
-live app does not show the card; the function is in place and the app shows "not available" when it is missing, so the
-order does not matter.
+Main `be7dae7b` was published on 2026-11-26 at about 01:30 UTC, as Lovable deployment
+`a7812bbf-2a06-41d8-ba0c-ee847b63578b`. The other session did this single publish, after its `20261202100000` was
+applied to production.
+
+- **Why it waited:** main moved on to `cb250b86` (#477) after the merges, and main's E2E for that commit (run 1421) was
+  red after its one re-run. The causes were outside the new code: a fixture player left on a game's roster by an earlier
+  failure, and a realtime catch-up gap that production already had. The other session's fix, #478 (`be7dae7b`), made
+  main's E2E green (run 1423).
+- **What it contains:** #475, #476, #477 and #478. Lovable's `latest_commit_sha` is `be7dae7b` and the project status is
+  `ready`.
+- **Production after the publish** (read-only check): ledger 427, latest `20261202100000`, and
+  `superadmin_scheduled_jobs` md5 still `373c8259…`, so the live app's Scheduled jobs card has its function.
 
 ## Checks
 
@@ -79,5 +85,6 @@ order does not matter.
 ## Open
 
 - A retention job for `cron.job_run_details` (about 260k rows, 348 MB, never purged) is being built as a separate change
-  (`20261203100000`), local only until approved.
-- The other session's `20261202100000` follows on production once its fix is green (ledger 426 → 427).
+  (`20261203100000`); its PR follows, and it is applied nowhere until the owner approves.
+- The other session applied its `20261202100000` to production before the publish (ledger 426 → 427, fingerprint 3530
+  `94ab49f1` equal to a replay of main); its own release record covers it.
