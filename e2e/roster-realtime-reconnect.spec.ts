@@ -1,6 +1,11 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import { stubRiskAcknowledged } from "./helpers/risk-ack";
-import { ensureNotJoined, joinFreeRun, leaveFreeRun } from "./helpers/realtime-join";
+import {
+  ensureNotJoined,
+  joinFreeRun,
+  leaveFreeRun,
+  leaveIfJoinedViaApi,
+} from "./helpers/realtime-join";
 
 /**
  * E2E: roster + participant count stay in sync across two clients through
@@ -158,6 +163,7 @@ test("roster stays consistent across INSERT, DELETE, and reconnect", async ({ br
       })
       .toBe(baseline!);
   } finally {
+    await leaveIfJoinedViaApi(bDetail);
     await deviceA.close();
     await deviceB.close();
   }
