@@ -21,6 +21,12 @@ const server = {
   rosterError: null as { message: string } | null,
   // When set, reading the stored session fails with it.
   sessionError: null as { message: string } | null,
+  // The user each roster read asked for, in the order the reads were sent.
+  rosterReads: [] as string[],
+  // When set, a leave's DELETE waits for it; when the DELETE goes through, the game leaves `roster`.
+  deleteGate: null as Promise<void> | null,
+  // When set, a leave's DELETE fails with it.
+  deleteError: null as { message: string } | null,
 };
 
 const toastError = vi.fn();
@@ -28,7 +34,8 @@ const toastError = vi.fn();
 function table() {
   return {
     select: () => ({
-      eq: async () => {
+      eq: async (_column: string, userId: string) => {
+        server.rosterReads.push(userId);
         const data = server.roster.map((game_id) => ({ id: `row-${game_id}`, game_id }));
         if (server.rosterGate) await server.rosterGate;
         if (server.rosterError) return { data: null, error: server.rosterError };
@@ -45,7 +52,16 @@ function table() {
         },
       }),
     }),
-    delete: () => ({ eq: () => ({ eq: async () => ({ error: null }) }) }),
+    delete: () => ({
+      eq: (_column: string, gameId: string) => ({
+        eq: async () => {
+          if (server.deleteGate) await server.deleteGate;
+          if (server.deleteError) return { error: server.deleteError };
+          server.roster = server.roster.filter((g) => g !== gameId);
+          return { error: null };
+        },
+      }),
+    }),
   };
 }
 
@@ -53,17 +69,23 @@ type RosterPayload = { eventType: string; new?: unknown; old?: unknown };
 const realtime = {
   handlers: [] as Array<(p: RosterPayload) => void>,
   authListener: null as null | ((event: string, session: unknown) => void),
+  // What each channel was opened with, and the status callback each subscribe was given, in order.
+  opened: [] as Array<{ name: string; options: unknown }>,
+  statusCallbacks: [] as Array<((status: string) => void) | undefined>,
 };
 
 const channel: {
   on: (type: string, filter: unknown, cb: (p: RosterPayload) => void) => typeof channel;
-  subscribe: () => typeof channel;
+  subscribe: (cb?: (status: string) => void) => typeof channel;
 } = {
   on: (_type, _filter, cb) => {
     realtime.handlers.push(cb);
     return channel;
   },
-  subscribe: () => channel,
+  subscribe: (cb) => {
+    realtime.statusCallbacks.push(cb);
+    return channel;
+  },
 };
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -82,7 +104,10 @@ vi.mock("@/integrations/supabase/client", () => ({
       },
     },
     from: () => table(),
-    channel: () => channel,
+    channel: (name: string, options?: unknown) => {
+      realtime.opened.push({ name, options });
+      return channel;
+    },
     removeChannel: () => {},
   },
 }));
@@ -103,8 +128,13 @@ beforeEach(() => {
   server.rosterError = null;
   server.sessionError = null;
   toastError.mockReset();
+  server.rosterReads = [];
+  server.deleteGate = null;
+  server.deleteError = null;
   realtime.handlers = [];
   realtime.authListener = null;
+  realtime.opened = [];
+  realtime.statusCallbacks = [];
 });
 
 describe("joinGame", () => {
@@ -304,6 +334,155 @@ describe("realtime roster changes from another device", () => {
   });
 });
 
+describe("catching up when the roster channel joins", () => {
+  /** Mounts the store for u1 with `roster`, and waits for the first load and the channel. */
+  async function mounted(roster: string[]) {
+    server.roster = roster;
+    const store = await loadStore();
+    const { result } = renderHook(() => store.useJoinedGameIds());
+    await waitFor(() => expect(result.current).toEqual([...roster].sort()));
+    expect(realtime.handlers).toHaveLength(1);
+    // Optional call: a store that passes no status callback must fail on what it shows, not on a TypeError here.
+    const joinedStatus = (status: string, callback = realtime.statusCallbacks.at(-1)) =>
+      act(async () => {
+        callback?.(status);
+        await Promise.resolve();
+      });
+    return { store, result, joinedStatus };
+  }
+
+  const flush = () => act(async () => new Promise<void>((r) => setTimeout(r, 0)));
+
+  it("opens the channel holding SUBSCRIBED until the server streams the changes", async () => {
+    await mounted([]);
+    expect(realtime.opened).toEqual([
+      {
+        name: "game_participants:me:u1",
+        options: { config: { postgres_changes_options: { wait: true } } },
+      },
+    ]);
+  });
+
+  it("reads the roster again on SUBSCRIBED and shows a join the channel never delivered", async () => {
+    const { result, joinedStatus } = await mounted(["g1"]);
+    const readsBefore = server.rosterReads.length;
+    // Joined on another device while this page was loading: the INSERT came before the subscription was live.
+    server.roster = ["g1", "missed"];
+    await joinedStatus("SUBSCRIBED");
+    await waitFor(() => expect(result.current).toEqual(["g1", "missed"]));
+    expect(server.rosterReads.slice(readsBefore)).toEqual(["u1"]);
+    // It reads again on every rejoin (a dropped connection), not only the first.
+    server.roster = ["g1"];
+    await joinedStatus("CHANNEL_ERROR");
+    await joinedStatus("SUBSCRIBED");
+    await waitFor(() => expect(result.current).toEqual(["g1"]));
+    expect(server.rosterReads.slice(readsBefore)).toEqual(["u1", "u1"]);
+  });
+
+  it("learns the missed row's id, so a leave on another device that names only the row id is applied", async () => {
+    const { result, joinedStatus } = await mounted([]);
+    server.roster = ["missed"];
+    await joinedStatus("SUBSCRIBED");
+    await waitFor(() => expect(result.current).toEqual(["missed"]));
+    act(() => realtime.handlers[0]!({ eventType: "DELETE", old: { id: "row-missed" }, new: {} }));
+    expect(result.current).toEqual([]);
+  });
+
+  it("reads nothing for a SUBSCRIBED that comes after sign-out", async () => {
+    const { result, joinedStatus } = await mounted(["g1"]);
+    const oldChannelStatus = realtime.statusCallbacks.at(-1);
+    act(() => realtime.authListener?.("SIGNED_OUT", null));
+    expect(result.current).toEqual([]);
+    const readsBefore = server.rosterReads.length;
+    await joinedStatus("SUBSCRIBED", oldChannelStatus);
+    await flush();
+    expect(server.rosterReads.length).toBe(readsBefore);
+    expect(result.current).toEqual([]);
+  });
+
+  it("reads nothing for the old account when its channel reports SUBSCRIBED after a switch", async () => {
+    const { result, joinedStatus } = await mounted(["g1"]);
+    const oldChannelStatus = realtime.statusCallbacks.at(-1);
+    server.userId = "u2";
+    server.roster = ["u2-game"];
+    act(() => realtime.authListener?.("SIGNED_IN", { user: { id: "u2" } }));
+    await waitFor(() => expect(result.current).toEqual(["u2-game"]));
+    const readsBefore = server.rosterReads.length;
+    await joinedStatus("SUBSCRIBED", oldChannelStatus);
+    await flush();
+    expect(server.rosterReads.slice(readsBefore)).not.toContain("u1");
+    expect(result.current).toEqual(["u2-game"]);
+  });
+
+  it("keeps a realtime INSERT that arrives while the catch-up read is out", async () => {
+    const { result, joinedStatus } = await mounted([]);
+    let release!: () => void;
+    server.rosterGate = new Promise<void>((r) => (release = r));
+    const readsBefore = server.rosterReads.length;
+    await joinedStatus("SUBSCRIBED");
+    expect(server.rosterReads.length).toBe(readsBefore + 1);
+    act(() =>
+      realtime.handlers[0]!({
+        eventType: "INSERT",
+        old: {},
+        new: { id: "row-late", game_id: "g7", user_id: "u1" },
+      }),
+    );
+    expect(result.current).toEqual(["g7"]);
+    // The read answers with the roster from before the INSERT.
+    await act(async () => {
+      release();
+      await server.rosterGate;
+    });
+    await flush();
+    expect(result.current).toEqual(["g7"]);
+  });
+
+  it("keeps a realtime DELETE and a leave here that come while the catch-up read is out", async () => {
+    const { store, result, joinedStatus } = await mounted(["g1", "g2"]);
+    let release!: () => void;
+    server.rosterGate = new Promise<void>((r) => (release = r));
+    const readsBefore = server.rosterReads.length;
+    await joinedStatus("SUBSCRIBED");
+    expect(server.rosterReads.length).toBe(readsBefore + 1);
+    act(() => realtime.handlers[0]!({ eventType: "DELETE", old: { id: "row-g1" }, new: {} }));
+    act(() => store.leaveGame("g2"));
+    expect(result.current).toEqual([]);
+    // The read answers with both rows still there.
+    await act(async () => {
+      release();
+      await server.rosterGate;
+    });
+    await flush();
+    expect(result.current).toEqual([]);
+  });
+
+  it("does not let the first load, answering last, undo what the later catch-up read found", async () => {
+    // The first load is sent before the subscription is live and is slow to answer.
+    let releaseFirst!: () => void;
+    server.rosterGate = new Promise<void>((r) => (releaseFirst = r));
+    const firstGate = server.rosterGate;
+    const store = await loadStore();
+    const { result } = renderHook(() => store.useJoinedGameIds());
+    await waitFor(() => expect(server.rosterReads).toHaveLength(1));
+    // A join on another device lands before the subscription is live: the channel never delivers it.
+    server.roster = ["missed"];
+    server.rosterGate = null;
+    await act(async () => {
+      realtime.statusCallbacks.at(-1)?.("SUBSCRIBED");
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(result.current).toEqual(["missed"]));
+    // Now the first load answers, with the roster from before the join.
+    await act(async () => {
+      releaseFirst();
+      await firstGate;
+    });
+    await flush();
+    expect(result.current).toEqual(["missed"]);
+  });
+});
+
 describe("useRosterLoadState (whether useIsJoined has been read from the database)", () => {
   it("is 'loading' while only the saved list is known, then 'ready' with the roster", async () => {
     // Saved on this device, but the host has since removed them: the saved list alone would say "joined".
@@ -422,5 +601,76 @@ describe("reloadRoster (the pay page after a PayPal capture)", () => {
     });
     expect(result.current).toBe(true);
     expect(store.isJoined("kept")).toBe(true);
+  });
+});
+
+describe("leaving while a roster read is out", () => {
+  async function mounted(roster: string[]) {
+    server.roster = roster;
+    const store = await loadStore();
+    const { result } = renderHook(() => store.useJoinedGameIds());
+    await waitFor(() => expect(result.current).toEqual([...roster].sort()));
+    // A SUBSCRIBED (or any refresh) sends a roster read at the moment the test chooses.
+    const read = () =>
+      act(async () => {
+        realtime.statusCallbacks.at(-1)?.("SUBSCRIBED");
+        await Promise.resolve();
+      });
+    return { store, result, read };
+  }
+
+  const flush = () => act(async () => new Promise<void>((r) => setTimeout(r, 0)));
+
+  it("does not put the game back for a read sent after the tap that answers before the DELETE commits", async () => {
+    const { store, result, read } = await mounted(["g1"]);
+    let releaseDelete!: () => void;
+    server.deleteGate = new Promise<void>((r) => (releaseDelete = r));
+    act(() => store.leaveGame("g1"));
+    expect(result.current).toEqual([]);
+    // The read is served while the row is still there.
+    await read();
+    await flush();
+    expect(result.current).toEqual([]);
+    await act(async () => {
+      releaseDelete();
+      await server.deleteGate;
+    });
+    await flush();
+    expect(result.current).toEqual([]);
+  });
+
+  it("does not put the game back for a read sent before the DELETE committed that answers after it", async () => {
+    const { store, result, read } = await mounted(["g1"]);
+    let releaseDelete!: () => void;
+    server.deleteGate = new Promise<void>((r) => (releaseDelete = r));
+    act(() => store.leaveGame("g1"));
+    // The read sees the row, then is slow to answer.
+    let releaseRead!: () => void;
+    server.rosterGate = new Promise<void>((r) => (releaseRead = r));
+    const readGate = server.rosterGate;
+    await read();
+    await act(async () => {
+      releaseDelete();
+      await server.deleteGate;
+    });
+    await flush();
+    expect(server.roster).toEqual([]);
+    await act(async () => {
+      releaseRead();
+      await readGate;
+    });
+    await flush();
+    expect(result.current).toEqual([]);
+  });
+
+  it("lets a later read show the game again when the leave failed", async () => {
+    // On the roster (the server put them there) but not in this browser's list yet.
+    const { store, result, read } = await mounted([]);
+    server.roster = ["g1"];
+    server.deleteError = { message: "network down" };
+    act(() => store.leaveGame("g1"));
+    await flush();
+    await read();
+    await waitFor(() => expect(result.current).toEqual(["g1"]));
   });
 });

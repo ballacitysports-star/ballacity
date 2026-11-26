@@ -299,28 +299,12 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
     } else {
       try {
         const now = Date.now();
-        // hosted_games.joined is the game's participant count: the
-        // game_participants_sync_count trigger recounts it on every join and
-        // leave, and every card, the map and the pay page read it. g1 is the
-        // game the realtime specs really join and leave, so seed what its roster
-        // holds. A fixed 8 over an empty roster made the first join recount to
-        // 1 and the "N spots" pill jump from 2 to 9 instead of dropping by one.
-        //
         // g1 starts a day out. Leaving inside a game's cancel cutoff (2 hours
         // by default) records a late cancellation against the player, and the
         // realtime specs leave g1 on every run: at 3 hours out, any spec that
         // ran more than an hour after this seed recorded one against the shared
         // fixture player. leaveFreeRun (e2e/helpers/realtime-join.ts) fails if
         // it is ever offered only "Leave anyway". No spec reads g1's start time.
-        const { count: g1Roster, error: g1CountErr } = await admin
-          .from("game_participants")
-          .select("id", { count: "exact", head: true })
-          .eq("game_id", "g1");
-        if (g1CountErr) {
-          console.warn(
-            `[e2e global-setup] Could not count g1's roster (${g1CountErr.message}); seeding joined = 0.`,
-          );
-        }
         const rows = [
           {
             id: "g1",
@@ -332,7 +316,8 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
             location: "Tompkins Square Courts",
             neighborhood: "East Village",
             max_players: 10,
-            joined: g1Roster ?? 0,
+            // Set below from g1's roster once the fixture player is off it.
+            joined: 0,
             skill: "Intermediate",
             price: 0,
             indoor: false,
@@ -380,6 +365,58 @@ export default async function globalSetup(config?: Pick<FullConfig, "webServer">
           );
         }
         const writable = rows.filter((r) => !foreign.has(r.id));
+
+        // Every run starts with the fixture player NOT on g1 or g2. A realtime
+        // spec that fails between its join and its leave leaves the player on
+        // g1, and a retried run then fails every spec that expects a viewer who
+        // has not joined (the invite specs among them). The roster is reset here
+        // rather than trusted to each spec's own cleanup.
+        //
+        // As the service role this records nothing against the player: the late
+        // cancellation and refund triggers act only when auth.uid() is the
+        // player or their guardian, and it is null here. The waitlist trigger can
+        // still tell the next waiting player that a spot opened, as any leave
+        // does. This reset runs before the upsert because the join count trigger
+        // recounts hosted_games.joined on every delete, which would otherwise
+        // overwrite g2's seeded 11.
+        const playerId = accountIds.get("player");
+        const resetIds = writable.map((r) => r.id);
+        if (!playerId) {
+          console.warn(
+            "[e2e global-setup] No fixture player account; not resetting its g1/g2 roster rows.",
+          );
+        } else if (resetIds.length > 0) {
+          const { data: removed, error: resetErr } = await admin
+            .from("game_participants")
+            .delete()
+            .eq("user_id", playerId)
+            .in("game_id", resetIds)
+            .select("id");
+          if (resetErr) {
+            throw new Error(`resetting the fixture player's roster rows: ${resetErr.message}`);
+          }
+          console.log(
+            `[e2e global-setup] Removed ${removed?.length ?? 0} fixture player roster row(s) from g1/g2.`,
+          );
+        }
+
+        // hosted_games.joined is the game's participant count: the
+        // game_participants_sync_count trigger recounts it on every join and
+        // leave, and every card, the map and the pay page read it. g1 is the
+        // game the realtime specs really join and leave, so seed what its roster
+        // holds. A fixed 8 over an empty roster made the first join recount to
+        // 1 and the "N spots" pill jump from 2 to 9 instead of dropping by one.
+        const { count: g1Roster, error: g1CountErr } = await admin
+          .from("game_participants")
+          .select("id", { count: "exact", head: true })
+          .eq("game_id", "g1");
+        if (g1CountErr) {
+          console.warn(
+            `[e2e global-setup] Could not count g1's roster (${g1CountErr.message}); seeding joined = 0.`,
+          );
+        }
+        for (const r of writable) if (r.id === "g1") r.joined = g1Roster ?? 0;
+
         if (writable.length > 0) {
           const { error } = await admin.from("hosted_games").upsert(writable, { onConflict: "id" });
           if (error) throw new Error(error.message);

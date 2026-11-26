@@ -369,7 +369,8 @@ function ensureRealtime() {
   if (realtimeAttached || typeof window === "undefined") return;
   realtimeAttached = true;
   const channel = supabase
-    .channel("hosted_games:all")
+    // Hold SUBSCRIBED until the server is streaming changes, so the catch-up load below runs once they flow.
+    .channel("hosted_games:all", { config: { postgres_changes_options: { wait: true } } })
     .on("postgres_changes", { event: "*", schema: "public", table: "hosted_games" }, (payload) => {
       const newRow = payload.new as DbRow | null;
       const oldRow = payload.old as DbRow | null;

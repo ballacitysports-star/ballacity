@@ -111,6 +111,35 @@ async function onRosterInDb(page: Page, gameId: string): Promise<boolean> {
 }
 
 /**
+ * Take this page's user off the game's roster through the API, for a spec's
+ * finally block. A spec that fails between its join and its leave otherwise
+ * leaves the shared fixture player on g1, and every later spec that expects a
+ * viewer who has not joined fails with it.
+ *
+ * This is the DELETE the app's own leave sends as the user, so the database
+ * treats it the same way. It skips the "Leave anyway" check in leaveFreeRun,
+ * which is safe only because global-setup seeds g1 a day out. Best effort: it
+ * never throws, so it cannot hide the failure that sent the spec to its
+ * finally, and a no-op when the user is not on the roster.
+ */
+export async function leaveIfJoinedViaApi(page: Page, gameId = "g1"): Promise<void> {
+  try {
+    if (page.isClosed()) return;
+    const base = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
+    const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_PUBLISHABLE_KEY;
+    if (!base || !key) return;
+    const { accessToken, userId } = await pageSession(page);
+    await page.request.delete(
+      `${base}/rest/v1/game_participants?game_id=eq.${encodeURIComponent(gameId)}` +
+        `&user_id=eq.${userId}`,
+      { headers: { apikey: key, authorization: `Bearer ${accessToken}` }, timeout: 5_000 },
+    );
+  } catch {
+    /* cleanup only; the spec's own result stands */
+  }
+}
+
+/**
  * Leave first if a previous run (or the other device) left this account on the
  * roster, so the join under test writes a real INSERT.
  *

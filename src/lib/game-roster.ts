@@ -88,8 +88,14 @@ export function useLiveParticipants(gameId: string | undefined): {
       return;
     }
     let cancelled = false;
+    // Loads, numbered as they are sent. Several can be out at once (the load on mount and the reload on SUBSCRIBED,
+    // say) and they can answer in either order: an answer from a load sent earlier is older and must not replace a
+    // later one's.
+    let loadsSent = 0;
+    let newestLoadApplied = 0;
 
     const load = async () => {
+      const loadNo = ++loadsSent;
       const { data, error } = await supabase
         .from("game_participants")
         .select("user_id, created_at, position, attended")
@@ -103,22 +109,30 @@ export function useLiveParticipants(gameId: string | undefined): {
       }
       const rows = (data ?? []) as Row[];
       const profiles = await fetchProfiles(rows.map((r) => r.user_id));
-      if (cancelled) return;
-      // Replace wholesale — this is the authoritative snapshot. Any realtime
+      if (cancelled || loadNo < newestLoadApplied) return;
+      newestLoadApplied = loadNo;
+      // Replace wholesale: this is the authoritative snapshot. Any realtime
       // deltas that arrived during the fetch will be reapplied on the next
       // event; the SUBSCRIBED-triggered reload guarantees we can't miss one.
       setParticipants(rows.map((r) => toParticipant(r, profiles.get(r.user_id))));
       setLoading(false);
     };
     reloadRef.current = load;
+    // Load at once, so the roster shows without waiting for the change stream: with wait (below), SUBSCRIBED comes
+    // only when the server is streaming changes, which a slow server can take seconds to confirm. The reload on
+    // SUBSCRIBED is sent after this load, so its answer is the newer one and wins whichever arrives first.
+    void load();
 
-    // Subscribe FIRST, then fetch the snapshot on the SUBSCRIBED ack (initial
+    // Then subscribe, and fetch the snapshot again on every SUBSCRIBED ack (initial
     // connect AND every reconnect after a network flap). This closes the race
-    // where an INSERT/DELETE fires between the SELECT and the subscribe ack,
-    // and it re-syncs after transient disconnects that would otherwise drop
+    // where an INSERT/DELETE fires between the first SELECT and the subscribe
+    // ack, and it re-syncs after transient disconnects that would otherwise drop
     // events silently.
     const channel = supabase
-      .channel(`game_participants:roster:${gameId}`)
+      // Hold SUBSCRIBED until the server is streaming changes, so the reload on it runs once they flow.
+      .channel(`game_participants:roster:${gameId}`, {
+        config: { postgres_changes_options: { wait: true } },
+      })
       .on(
         "postgres_changes",
         {

@@ -32,6 +32,11 @@ function forgetRow(rowId: string) {
 function markGameChanged(gameId: string) {
   gameChangedAt.set(gameId, ++changeSeq);
 }
+// Roster reads, numbered as they are sent. Two can be out at once (the first load
+// and the catch-up when the channel joins) and they can answer in either order:
+// the answer of a read sent earlier is older and must not undo a later one's.
+let readsSent = 0;
+let newestReadApplied = 0;
 const listeners = new Set<() => void>();
 const STORAGE_KEY = "openrun.joinedGameIds.v1";
 let loaded = false;
@@ -41,6 +46,9 @@ let realtimeAttached = false;
 let currentUserId: string | null = null;
 // Games whose join is being written right now: a refresh must not take them away.
 const inFlight = new Set<string>();
+// Games whose leave is being written right now: a refresh must not put them back. A read sent after the tap can still
+// be served before the DELETE commits, and then it has the row.
+const leaving = new Set<string>();
 let lastHydratedAt = 0;
 const REHYDRATE_AFTER_MS = 30_000;
 const EMPTY_SNAPSHOT = "[]";
@@ -114,6 +122,7 @@ async function hydrateFromDb(userId: string) {
   // INSERT or DELETE): keep it rather than let the older answer undo it.
   const startedAt = changeSeq;
   const newerThanQuery = (seq: number | undefined) => seq !== undefined && seq > startedAt;
+  const readNo = ++readsSent;
   const { data, error } = await supabase
     .from("game_participants")
     .select("id, game_id")
@@ -124,6 +133,8 @@ async function hydrateFromDb(userId: string) {
   }
   // An answer for an account that is no longer the signed-in one (signed out, or switched while the read was out).
   if (userId !== currentUserId) return;
+  if (readNo < newestReadApplied) return;
+  newestReadApplied = readNo;
   lastHydratedAt = Date.now();
   const rows = data ?? [];
   const rowIds = new Set(rows.map((r) => r.id));
@@ -138,7 +149,8 @@ async function hydrateFromDb(userId: string) {
   // for good: the saved list only ever grew. Joins still being written stay, and
   // so does any game whose state changed here while the query was out.
   const onRoster = new Set(rows.map((r) => r.game_id));
-  const settled = (id: string) => !inFlight.has(id) && !newerThanQuery(gameChangedAt.get(id));
+  const settled = (id: string) =>
+    !inFlight.has(id) && !leaving.has(id) && !newerThanQuery(gameChangedAt.get(id));
   Array.from(joined).forEach((id) => {
     if (!onRoster.has(id) && settled(id)) joined.delete(id);
   });
@@ -257,7 +269,12 @@ function attachRealtime(userId: string) {
   if (channel) supabase.removeChannel(channel);
   channelUserId = userId;
   channel = supabase
-    .channel(`game_participants:me:${userId}`)
+    // Without wait, SUBSCRIBED can come before the server is streaming this table's changes, and a change made in
+    // between is never delivered. With it, SUBSCRIBED means the changes are live (servers that do not know the option
+    // ignore it).
+    .channel(`game_participants:me:${userId}`, {
+      config: { postgres_changes_options: { wait: true } },
+    })
     .on(
       "postgres_changes",
       {
@@ -268,7 +285,15 @@ function attachRealtime(userId: string) {
       },
       (payload) => applyRosterChange(payload),
     )
-    .subscribe();
+    .subscribe((status) => {
+      // Every join, the first included: a join or leave made before the subscription was live (on another device
+      // while this page was loading, or while a phone slept) was never delivered, so read the roster again. The first
+      // join repeats the first load's read, which may have been sent before the subscription was live. A channel that
+      // was replaced (sign-out, another account) reads nothing.
+      if (status !== "SUBSCRIBED") return;
+      if (channelUserId !== userId || currentUserId !== userId) return;
+      void hydrateFromDb(userId);
+    });
 }
 
 function ensureRealtime() {
@@ -426,19 +451,32 @@ export function leaveGame(id: string) {
   }
   // Always attempt the DB delete — confirmed players are on the roster
   // even when the local set never tracked them.
+  leaving.add(id);
   void (async () => {
-    const uid = await getCurrentUserId();
-    if (!uid) return;
-    const { error } = await supabase
-      .from("game_participants")
-      .delete()
-      .eq("game_id", id)
-      .eq("user_id", uid);
-    if (error && wasJoined) {
-      // Roll back optimistic local removal on real failure.
-      joined.add(id);
-      saveJoinedGames();
-      emit();
+    try {
+      const uid = await getCurrentUserId();
+      if (!uid) return;
+      const { error } = await supabase
+        .from("game_participants")
+        .delete()
+        .eq("game_id", id)
+        .eq("user_id", uid);
+      if (error) {
+        if (wasJoined) {
+          // Roll back optimistic local removal on real failure.
+          joined.add(id);
+          saveJoinedGames();
+          emit();
+        }
+        return;
+      }
+      // The row is gone now. A read sent before this point may still have seen it, so mark the game as changed here
+      // (in the same step as it stops counting as leaving) and that read cannot put it back.
+      leaving.delete(id);
+      markGameChanged(id);
+    } finally {
+      // Also when signed out, on a failure or a throw: a game left in this set would never be read from the roster again.
+      leaving.delete(id);
     }
   })();
 }

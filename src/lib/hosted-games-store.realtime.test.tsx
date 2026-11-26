@@ -18,6 +18,7 @@ const h = vi.hoisted(() => ({
   byIdReads: [] as Deferred[],
   onChange: null as null | ((payload: unknown) => void),
   onStatus: null as null | ((status: string) => void),
+  opened: [] as { name: string; options: unknown }[],
 }));
 
 vi.mock("@/integrations/supabase/client", () => {
@@ -45,7 +46,10 @@ vi.mock("@/integrations/supabase/client", () => {
   return {
     supabase: {
       from: () => query,
-      channel: () => channel,
+      channel: (name: string, options?: unknown) => {
+        h.opened.push({ name, options });
+        return channel;
+      },
       removeChannel: () => undefined,
       auth: { onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) },
     },
@@ -112,10 +116,22 @@ beforeEach(() => {
   h.byIdReads = [];
   h.onChange = null;
   h.onStatus = null;
+  h.opened = [];
   localStorage.clear();
 });
 
 describe("hosted games store: a read that was out when a realtime change arrived", () => {
+  it("opens its channel holding SUBSCRIBED until the server streams the changes", async () => {
+    // The catch-up read on SUBSCRIBED only covers the changes made before it if the subscription is live by then.
+    await started([row("g1", 3)]);
+    expect(h.opened).toEqual([
+      {
+        name: "hosted_games:all",
+        options: { config: { postgres_changes_options: { wait: true } } },
+      },
+    ]);
+  });
+
   it("does not put back a player count from before a join", async () => {
     const { hook } = await started([row("g1", 3)]);
     expect(hook.result.current.g1).toBe(3);

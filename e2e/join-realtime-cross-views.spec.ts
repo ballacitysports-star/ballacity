@@ -1,6 +1,12 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import { stubRiskAcknowledged } from "./helpers/risk-ack";
-import { ensureNotJoined, joinCta, joinFreeRun, leaveFreeRun } from "./helpers/realtime-join";
+import {
+  ensureNotJoined,
+  joinCta,
+  joinFreeRun,
+  leaveFreeRun,
+  leaveIfJoinedViaApi,
+} from "./helpers/realtime-join";
 import { profileGamesHeading } from "./helpers/realtime-counters";
 
 /**
@@ -139,6 +145,7 @@ test("joining from game detail updates feed, profile, and detail CTA in real tim
 
     await expect(feedCard.getByText(/^Joined$/)).toHaveCount(0, { timeout: 15_000 });
   } finally {
+    await leaveIfJoinedViaApi(detailPage);
     await ctx.close();
   }
 });
