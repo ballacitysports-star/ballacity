@@ -1,6 +1,11 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import { stubRiskAcknowledged } from "./helpers/risk-ack";
-import { ensureNotJoined, joinFreeRun, leaveFreeRun } from "./helpers/realtime-join";
+import {
+  ensureNotJoined,
+  joinFreeRun,
+  leaveFreeRun,
+  leaveIfJoinedViaApi,
+} from "./helpers/realtime-join";
 import {
   mapSpotsPill,
   mapViewUrlFor,
@@ -179,6 +184,7 @@ test("another device joining updates roster + counters on feed, map, detail, pro
       })
       .toBe(beforeRoster);
   } finally {
+    await leaveIfJoinedViaApi(bDetail);
     await deviceA.close();
     await deviceB.close();
   }
