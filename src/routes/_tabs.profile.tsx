@@ -34,7 +34,7 @@ import { computeReputation } from "@/lib/reviews";
 import { useReviewsFor } from "@/lib/reviews-db";
 import { useReviewSubjectIsAdult } from "@/lib/review-subject";
 import { ReputationBadge } from "@/components/ReputationBadge";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { getCurrentUser, useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
@@ -57,6 +57,7 @@ import { LeaveFlowButton } from "@/components/LeaveFlowButton";
 import { MySignups } from "@/components/profile/MySignups";
 import { groupProfileGames } from "@/lib/game-series";
 import { supabase } from "@/integrations/supabase/client";
+import { liveChannel, onLive } from "@/lib/realtime-channel";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -234,6 +235,10 @@ function PlayerProfile() {
     search.req === "host" || search.req === "player" ? search.req : "all";
   const setRequestFilter = (v: "all" | "host" | "player") =>
     profileNav({ search: (p: any) => ({ ...p, req: v === "all" ? "" : v }), replace: true });
+  // Request reads, numbered as they are sent. The read on mount, the one on SUBSCRIBED and those
+  // after each change can be out at once and answer in any order: an answer from a read sent
+  // earlier must not replace a later one's.
+  const requestReads = useRef({ sent: 0, newestApplied: 0 });
   const refreshRequests = async (opts: { silent?: boolean } = {}) => {
     if (!profileUser) {
       setMyRequests([]);
@@ -242,7 +247,10 @@ function PlayerProfile() {
     }
     if (!opts.silent) setRequestsLoading(true);
     try {
+      const readNo = ++requestReads.current.sent;
       const [mine, hosted] = await Promise.all([listMyJoinRequests(), listHostJoinRequests()]);
+      if (readNo < requestReads.current.newestApplied) return;
+      requestReads.current.newestApplied = readNo;
       setMyRequests(mine);
       setHostRequests(hosted);
     } catch {
@@ -274,8 +282,9 @@ function PlayerProfile() {
         return next;
       });
     };
-    const ch = supabase
-      .channel(`profile-join-requests-${profileUser.id}`)
+    // join_requests is in the supabase_realtime publication, so the join can wait until its
+    // changes are live.
+    const ch = liveChannel(`profile-join-requests-${profileUser.id}`)
       .on(
         "postgres_changes",
         {
@@ -307,7 +316,9 @@ function PlayerProfile() {
           refreshRequests({ silent: true });
         },
       )
-      .subscribe();
+      // The read on mount may have been answered before the changes were live, and changes made
+      // while the channel was down are not replayed: read the requests again on every SUBSCRIBED.
+      .subscribe(onLive(() => void refreshRequests({ silent: true })));
     return () => {
       supabase.removeChannel(ch);
     };
@@ -349,14 +360,21 @@ function PlayerProfile() {
       return;
     }
     let cancelled = false;
-    const load = () =>
-      supabase
+    // Loads, numbered as they are sent. The load on mount, the one on SUBSCRIBED and those after
+    // each change can be out at once and answer in any order: an answer from a load sent earlier
+    // must not replace a later one's.
+    let loadsSent = 0;
+    let newestLoadApplied = 0;
+    const load = () => {
+      const loadNo = ++loadsSent;
+      return supabase
         .from("highlight_reels")
         .select(RECAP_COLUMNS)
         .eq("user_id", profileUser.id)
         .order("created_at", { ascending: false })
         .then(({ data }) => {
-          if (cancelled) return;
+          if (cancelled || loadNo < newestLoadApplied) return;
+          newestLoadApplied = loadNo;
           const rows = (data ?? []) as RecapSummary[];
           setAllRecaps(rows);
           const map: Record<string, RecapSummary[]> = {};
@@ -366,11 +384,12 @@ function PlayerProfile() {
           });
           setRecapsByGame(map);
         });
+    };
     load();
 
-    // Live progress: pipeline updates land as UPDATEs on the user's own rows.
-    const channel = supabase
-      .channel(`recaps-${profileUser.id}`)
+    // Live progress: pipeline updates land as UPDATEs on the user's own rows. highlight_reels is in
+    // the supabase_realtime publication, so the join can wait until its changes are live.
+    const channel = liveChannel(`recaps-${profileUser.id}`)
       .on(
         "postgres_changes",
         {
@@ -387,7 +406,9 @@ function PlayerProfile() {
           load();
         },
       )
-      .subscribe();
+      // The load on mount may have been answered before the changes were live, and changes made
+      // while the channel was down are not replayed: load again on every SUBSCRIBED.
+      .subscribe(onLive(() => void load()));
 
     return () => {
       cancelled = true;

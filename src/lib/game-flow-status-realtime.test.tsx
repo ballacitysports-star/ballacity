@@ -4,16 +4,24 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 
 // A stand-in for the realtime client that behaves like the real one: asking for a topic that is
 // already in use returns the existing channel, and adding a postgres_changes listener to a
-// channel that has been subscribed throws.
+// channel that has been subscribed throws. It also keeps the options each channel was opened with and the status
+// handler passed to subscribe, so a test can play SUBSCRIBED.
 const realtime = vi.hoisted(() => {
-  type Chan = { topic: string; subscribed: boolean; on: unknown; subscribe: unknown };
+  type Chan = {
+    topic: string;
+    subscribed: boolean;
+    on: unknown;
+    subscribe: unknown;
+    options?: unknown;
+    status?: (status: string, err?: Error) => void;
+  };
   const channels = new Map<string, Chan>();
   const topics: string[] = [];
-  const channel = (topic: string): Chan => {
+  const channel = (topic: string, options?: unknown): Chan => {
     topics.push(topic);
     const existing = channels.get(topic);
     if (existing) return existing;
-    const c: Chan = { topic, subscribed: false, on: null, subscribe: null };
+    const c: Chan = { topic, subscribed: false, on: null, subscribe: null, options };
     c.on = (type: string) => {
       if (c.subscribed && type === "postgres_changes") {
         throw new Error(
@@ -22,7 +30,8 @@ const realtime = vi.hoisted(() => {
       }
       return c;
     };
-    c.subscribe = () => {
+    c.subscribe = (cb?: (status: string, err?: Error) => void) => {
+      c.status = cb;
       c.subscribed = true;
       return c;
     };
@@ -52,13 +61,17 @@ vi.mock("@/integrations/supabase/client", () => {
   };
 });
 
-const reads = vi.hoisted(() => ({ requests: 0 }));
+// `answer`, when set, decides what each getMyJoinRequest read (numbered from 1) answers, and when.
+const reads = vi.hoisted(() => ({
+  requests: 0,
+  answer: null as null | ((n: number) => Promise<unknown>),
+}));
 
 vi.mock("@/lib/payments", () => ({
   getGamePaymentSettings: async () => null,
   getMyJoinRequest: async () => {
     reads.requests += 1;
-    return null;
+    return reads.answer ? reads.answer(reads.requests) : null;
   },
   listMySubmissionsForGame: async () => [],
 }));
@@ -70,6 +83,7 @@ const GAME = "host-mvli8ois-0sa6";
 afterEach(() => {
   cleanup();
   reads.requests = 0;
+  reads.answer = null;
   realtime.channels.clear();
   realtime.topics.length = 0;
 });
@@ -112,5 +126,60 @@ describe("refreshMyFlowStatus", () => {
     act(() => refreshMyFlowStatus(GAME));
     await new Promise((r) => setTimeout(r, 20));
     expect(reads.requests).toBe(3);
+  });
+});
+
+describe("useMyFlowStatus catch-up once changes are live", () => {
+  const onlyChannel = () => {
+    expect(realtime.channels.size).toBe(1);
+    return [...realtime.channels.values()][0]!;
+  };
+
+  it("opens its channel holding SUBSCRIBED until the server streams the changes", async () => {
+    renderHook(() => useMyFlowStatus(GAME));
+    await waitFor(() => expect(realtime.topics.length).toBe(1));
+    expect(onlyChannel().options).toStrictEqual({
+      config: { postgres_changes_options: { wait: true } },
+    });
+  });
+
+  it("re-reads on every SUBSCRIBED, and not on other statuses", async () => {
+    renderHook(() => useMyFlowStatus(GAME));
+    await waitFor(() => expect(reads.requests).toBe(1));
+    const chan = onlyChannel();
+    // The read on mount may have been answered before changes were live.
+    act(() => chan.status!("SUBSCRIBED"));
+    await waitFor(() => expect(reads.requests).toBe(2));
+    act(() => chan.status!("CHANNEL_ERROR"));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(reads.requests).toBe(2);
+    // A rejoin after a drop: changes made while it was down are not replayed.
+    act(() => chan.status!("SUBSCRIBED"));
+    await waitFor(() => expect(reads.requests).toBe(3));
+  });
+
+  it("an older read answering last does not replace a newer one", async () => {
+    let releaseFirst: () => void = () => {};
+    const firstHeld = new Promise<void>((r) => {
+      releaseFirst = r;
+    });
+    const request = (status: "pending" | "approved") => ({ id: "jr-1", game_id: GAME, status });
+    // The read on mount saw the request still pending, but answers only after the catch-up.
+    reads.answer = async (n) => {
+      if (n === 1) {
+        await firstHeld;
+        return request("pending");
+      }
+      return request("approved");
+    };
+    const { result } = renderHook(() => useMyFlowStatus(GAME));
+    await waitFor(() => expect(reads.requests).toBe(1));
+    act(() => onlyChannel().status!("SUBSCRIBED"));
+    await waitFor(() => expect(result.current.status).toBe("confirmed"));
+    await act(async () => {
+      releaseFirst();
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(result.current.status).toBe("confirmed");
   });
 });

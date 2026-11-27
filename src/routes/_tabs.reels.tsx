@@ -55,6 +55,7 @@ import { useMyPrivacy } from "@/lib/privacy";
 import { AI_RESULTS_CAVEAT } from "@/lib/ai-video-privacy";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { liveChannel, onLive } from "@/lib/realtime-channel";
 import { validateVideoSize } from "@/lib/video-validation";
 import { finalizeVideoUpload, getMyClipLimits } from "@/lib/media-uploads.functions";
 import {
@@ -846,16 +847,25 @@ function ReelsPage() {
     if (!user) return;
     const env = getBillingEnvironment();
     let cancelled = false;
-    const load = () =>
-      supabase
+    // Loads, numbered as they are sent. The load on mount and the one on SUBSCRIBED can both be
+    // out and answer in either order: an answer from a load sent earlier must not replace a later
+    // one's.
+    let loadsSent = 0;
+    let newestLoadApplied = 0;
+    const load = () => {
+      const loadNo = ++loadsSent;
+      return supabase
         .from("highlight_reels")
         .select("*")
         .eq("user_id", user.id)
         .eq("environment", env)
         .order("created_at", { ascending: false })
         .then(({ data }) => {
-          if (!cancelled) setReels((data as Reel[]) ?? []);
+          if (cancelled || loadNo < newestLoadApplied) return;
+          newestLoadApplied = loadNo;
+          setReels((data as Reel[]) ?? []);
         });
+    };
     load();
 
     /** Applies one live row change in place so the card updates without a refetch. */
@@ -871,9 +881,9 @@ function ReelsPage() {
       });
     };
 
-    // Live pipeline progress for this user's reels.
-    const channel = supabase
-      .channel(`my-reels-${user.id}`)
+    // Live pipeline progress for this user's reels. highlight_reels is in the supabase_realtime
+    // publication, so the join can wait until its changes are live.
+    const channel = liveChannel(`my-reels-${user.id}`)
       .on(
         "postgres_changes",
         {
@@ -891,7 +901,10 @@ function ReelsPage() {
           applyRow(row, payload.eventType);
         },
       )
-      .subscribe();
+      // Changes are applied as deltas, so one made after the load on mount read the list but
+      // before the changes were live, or while the channel was down, would be missing until the
+      // next load: load the list again on every SUBSCRIBED, the first included.
+      .subscribe(onLive(() => void load()));
 
     return () => {
       cancelled = true;

@@ -47,6 +47,7 @@ import { needsRiskAcknowledgment, RISK_ACKNOWLEDGMENT } from "@/lib/safety";
 import { recordSafetyAck, useSafetyAck } from "@/lib/safety-acks";
 import { planRiskAckTap, riskAckReadFrom, settleRiskAckTap } from "@/lib/risk-ack-tap";
 import { createLocalWriteGuard } from "@/lib/local-write-guard";
+import { claimNewestRead, newReadOrder } from "@/lib/read-order";
 import {
   GAME_FULL_MESSAGE,
   INVITE_EXPIRED_MESSAGE,
@@ -415,6 +416,12 @@ function GameDetail() {
   const [myReqGuard] = useState(createLocalWriteGuard);
   const [mySubsGuard] = useState(createLocalWriteGuard);
   const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
+  // The host's request list, the settings and the removal record are each replaced wholesale by
+  // reads that can overlap (on mount, on a change, and on every SUBSCRIBED of the live channels),
+  // so only the newest read sent may land (src/lib/read-order.ts).
+  const [hostReqReads] = useState(newReadOrder);
+  const [settingsReads] = useState(newReadOrder);
+  const [removedReads] = useState(newReadOrder);
   const [messaging, setMessaging] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [editOpen, _setEditOpen] = useState(urlModal === "edit");
@@ -620,6 +627,8 @@ function GameDetail() {
     if (leavingRef.current) return;
     const reqTicket = myReqGuard.beginRead();
     const subsTicket = mySubsGuard.beginRead();
+    const settingsReadNo = ++settingsReads.sent;
+    const removedReadNo = ++removedReads.sent;
     try {
       // The settings decide the join button, so they land as soon as they arrive;
       // the viewer's own rows are not waited for (see loadGameViewerStatus).
@@ -629,11 +638,15 @@ function GameDetail() {
         req,
         removed,
       } = await loadGameViewerStatus(game.id, (early) => {
-        if (!leavingRef.current) setSettings(early);
+        if (!leavingRef.current && claimNewestRead(settingsReads, settingsReadNo)) {
+          setSettings(early);
+        }
       });
       if (leavingRef.current) return;
-      setSettings(s);
-      setRemovedRecorded(removed);
+      if (claimNewestRead(settingsReads, settingsReadNo)) setSettings(s);
+      // Ordered apart from the settings: a newer read whose settings landed early can still fail
+      // before its removal record arrives, and then this older record is the newest one.
+      if (claimNewestRead(removedReads, removedReadNo)) setRemovedRecorded(removed);
       // The viewer's own rows land only if the page has not written them since
       // this read went out: a read sent before a Request Spot tap would answer
       // "no request" and wipe the pending request the tap just showed.
@@ -677,8 +690,10 @@ function GameDetail() {
   const refreshHostRequests = async () => {
     if (!game || !user) return;
     if (!hostsThisGame && (!settings || user.id !== settings.host_id)) return;
+    const readNo = ++hostReqReads.sent;
     try {
       const all = await listHostJoinRequests();
+      if (!claimNewestRead(hostReqReads, readNo)) return;
       setHostRequests(all.filter((r) => r.game_id === game.id));
     } catch {}
   };

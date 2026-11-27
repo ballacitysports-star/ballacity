@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { liveChannel, onLive } from "@/lib/realtime-channel";
 import { useAuth } from "@/hooks/use-auth";
 import { isAllowed } from "@/lib/notification-prefs";
 import { openDeepLink } from "@/lib/deep-links";
@@ -128,10 +129,18 @@ export function useUnreadNotificationCountState(
     }
     let cancelled = false;
     setCount(null);
+    // Reads, numbered as they are sent. The read on mount, the one on SUBSCRIBED and one per event can be out at
+    // once and answer in either order: an older count must not replace a newer one.
+    let readsSent = 0;
+    let newestReadApplied = 0;
     const fetchCount = async () => {
+      const readNo = ++readsSent;
       try {
         const c = await countUnreadNotifications(user.id, { excludeType });
-        if (!cancelled) setCount(c);
+        if (!cancelled && readNo > newestReadApplied) {
+          newestReadApplied = readNo;
+          setCount(c);
+        }
       } catch {
         // Keep the last known count (or null, "unknown"): a failed read is not "nothing unread".
       }
@@ -139,14 +148,19 @@ export function useUnreadNotificationCountState(
     fetchRef.current = () => void fetchCount();
     fetchCount();
 
-    const channel = supabase
-      .channel(`notif-count-${scope}${user.id}`)
+    const channel = liveChannel(`notif-count-${scope}${user.id}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
         fetchCount,
       )
-      .subscribe();
+      // Count again on every SUBSCRIBED, the first included: the read on mount may have been answered before
+      // changes were live, and changes made while the channel was down are not replayed.
+      .subscribe(
+        onLive(() => {
+          if (!cancelled) void fetchCount();
+        }),
+      );
     return () => {
       cancelled = true;
       fetchRef.current = () => {};
@@ -172,25 +186,35 @@ export function useUnreadMessageCount() {
       return;
     }
     let cancelled = false;
+    // Numbered as sent, so an older count answering last cannot replace a newer one.
+    let readsSent = 0;
+    let newestReadApplied = 0;
     const fetchCount = async () => {
+      const readNo = ++readsSent;
       const { count: c } = await supabase
         .from("notifications" as any)
         .select("*", { count: "exact", head: true })
         .eq("user_id", user.id)
         .eq("type", "message")
         .is("read_at", null);
-      if (!cancelled) setCount(c ?? 0);
+      if (cancelled || readNo < newestReadApplied) return;
+      newestReadApplied = readNo;
+      setCount(c ?? 0);
     };
     fetchCount();
 
-    const channel = supabase
-      .channel(`notif-msg-count-${user.id}`)
+    const channel = liveChannel(`notif-msg-count-${user.id}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
         fetchCount,
       )
-      .subscribe();
+      // Count again on every SUBSCRIBED, the first included, for the same reason as the hook above.
+      .subscribe(
+        onLive(() => {
+          if (!cancelled) void fetchCount();
+        }),
+      );
     return () => {
       cancelled = true;
       supabase.removeChannel(channel);
@@ -309,8 +333,10 @@ export function useNotificationPush() {
     let active = true;
     // Track grouped message counts per conversation (resets on unmount/page reload)
     const messageGroups = new Map<string, number>();
-    const channel = supabase
-      .channel(`notif-push-${user.id}`)
+    // wait makes SUBSCRIBED mean inserts are being delivered. There is no catch-up on SUBSCRIBED: this channel only
+    // pops a toast per new row, so re-reading would pop old ones again. A row missed before the stream was live
+    // still shows up through the list and count channels, which do re-read.
+    const channel = liveChannel(`notif-push-${user.id}`)
       .on(
         "postgres_changes",
         {

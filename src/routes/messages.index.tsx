@@ -15,6 +15,7 @@ import {
 import { UserAvatarById } from "@/components/UserAvatar";
 import { usePrefetchUserAvatars } from "@/lib/user-avatars";
 import { supabase } from "@/integrations/supabase/client";
+import { liveChannel, onLive } from "@/lib/realtime-channel";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
 import { TeamInvitesInbox } from "@/components/team/TeamInvitesInbox";
 import { useUnreadNotificationCount } from "@/lib/notifications";
@@ -74,35 +75,43 @@ function MessagesInbox() {
       return;
     }
     let cancelled = false;
+    // Loads, numbered as they are sent. The load on mount, the reload on
+    // SUBSCRIBED and one per event can be out at once and answer in either
+    // order, and each replaces the list: an older answer must not replace a
+    // newer one.
+    let loadsSent = 0;
+    let newestLoadApplied = 0;
     const load = async () => {
+      const loadNo = ++loadsSent;
       try {
         const data = await listMyConversations();
-        if (!cancelled) {
+        if (!cancelled && loadNo > newestLoadApplied) {
+          newestLoadApplied = loadNo;
           setConvs(data);
           setLoadFailed(false);
         }
       } catch {
         // Keep what is already on screen on a refresh; only a first load that
-        // fails needs the retry state.
-        if (!cancelled) setLoadFailed(true);
+        // fails needs the retry state. A failure does not count as the newest
+        // answer, and never overrides a newer load that succeeded.
+        if (!cancelled && loadNo > newestLoadApplied) setLoadFailed(true);
       } finally {
         if (!cancelled) setFetching(false);
       }
     };
     load();
-    let hasSubscribed = false;
-    const channel = supabase
-      .channel(`inbox-${user.id}`)
+    const channel = liveChannel(`inbox-${user.id}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, load)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages" }, load)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "conversations" }, load)
-      .subscribe((status) => {
-        // Joined again after a drop: events in the gap never arrived.
-        if (status === "SUBSCRIBED") {
-          if (hasSubscribed) void load();
-          hasSubscribed = true;
-        }
-      });
+      // Reload on every SUBSCRIBED, the first included: the load on mount may
+      // have been answered before changes were live, and after a drop the
+      // events in the gap never arrived.
+      .subscribe(
+        onLive(() => {
+          if (!cancelled) void load();
+        }),
+      );
     const onVisible = () => {
       if (document.visibilityState === "visible") void load();
     };

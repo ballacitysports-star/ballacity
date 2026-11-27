@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { liveChannel, onLive } from "@/lib/realtime-channel";
 
 type PayloadRow = { game_id?: string; player_id?: string } | null;
 
@@ -24,6 +25,11 @@ type PayloadRow = { game_id?: string; player_id?: string } | null;
  * Callbacks are stored in a ref so subscriptions do not churn when the
  * caller re-renders with new closures; only id/host changes cause
  * unsubscribe + resubscribe.
+ *
+ * Each channel holds SUBSCRIBED until the server streams its changes
+ * (liveChannel) and calls its change callback on every SUBSCRIBED, the first
+ * included: the caller's load on mount may have been answered before changes
+ * were live, and changes made while a channel was down are not replayed.
  */
 export function useGameRealtimeChannels(params: {
   gameId: string | undefined;
@@ -42,8 +48,7 @@ export function useGameRealtimeChannels(params: {
   // Host-only: join_requests for this game.
   useEffect(() => {
     if (!gameId || !userId || !hostsThisGame) return;
-    const channel = supabase
-      .channel(`join_requests:host:${gameId}:${userId}`)
+    const channel = liveChannel(`join_requests:host:${gameId}:${userId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "join_requests", filter: `game_id=eq.${gameId}` },
@@ -53,11 +58,16 @@ export function useGameRealtimeChannels(params: {
           cbs.current.onHostJoinRequestChange();
         },
       )
-      .subscribe((status: string) => {
-        if (status !== "SUBSCRIBED") {
-          console.warn(`[realtime] join_requests:host channel status: ${status}`);
-        }
-      });
+      .subscribe(
+        onLive(
+          () => cbs.current.onHostJoinRequestChange(),
+          (status) => {
+            if (status !== "SUBSCRIBED") {
+              console.warn(`[realtime] join_requests:host channel status: ${status}`);
+            }
+          },
+        ),
+      );
     return () => {
       supabase.removeChannel(channel);
     };
@@ -66,8 +76,7 @@ export function useGameRealtimeChannels(params: {
   // Viewer-scoped: my join_request status for this game.
   useEffect(() => {
     if (!gameId || !userId) return;
-    const channel = supabase
-      .channel(`join_requests:me:${gameId}:${userId}`)
+    const channel = liveChannel(`join_requests:me:${gameId}:${userId}`)
       .on(
         "postgres_changes",
         {
@@ -83,11 +92,16 @@ export function useGameRealtimeChannels(params: {
           }
         },
       )
-      .subscribe((status: string) => {
-        if (status !== "SUBSCRIBED") {
-          console.warn(`[realtime] join_requests:me channel status: ${status}`);
-        }
-      });
+      .subscribe(
+        onLive(
+          () => cbs.current.onMyJoinRequestChange(),
+          (status) => {
+            if (status !== "SUBSCRIBED") {
+              console.warn(`[realtime] join_requests:me channel status: ${status}`);
+            }
+          },
+        ),
+      );
     return () => {
       supabase.removeChannel(channel);
     };
@@ -96,8 +110,7 @@ export function useGameRealtimeChannels(params: {
   // Game-scoped (public): payment settings.
   useEffect(() => {
     if (!gameId) return;
-    const channel = supabase
-      .channel(`game_payment_settings:${gameId}`)
+    const channel = liveChannel(`game_payment_settings:${gameId}`)
       .on(
         "postgres_changes",
         {
@@ -112,11 +125,16 @@ export function useGameRealtimeChannels(params: {
           cbs.current.onSettingsChange();
         },
       )
-      .subscribe((status: string) => {
-        if (status !== "SUBSCRIBED") {
-          console.warn(`[realtime] game_payment_settings channel status: ${status}`);
-        }
-      });
+      .subscribe(
+        onLive(
+          () => cbs.current.onSettingsChange(),
+          (status) => {
+            if (status !== "SUBSCRIBED") {
+              console.warn(`[realtime] game_payment_settings channel status: ${status}`);
+            }
+          },
+        ),
+      );
     return () => {
       supabase.removeChannel(channel);
     };
@@ -125,8 +143,7 @@ export function useGameRealtimeChannels(params: {
   // Viewer-scoped: my payment submission for this game.
   useEffect(() => {
     if (!gameId || !userId) return;
-    const channel = supabase
-      .channel(`payment_submissions:me:${gameId}:${userId}`)
+    const channel = liveChannel(`payment_submissions:me:${gameId}:${userId}`)
       .on(
         "postgres_changes",
         {
@@ -142,11 +159,16 @@ export function useGameRealtimeChannels(params: {
           cbs.current.onMyPaymentChange();
         },
       )
-      .subscribe((status: string) => {
-        if (status !== "SUBSCRIBED") {
-          console.warn(`[realtime] payment_submissions:me channel status: ${status}`);
-        }
-      });
+      .subscribe(
+        onLive(
+          () => cbs.current.onMyPaymentChange(),
+          (status) => {
+            if (status !== "SUBSCRIBED") {
+              console.warn(`[realtime] payment_submissions:me channel status: ${status}`);
+            }
+          },
+        ),
+      );
     return () => {
       supabase.removeChannel(channel);
     };

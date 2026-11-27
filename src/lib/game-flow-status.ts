@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getCurrentUserId } from "@/lib/current-user-id";
+import { liveChannel, onLive } from "@/lib/realtime-channel";
 import {
   getGamePaymentSettings,
   getMyJoinRequest,
@@ -267,9 +268,16 @@ export function useMyFlowStatus(gameId: string | undefined): {
     }
     let cancelled = false;
     const knownRowIds = new Set<string>();
+    // Reads, numbered as they are sent. Several can be out at once (the read on mount, the one on SUBSCRIBED, one per
+    // change) and they can answer in either order: an answer from a read sent earlier is older and must not replace
+    // a later one's.
+    let loadsSent = 0;
+    let newestLoadApplied = 0;
     const reload = async () => {
+      const loadNo = ++loadsSent;
       const inputs = await fetchFlowInputs(gameId, userId);
-      if (cancelled) return;
+      if (cancelled || loadNo < newestLoadApplied) return;
+      newestLoadApplied = loadNo;
       // Keep ids seen earlier too: a DELETE arrives after the row is gone.
       inputs.rowIds.forEach((id) => knownRowIds.add(id));
       setSettings(inputs.settings);
@@ -285,8 +293,8 @@ export function useMyFlowStatus(gameId: string | undefined): {
       if (flowChangeConcernsGame(p, gameId, knownRowIds)) void reload();
     };
 
-    const chan = supabase
-      .channel(`flow-status:${gameId}:${userId}:${++flowChannelSeq}`)
+    // Every table here is in the supabase_realtime publication, so the join can wait for the change stream.
+    const chan = liveChannel(`flow-status:${gameId}:${userId}:${++flowChannelSeq}`)
       .on(
         "postgres_changes",
         {
@@ -317,7 +325,9 @@ export function useMyFlowStatus(gameId: string | undefined): {
         },
         onChange,
       )
-      .subscribe();
+      // Read again on every SUBSCRIBED: the read on mount may have been answered before changes were live, and
+      // changes made while the channel was down are not replayed.
+      .subscribe(onLive(reloadNow));
 
     return () => {
       cancelled = true;

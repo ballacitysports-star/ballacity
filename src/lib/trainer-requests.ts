@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { liveChannel, onLive } from "@/lib/realtime-channel";
 
 export type TrainerRequestStatus = "pending" | "accepted" | "declined" | "cancelled" | "completed";
 
@@ -176,8 +177,9 @@ export function subscribeToMyTrainerRequests(userId: string, onChange: () => voi
   if (!entry) {
     const listeners = new Set<() => void>();
     const fanout = () => listeners.forEach((cb) => cb());
-    const channel = supabase
-      .channel(`trainer-requests-${userId}`)
+    // trainer_session_requests is in the supabase_realtime publication, so the join can wait for
+    // its changes to be live.
+    const channel = liveChannel(`trainer-requests-${userId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: TABLE, filter: `from_user_id=eq.${userId}` },
@@ -188,7 +190,9 @@ export function subscribeToMyTrainerRequests(userId: string, onChange: () => voi
         { event: "*", schema: "public", table: TABLE, filter: `to_user_id=eq.${userId}` },
         fanout,
       )
-      .subscribe();
+      // Every listener read on mount, maybe before the changes were live, and changes made while
+      // the channel was down are not replayed: have each read again on every SUBSCRIBED.
+      .subscribe(onLive(fanout));
     entry = { channel, listeners };
     sharedSubs.set(userId, entry);
   }

@@ -22,6 +22,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { useAuth } from "@/hooks/use-auth";
 import { useMyChildStatus } from "@/lib/child-safety";
 import { supabase } from "@/integrations/supabase/client";
+import { liveChannel, onLive } from "@/lib/realtime-channel";
 import { formatWhen } from "@/lib/format";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuthSearchHere } from "@/lib/auth-return";
@@ -70,10 +71,11 @@ export function PostEngagement({ subjectType, subjectId }: Props) {
     enabled: !!user,
   });
 
-  // Realtime — invalidate on any change
+  // Realtime: invalidate on any change. post_comments and post_reactions are both in the
+  // supabase_realtime publication, so the join waits until their changes are live, signed in or not
+  // (a signed-out join that waits on both tables went live on the staging project, 2026-11-27).
   useEffect(() => {
-    const channel = supabase
-      .channel(`engagement:${subjectType}:${subjectId}`)
+    const channel = liveChannel(`engagement:${subjectType}:${subjectId}`)
       .on(
         "postgres_changes",
         {
@@ -97,7 +99,15 @@ export function PostEngagement({ subjectType, subjectId }: Props) {
           qc.invalidateQueries({ queryKey: myReactionsKey });
         },
       )
-      .subscribe();
+      // The queries on mount may have been answered before the changes were live, and changes made
+      // while the channel was down are not replayed, so read all three again on every SUBSCRIBED.
+      .subscribe(
+        onLive(() => {
+          void qc.invalidateQueries({ queryKey: commentsKey });
+          void qc.invalidateQueries({ queryKey: reactionsKey });
+          void qc.invalidateQueries({ queryKey: myReactionsKey });
+        }),
+      );
     return () => {
       supabase.removeChannel(channel);
     };

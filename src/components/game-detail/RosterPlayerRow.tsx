@@ -22,12 +22,7 @@ import { useReviewsFor } from "@/lib/reviews-db";
 import { subscribeGamePaymentChanges } from "@/lib/game-payment-channel";
 import { toast } from "sonner";
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  getSignedProofUrl,
-  hostRemovePlayer,
-  reviewJoinRequest,
-  type JoinRequest,
-} from "@/lib/payments";
+import { getSignedProofUrl, hostRemovePlayer, type JoinRequest } from "@/lib/payments";
 import { reviewPaymentAction } from "@/lib/payments.functions";
 import { PAID_NOT_PLACED_MESSAGE } from "@/lib/payments-policy";
 import { playAttentionPing } from "@/lib/attention-ping";
@@ -375,6 +370,9 @@ export function RosterPlayerRow({
     }
   };
 
+  // The same host_remove_player as Remove, so the removal is recorded (game_removals) and the player stays out, then the
+  // account block. Only a failed removal puts the row back: once the call has answered, the removal is committed and the
+  // client cannot undo it, so whatever happens after that (the notice, the block) never rolls back.
   const removeAndBlock = async () => {
     if (
       !confirm(
@@ -385,13 +383,15 @@ export function RosterPlayerRow({
     setBusy(true);
     const rollback = onOptimistic(req.id, "rejected");
     try {
-      await reviewJoinRequest(req.id, "rejected", "Blocked by host", { removing: true });
-      const { error: delErr } = await supabase
-        .from("game_participants")
-        .delete()
-        .eq("game_id", req.game_id)
-        .eq("user_id", req.player_id);
-      if (delErr) throw delErr;
+      const removeErr = await hostRemovePlayer(req.game_id, req.player_id);
+      if (removeErr) throw removeErr;
+    } catch (e: unknown) {
+      rollback();
+      toast.error(userErrorMessage(e, "Couldn't remove this player. Please try again."));
+      setBusy(false);
+      return;
+    }
+    try {
       await createNotification({
         user_id: req.player_id,
         type: "join_declined",
@@ -399,10 +399,13 @@ export function RosterPlayerRow({
         body: "The host removed you from this game.",
         link: `/games/${req.game_id}`,
       });
-      await blockPlayer(req.player_id, name);
+      await blockPlayer(req.player_id, name, "removed");
     } catch (e: unknown) {
-      rollback();
-      toast.error(userErrorMessage(e, "Couldn't block this player. Please try again."));
+      // Both report their own failures today; this keeps a future throw from escaping or undoing the removal. A throw
+      // from the notice means the block never ran, so the sentence still holds.
+      toast.error(
+        `Removed, but couldn't block ${name}. ${userErrorMessage(e, "Try again from their profile.")}`,
+      );
     } finally {
       setBusy(false);
     }

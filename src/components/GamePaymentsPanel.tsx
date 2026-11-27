@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
@@ -19,6 +19,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { withManagedProfileNames } from "@/lib/managed-profile-names";
 import { getCurrentUserId } from "@/lib/current-user-id";
+import { liveChannel, onLive } from "@/lib/realtime-channel";
 import {
   listMySubmissionsForGame,
   getSignedProofUrl,
@@ -100,6 +101,27 @@ let paymentsTopicSeq = 0;
 function freshPaymentsTopic(base: string): string {
   paymentsTopicSeq += 1;
   return `${base}:${paymentsTopicSeq}`;
+}
+
+/**
+ * Send order for a panel's loads. Several can be out at once (the load on mount, the one on SUBSCRIBED, one per
+ * change or action) and they can answer in either order; each replaces the list wholesale, so an answer from a load
+ * sent earlier is older and must not replace a later one's.
+ */
+function useLoadOrder(): { send: () => number; isNewest: (loadNo: number) => boolean } {
+  const order = useRef({ sent: 0, newestApplied: 0 });
+  return useMemo(
+    () => ({
+      send: () => ++order.current.sent,
+      // True when no later load has been applied yet, and records this one as applied.
+      isNewest: (loadNo: number) => {
+        if (loadNo < order.current.newestApplied) return false;
+        order.current.newestApplied = loadNo;
+        return true;
+      },
+    }),
+    [],
+  );
 }
 
 function fmtWhen(iso: string | null): string {
@@ -382,8 +404,10 @@ export function HostPaymentsPanel({
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>("pending");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const loadOrder = useLoadOrder();
 
   const load = async () => {
+    const loadNo = loadOrder.send();
     try {
       const { data, error } = await supabase
         .from("payment_submissions")
@@ -414,6 +438,7 @@ export function HostPaymentsPanel({
           };
         }
       }
+      if (!loadOrder.isNewest(loadNo)) return;
       setRows(
         subs.map((s) => ({
           ...s,
@@ -431,8 +456,8 @@ export function HostPaymentsPanel({
 
   useEffect(() => {
     void load();
-    const ch = supabase
-      .channel(freshPaymentsTopic(`host_payments:${gameId}`))
+    // payment_submissions is in the supabase_realtime publication, so the join can wait for the change stream.
+    const ch = liveChannel(freshPaymentsTopic(`host_payments:${gameId}`))
       .on(
         "postgres_changes",
         {
@@ -443,7 +468,9 @@ export function HostPaymentsPanel({
         },
         () => load(),
       )
-      .subscribe();
+      // Load again on every SUBSCRIBED: the load on mount may have been answered before changes were live, and
+      // changes made while the channel was down are not replayed.
+      .subscribe(onLive(() => void load()));
     return () => {
       void supabase.removeChannel(ch);
     };
@@ -832,9 +859,13 @@ export function PlayerPaymentsPanel({
   const [subs, setSubs] = useState<PaymentSubmission[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const loadOrder = useLoadOrder();
+
   const load = async () => {
+    const loadNo = loadOrder.send();
     try {
       const list = await listMySubmissionsForGame(gameId);
+      if (!loadOrder.isNewest(loadNo)) return;
       setSubs(list);
     } catch (e: any) {
       toast.error(userErrorMessage(e, "Couldn't load your payments. Please try again."));
@@ -852,8 +883,8 @@ export function PlayerPaymentsPanel({
     void (async () => {
       const uid = await getCurrentUserId();
       if (cancelled || !uid) return;
-      ch = supabase
-        .channel(freshPaymentsTopic(`my_payments:${gameId}:${uid}`))
+      // payment_submissions is in the supabase_realtime publication, so the join can wait for the change stream.
+      ch = liveChannel(freshPaymentsTopic(`my_payments:${gameId}:${uid}`))
         .on(
           "postgres_changes",
           {
@@ -868,7 +899,9 @@ export function PlayerPaymentsPanel({
             load();
           },
         )
-        .subscribe();
+        // Load again on every SUBSCRIBED: the load on mount went out before the user id was even known, so it may
+        // have been answered long before changes were live.
+        .subscribe(onLive(() => void load()));
     })();
     return () => {
       cancelled = true;

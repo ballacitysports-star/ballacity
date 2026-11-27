@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Building2, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { liveChannel, onLive } from "@/lib/realtime-channel";
 
 type PlayerOrgRow = {
   id: string;
@@ -31,6 +32,10 @@ type PlayerOrgRow = {
  * FULL, so its filtered DELETEs do arrive. Here deletes are watched unfiltered
  * instead, which delivers every membership's DELETE as `{ id }` only (row-level
  * security strips the rest), and matched against the rows shown.
+ *
+ * The channel holds SUBSCRIBED until the changes are live, and the rows are
+ * read again on every SUBSCRIBED: the read on mount may have been answered
+ * before then, and a change in that gap would otherwise never show.
  */
 export function PlayerOrgsSection({ userId }: { userId: string }) {
   const [rows, setRows] = useState<PlayerOrgRow[]>([]);
@@ -39,12 +44,19 @@ export function PlayerOrgsSection({ userId }: { userId: string }) {
 
   useEffect(() => {
     let cancelled = false;
+    // Reads, numbered as they are sent. The read on mount, the one on SUBSCRIBED and those after
+    // events can be out at once and answer in any order: an answer from a read sent earlier must
+    // not replace a later one's.
+    let loadsSent = 0;
+    let newestLoadApplied = 0;
     const fetchRows = async () => {
+      const loadNo = ++loadsSent;
       const { data } = await supabase
         .from("trainer_org_members")
         .select("id, org_id, role, org:org_id(id,name,handle,avatar,city,verified)")
         .eq("user_id", userId);
-      if (cancelled) return;
+      if (cancelled || loadNo < newestLoadApplied) return;
+      newestLoadApplied = loadNo;
       const next = ((data as unknown as PlayerOrgRow[]) ?? []).filter((r) => r.org);
       shownIds.current = new Set(next.map((r) => r.id));
       setRows(next);
@@ -52,8 +64,9 @@ export function PlayerOrgsSection({ userId }: { userId: string }) {
     };
     fetchRows();
 
-    const ch = supabase
-      .channel(`player-orgs:${userId}`)
+    // trainer_org_members and trainer_orgs are both in the supabase_realtime publication, so the
+    // join can wait for their changes to be live.
+    const ch = liveChannel(`player-orgs:${userId}`)
       .on(
         "postgres_changes",
         {
@@ -77,7 +90,7 @@ export function PlayerOrgsSection({ userId }: { userId: string }) {
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "trainer_orgs" }, () => {
         fetchRows();
       })
-      .subscribe();
+      .subscribe(onLive(() => void fetchRows()));
 
     return () => {
       cancelled = true;

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getCurrentUserId } from "@/lib/current-user-id";
+import { liveChannel, onLive } from "@/lib/realtime-channel";
 
 export type WaitlistStatus = "waiting" | "approved" | "declined";
 
@@ -38,7 +39,8 @@ function toEntry(r: Row): WaitlistEntry {
 
 /**
  * Live waitlist for one game. Fetches on mount and subscribes to
- * INSERT/DELETE so counts and viewer status stay in sync.
+ * INSERT/UPDATE/DELETE so counts and viewer status stay in sync, and fetches
+ * again on every SUBSCRIBED.
  */
 export function useGameWaitlist(gameId: string | undefined): {
   entries: WaitlistEntry[];
@@ -54,8 +56,13 @@ export function useGameWaitlist(gameId: string | undefined): {
       return;
     }
     let cancelled = false;
+    // Loads, numbered as they are sent. The load on mount and the one on SUBSCRIBED can both be out and answer in
+    // either order: an answer from a load sent earlier is older and must not replace a later one's.
+    let loadsSent = 0;
+    let newestLoadApplied = 0;
 
     const load = async () => {
+      const loadNo = ++loadsSent;
       const { data, error } = await supabase
         .from("game_position_waitlist")
         .select("id, game_id, position, user_id, created_at, status, reviewed_at")
@@ -63,14 +70,16 @@ export function useGameWaitlist(gameId: string | undefined): {
         .order("created_at", { ascending: true });
       if (cancelled) return;
       if (!error && data) {
+        if (loadNo < newestLoadApplied) return;
+        newestLoadApplied = loadNo;
         setEntries((data as Row[]).map(toEntry));
       }
       setLoading(false);
     };
     void load();
 
-    const channel = supabase
-      .channel(`game_position_waitlist:${gameId}`)
+    // game_position_waitlist is in the supabase_realtime publication, so the join can wait for the change stream.
+    const channel = liveChannel(`game_position_waitlist:${gameId}`)
       .on(
         "postgres_changes",
         {
@@ -113,7 +122,9 @@ export function useGameWaitlist(gameId: string | undefined): {
           setEntries((prev) => prev.filter((e) => e.id !== old.id));
         },
       )
-      .subscribe();
+      // The changes are applied as deltas, so one made before they were live (after the load on mount read the
+      // list) would be missing for good: load the whole list again on every SUBSCRIBED, rejoins after a drop included.
+      .subscribe(onLive(() => void load()));
 
     return () => {
       cancelled = true;
