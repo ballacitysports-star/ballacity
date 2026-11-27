@@ -27,7 +27,7 @@ type Row = {
 // The rules of 20261205110000, as the SQL test checks them: the fake answers what the database would.
 const lapsed = (r: Row) =>
   (r.expires_at != null && r.expires_at < NOW) ||
-  (r.ready_at != null && r.ready_at < NOW - 24 * HOUR);
+  (r.expires_at == null && r.ready_at != null && r.ready_at < NOW - 24 * HOUR);
 const due = (r: Row) =>
   r.storage_path != null &&
   (r.status === "expired" || r.status === "failed") &&

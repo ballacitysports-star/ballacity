@@ -5,10 +5,12 @@
 --
 -- WHAT. The window is the one the app already sets and the docs already state; nothing here changes it.
 -- 1. private_sec.data_export_lapsed(_expires_at, _ready_at) -> boolean: the one rule for "the download window has ended".
---    True when expires_at is set and strictly in the past (the app sets it to ready_at + 24 hours, EXPORT_TTL_HOURS), or
---    when ready_at is set and strictly more than 24 hours in the past (so a ready row whose expires_at is missing, or
---    later than the promise, still ends 24 hours after it was ready). Exactly 24 hours old is not yet lapsed; the next run
---    takes it. EXECUTE for nobody but its owner; the functions below run as the owner.
+--    The row's own expires_at decides when it is set: true when it is strictly in the past. That is the time the app
+--    shows the member and checks before it signs a download (getDataExportDownloadUrl; requestDataExport sets it to
+--    ready_at + EXPORT_TTL_HOURS, 24), so the job never deletes a file the app still offers, whatever the TTL. Only when
+--    expires_at is missing (the app never writes a ready row without one) does ready_at decide: true when it is strictly
+--    more than 24 hours in the past, the window docs/data-retention.md states. Exactly at the boundary is not yet lapsed;
+--    the next run takes it. EXECUTE for nobody but its owner; the functions below run as the owner.
 -- 2. public.expire_stale_data_exports() -> integer, replaced: the same rows as before (status 'ready', 'processing' or
 --    'requested') flip to 'expired' when data_export_lapsed says so. Tightened: search_path '' (was public), lock_timeout
 --    5s. Same signature, same grants (service_role only). It writes nothing else; the row and its file pointer stay.
@@ -37,8 +39,15 @@
 --
 -- This migration deletes no file and changes no row itself. Where pg_cron is installed, the first deletion is the job's
 -- first run, the next 04:27 UTC after the migration is applied and the app with the route is published: applying it to
--- production is the owner's go-ahead for that first run. Deleted files cannot be restored. A file is deleted at the first
--- run after its window ends, so up to a day after.
+-- production is the owner's go-ahead for that first run. Deleted files cannot be restored. A run deletes at most 1000
+-- files (10 batches of 100, fewer if it reaches its 3 second budget) and the next run is a day later, so a file is
+-- usually deleted at the first run after its window ends, up to a day after; a larger backlog, such as the first run's
+-- (every lapsed export that still holds its file), is cleared over the following days. Before applying it to production,
+-- record that backlog in the release record (read-only):
+--     SELECT count(*) FILTER (WHERE storage_path IS NOT NULL) AS with_file, count(*) AS all_rows
+--       FROM public.data_export_requests;
+-- A file whose row never got its pointer (the Worker cut off between storing the file and marking the export ready) is
+-- not found by this job; when that step fails, requestDataExport tries once to delete the file itself.
 --
 -- Rollback: docs/rollbacks/20261205110000_expire_data_exports.down.sql.
 
@@ -52,11 +61,11 @@ STABLE
 SET search_path = ''
 AS $$
   SELECT (_expires_at IS NOT NULL AND _expires_at < pg_catalog.now())
-      OR (_ready_at IS NOT NULL AND _ready_at < pg_catalog.now() - interval '24 hours')
+      OR (_expires_at IS NULL AND _ready_at IS NOT NULL AND _ready_at < pg_catalog.now() - interval '24 hours')
 $$;
 REVOKE ALL ON FUNCTION private_sec.data_export_lapsed(timestamptz, timestamptz) FROM PUBLIC, anon, authenticated, service_role;
 COMMENT ON FUNCTION private_sec.data_export_lapsed(timestamptz, timestamptz) IS
-  'P3-6a: whether a data export''s download window has ended: expires_at in the past, or ready_at more than 24 hours ago. Owner only.';
+  'P3-6a: whether a data export''s download window has ended: expires_at in the past, or, when it has no expires_at, ready_at more than 24 hours ago. Owner only.';
 
 -- 2. The status ------------------------------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.expire_stale_data_exports()

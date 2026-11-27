@@ -1,11 +1,13 @@
 -- 20261205110000_expire_data_exports: a data export expires 24 hours after it is ready, and then its file is deleted.
--- expire_stale_data_exports flips to 'expired' only exports whose window has ended (expires_at strictly in the past, or
--- ready_at strictly more than 24 hours ago), never a fresh one, one exactly at the boundary, a failed one or one with no
--- window. data_export_files_due lists, oldest first and at most a batch, the expired (or failed) exports whose window has
--- ended and that still point at their own file '<user_id>/<id>.json': never a ready export (lapsed or not), never a fresh
--- one marked expired, never a pointer at another export's file. clear_data_export_files clears only those pointers and
--- keeps every row. Only the service role runs the three; visitors and members cannot, and nobody but the owner runs the
--- window rule or the scheduler. The daily job 'expire-data-exports' (04:27 UTC, through private_sec.worker_post) is
+-- expire_stale_data_exports flips to 'expired' only exports whose window has ended: expires_at strictly in the past when
+-- the row has one (later or earlier than 24 hours after ready_at, it is the time the app shows and checks), or, only when
+-- it has none, ready_at strictly more than 24 hours ago. Never a fresh one, one exactly at either boundary, a failed one
+-- or one with no window; a lapsed 'processing' or 'requested' row expires too. data_export_files_due lists, oldest first
+-- and at most a batch (held to 1..1000, NULL meaning 100), the expired (or failed) exports whose window has ended and
+-- that still point at their own file '<user_id>/<id>.json': never a ready export (lapsed or not), never a fresh one
+-- marked expired, never a pointer at another export's file. clear_data_export_files clears only those pointers, keeps
+-- every row, takes exactly 1000 ids and refuses 1001. Only the service role runs the three; visitors and members cannot,
+-- and nobody but the owner runs the window rule or the scheduler. The daily job 'expire-data-exports' (04:27 UTC, through private_sec.worker_post) is
 -- scheduled only where pg_cron and pg_net are installed, is one job, and is replaced (not duplicated) when scheduled again.
 -- This database has neither, so the test builds stand-ins shaped like them, inside the transaction.
 BEGIN;
@@ -88,6 +90,15 @@ SELECT pg_temp.row987('stuck',        'thirdone',  'processing', NULL,          
 SELECT pg_temp.row987('wrongpath',    'thirdone',  'expired',    '3 days',               '-2 days',    '3 days 1 minute',
                       (SELECT path FROM tags987 WHERE tag = 'fresh'));
 SELECT pg_temp.row987('expiredearly', 'member',    'expired',    '1 hour',               '23 hours',   '1 hour 2 minutes');
+-- no expires_at: ready_at decides, at the 24-hour boundary
+SELECT pg_temp.row987('noexpover',    'thirdone',  'ready',      '24 hours 1 second',    NULL,         '24 hours 3 minutes');
+SELECT pg_temp.row987('noexpexact',   'thirdone',  'ready',      '24 hours',             NULL,         '24 hours 4 minutes');
+-- an expires_at decides, later or earlier than 24 hours after ready_at
+SELECT pg_temp.row987('extended',     'thirdone',  'ready',      '24 hours 1 second',    '1 hour',     '24 hours 5 minutes');
+SELECT pg_temp.row987('shortttl',     'thirdone',  'ready',      '2 hours',              '-1 second',  '2 hours 1 minute');
+-- lapsed rows that never became ready
+SELECT pg_temp.row987('proclapsed',   'thirdone',  'processing', NULL,                   '-1 hour',    '26 hours', NULL);
+SELECT pg_temp.row987('reqlapsed',    'thirdone',  'requested',  '26 hours',             NULL,         '26 hours 1 minute', NULL);
 
 -- tag:status, then + while the row points at a file and - once it does not
 CREATE FUNCTION pg_temp.state987() RETURNS text LANGUAGE sql AS $f$
@@ -103,10 +114,11 @@ CREATE FUNCTION pg_temp.ids987(VARIADIC _tags text[]) RETURNS uuid[] LANGUAGE sq
   SELECT array_agg(t.id('export-' || x)) FROM unnest(_tags) x $f$;
 
 SELECT t.eq(pg_temp.state987(),
-            'cleared:expired-,exactly:ready+,expiredearly:expired+,failedfresh:failed+,failedold:failed+,fresh:ready+,'
-            'justover:ready+,lapsed:ready+,late:ready+,noexp:ready+,noexpfresh:ready+,oldexpired:expired+,'
-            'processing:processing-,requested:requested-,soon:ready+,stuck:processing-,wrongpath:expired+',
-            'setup: seventeen exports');
+            'cleared:expired-,exactly:ready+,expiredearly:expired+,extended:ready+,failedfresh:failed+,failedold:failed+,'
+            'fresh:ready+,justover:ready+,lapsed:ready+,late:ready+,noexp:ready+,noexpexact:ready+,noexpfresh:ready+,'
+            'noexpover:ready+,oldexpired:expired+,processing:processing-,proclapsed:processing-,reqlapsed:requested-,'
+            'requested:requested-,shortttl:ready+,soon:ready+,stuck:processing-,wrongpath:expired+',
+            'setup: twenty-three exports');
 
 -- ================= 3. nobody but the service role runs them =================
 SELECT t.as_anon();
@@ -129,35 +141,41 @@ SELECT t.throws($$SELECT private_sec.schedule_data_export_expiry()$$, 'permissio
                 'the service role cannot schedule the job either');
 SELECT t.reset();
 SELECT t.eq(pg_temp.state987(),
-            'cleared:expired-,exactly:ready+,expiredearly:expired+,failedfresh:failed+,failedold:failed+,fresh:ready+,'
-            'justover:ready+,lapsed:ready+,late:ready+,noexp:ready+,noexpfresh:ready+,oldexpired:expired+,'
-            'processing:processing-,requested:requested-,soon:ready+,stuck:processing-,wrongpath:expired+',
+            'cleared:expired-,exactly:ready+,expiredearly:expired+,extended:ready+,failedfresh:failed+,failedold:failed+,'
+            'fresh:ready+,justover:ready+,lapsed:ready+,late:ready+,noexp:ready+,noexpexact:ready+,noexpfresh:ready+,'
+            'noexpover:ready+,oldexpired:expired+,processing:processing-,proclapsed:processing-,reqlapsed:requested-,'
+            'requested:requested-,shortttl:ready+,soon:ready+,stuck:processing-,wrongpath:expired+',
             'the refused calls changed nothing');
 
 -- ================= 4. a ready export is expired before its file is touched =================
 SELECT t.eq(pg_temp.due987(), 'oldexpired,failedold',
             'before the expiry only exports already expired (or failed) with an ended window are listed: not a lapsed one '
             'still marked ready, not one marked expired early, not a pointer at another export''s file');
-SELECT t.eq(public.clear_data_export_files(pg_temp.ids987('lapsed', 'justover', 'noexp', 'late')), 0,
+SELECT t.eq(public.clear_data_export_files(pg_temp.ids987('lapsed', 'justover', 'noexp', 'noexpover', 'shortttl')), 0,
             'a lapsed export still marked ready keeps its pointer');
 
 -- ================= 5. only lapsed exports expire =================
 SELECT t.as_service();
-SELECT t.eq(public.expire_stale_data_exports(), 4, 'the service role expires the four ready exports whose window ended');
+SELECT t.eq(public.expire_stale_data_exports(), 7,
+            'the service role expires the five ready exports and the two never-ready ones whose window ended');
 SELECT t.reset();
 SELECT t.eq(pg_temp.state987(),
-            'cleared:expired-,exactly:ready+,expiredearly:expired+,failedfresh:failed+,failedold:failed+,fresh:ready+,'
-            'justover:expired+,lapsed:expired+,late:expired+,noexp:expired+,noexpfresh:ready+,oldexpired:expired+,'
-            'processing:processing-,requested:requested-,soon:ready+,stuck:processing-,wrongpath:expired+',
-            'expired: one second past its expiry, an hour past, 25 hours ready with no expiry, 30 hours ready with an '
-            'expiry later than the promise; kept: fresh, 30 minutes left, exactly 24 hours, 23 hours ready with no expiry, '
-            'failed, in progress; no file pointer changed');
+            'cleared:expired-,exactly:ready+,expiredearly:expired+,extended:ready+,failedfresh:failed+,failedold:failed+,'
+            'fresh:ready+,justover:expired+,lapsed:expired+,late:ready+,noexp:expired+,noexpexact:ready+,noexpfresh:ready+,'
+            'noexpover:expired+,oldexpired:expired+,processing:processing-,proclapsed:expired-,reqlapsed:expired-,'
+            'requested:requested-,shortttl:expired+,soon:ready+,stuck:processing-,wrongpath:expired+',
+            'expired: one second past its expiry, an hour past, an expiry 1 second ago 2 hours after ready, no expiry and '
+            'ready 25 hours or 24 hours and 1 second ago, a processing row past its expiry, a requested row ready 26 hours '
+            'ago with no expiry; kept: fresh, 30 minutes left, exactly at its expiry, no expiry and ready exactly 24 hours '
+            'or 23 hours ago, ready 24 hours and 1 second or 30 hours ago with an expiry still ahead, failed, in progress '
+            'with no window; no file pointer changed');
 SELECT t.eq((SELECT status FROM public.data_export_requests WHERE id = t.id('export-fresh')), 'ready',
             'a fresh export is untouched');
 SELECT t.eq(public.expire_stale_data_exports(), 0, 'a second run expires nothing');
 
 -- ================= 6. the files to delete =================
-SELECT t.eq(pg_temp.due987(), 'oldexpired,late,failedold,noexp,lapsed,justover',
+-- noexpover and justover were ready at the same moment: the id decides (noexpover's is the smaller)
+SELECT t.eq(pg_temp.due987(), 'oldexpired,failedold,noexp,lapsed,noexpover,justover,shortttl',
             'every expired or failed export with an ended window and its own file, oldest ready first');
 SELECT t.ok((SELECT bool_and(d.storage_path = g.path AND g.path = t.id(g.who)::text || '/' || g.id::text || '.json')
                FROM public.data_export_files_due() d JOIN tags987 g ON g.id = d.id),
@@ -165,21 +183,23 @@ SELECT t.ok((SELECT bool_and(d.storage_path = g.path AND g.path = t.id(g.who)::t
 SELECT t.ok(NOT EXISTS (SELECT 1 FROM public.data_export_files_due(1000) d
                          WHERE d.storage_path = (SELECT path FROM tags987 WHERE tag = 'fresh')),
             'the fresh export''s file is never listed, not even through another row''s pointer');
-SELECT t.eq(pg_temp.due987(2), 'oldexpired,late', 'a batch of 2 lists the 2 oldest');
+SELECT t.eq(pg_temp.due987(2), 'oldexpired,failedold', 'a batch of 2 lists the 2 oldest');
 SELECT t.eq(pg_temp.due987(0), 'oldexpired', 'a batch of 0 is held to 1');
-SELECT t.eq(pg_temp.due987(NULL), 'oldexpired,late,failedold,noexp,lapsed,justover', 'NULL means the default batch');
+SELECT t.eq(pg_temp.due987(NULL), 'oldexpired,failedold,noexp,lapsed,noexpover,justover,shortttl',
+            'NULL means the default batch');
 SELECT t.as_service();
-SELECT t.eq((SELECT count(*)::int FROM public.data_export_files_due()), 6, 'the service role lists them');
+SELECT t.eq((SELECT count(*)::int FROM public.data_export_files_due()), 7, 'the service role lists them');
 SELECT t.reset();
 
 -- ================= 7. clearing the pointers =================
-SELECT t.eq(public.clear_data_export_files(pg_temp.ids987('oldexpired', 'late', 'fresh', 'soon', 'exactly', 'noexpfresh',
-                                                          'expiredearly', 'failedfresh', 'wrongpath', 'cleared',
-                                                          'processing')), 2,
+SELECT t.eq(public.clear_data_export_files(pg_temp.ids987('oldexpired', 'failedold', 'late', 'extended', 'fresh', 'soon',
+                                                          'exactly', 'noexpexact', 'noexpfresh', 'expiredearly',
+                                                          'failedfresh', 'wrongpath', 'cleared', 'processing',
+                                                          'proclapsed')), 2,
             'of a mixed list only the two listed exports are cleared');
-SELECT t.eq(pg_temp.due987(), 'failedold,noexp,lapsed,justover', 'the next batch is the rest');
+SELECT t.eq(pg_temp.due987(), 'noexp,lapsed,noexpover,justover,shortttl', 'the next batch is the rest');
 SELECT t.as_service();
-SELECT t.eq(public.clear_data_export_files((SELECT array_agg(id) FROM tags987)), 4,
+SELECT t.eq(public.clear_data_export_files((SELECT array_agg(id) FROM tags987)), 5,
             'the service role clears the rest, given every id');
 SELECT t.eq((SELECT count(*)::int FROM public.data_export_files_due()), 0, 'nothing is left to delete');
 SELECT t.eq(public.clear_data_export_files((SELECT array_agg(id) FROM tags987)), 0, 'clearing again changes nothing');
@@ -189,17 +209,18 @@ SELECT t.throws(format('SELECT public.clear_data_export_files(%L)',
                 'more than 1000 ids at once is refused');
 SELECT t.reset();
 SELECT t.eq(pg_temp.state987(),
-            'cleared:expired-,exactly:ready+,expiredearly:expired+,failedfresh:failed+,failedold:failed-,fresh:ready+,'
-            'justover:expired-,lapsed:expired-,late:expired-,noexp:expired-,noexpfresh:ready+,oldexpired:expired-,'
-            'processing:processing-,requested:requested-,soon:ready+,stuck:processing-,wrongpath:expired+',
-            'only the six lapsed exports lost their pointer; statuses unchanged; the fresh, early, failed-fresh and '
-            'wrong-pointer rows keep theirs');
-SELECT t.eq((SELECT count(*)::int FROM public.data_export_requests WHERE id IN (SELECT id FROM tags987)), 17,
+            'cleared:expired-,exactly:ready+,expiredearly:expired+,extended:ready+,failedfresh:failed+,failedold:failed-,'
+            'fresh:ready+,justover:expired-,lapsed:expired-,late:ready+,noexp:expired-,noexpexact:ready+,noexpfresh:ready+,'
+            'noexpover:expired-,oldexpired:expired-,processing:processing-,proclapsed:expired-,reqlapsed:expired-,'
+            'requested:requested-,shortttl:expired-,soon:ready+,stuck:processing-,wrongpath:expired+',
+            'only the seven lapsed exports lost their pointer; statuses unchanged; the fresh, early, extended, '
+            'failed-fresh and wrong-pointer rows keep theirs');
+SELECT t.eq((SELECT count(*)::int FROM public.data_export_requests WHERE id IN (SELECT id FROM tags987)), 23,
             'every row is kept');
 SELECT t.eq((SELECT string_agg(g.tag || '=' || r.file_bytes, ',' ORDER BY g.tag COLLATE "C")
                FROM tags987 g JOIN public.data_export_requests r ON r.id = g.id
-              WHERE g.tag IN ('oldexpired', 'late', 'justover')),
-            'justover=1234,late=1234,oldexpired=1234', 'a cleared row keeps its size and times');
+              WHERE g.tag IN ('oldexpired', 'noexpover', 'justover')),
+            'justover=1234,noexpover=1234,oldexpired=1234', 'a cleared row keeps its size and times');
 SELECT t.as_user(t.id('member'));
 SELECT t.eq(t.count('SELECT 1 FROM public.data_export_requests'), 6, 'the member still sees their whole export history');
 SELECT t.reset();
@@ -273,9 +294,33 @@ SELECT t.eq((SELECT jsonb_agg(jsonb_build_array(url, headers ->> 'x-worker-secre
             '[["https://app.example/api/public/data-exports/expire", "sekretninetwoseven"]]'::jsonb,
             'the job''s command posts once to /api/public/data-exports/expire with the worker secret');
 SELECT t.eq(pg_temp.state987(),
-            'cleared:expired-,exactly:ready+,expiredearly:expired+,failedfresh:failed+,failedold:failed-,fresh:ready+,'
-            'justover:expired-,lapsed:expired-,late:expired-,noexp:expired-,noexpfresh:ready+,oldexpired:expired-,'
-            'processing:processing-,requested:requested-,soon:ready+,stuck:processing-,wrongpath:expired+',
+            'cleared:expired-,exactly:ready+,expiredearly:expired+,extended:ready+,failedfresh:failed+,failedold:failed-,'
+            'fresh:ready+,justover:expired-,lapsed:expired-,late:ready+,noexp:expired-,noexpexact:ready+,noexpfresh:ready+,'
+            'noexpover:expired-,oldexpired:expired-,processing:processing-,proclapsed:expired-,reqlapsed:expired-,'
+            'requested:requested-,shortttl:expired-,soon:ready+,stuck:processing-,wrongpath:expired+',
             'scheduling and running the job''s command change no export in the database (the route does the work)');
+
+-- ================= 10. the batch limits =================
+-- 1001 lapsed expired exports with their own files, requested 3 days ago (so the rate-limit trigger lets them in)
+SELECT t.person('bulkone', 30);
+INSERT INTO public.data_export_requests (id, user_id, status, categories, storage_path, file_bytes, requested_at, ready_at,
+                                         expires_at)
+SELECT b.id, t.id('bulkone'), 'expired', '{profile}', t.id('bulkone')::text || '/' || b.id::text || '.json', 1234,
+       now() - interval '3 days', now() - interval '3 days' - make_interval(secs => b.n), now() - interval '2 days'
+  FROM (SELECT gen_random_uuid() AS id, n FROM generate_series(1, 1001) n) b;
+SELECT t.as_service();
+SELECT t.eq((SELECT count(*)::int FROM public.data_export_files_due(5000)), 1000,
+            'a batch is held to 1000 (the storage API deletes at most 1000 names per call)');
+SELECT t.eq((SELECT count(*)::int FROM public.data_export_files_due(1000)), 1000, 'a batch of 1000 lists 1000');
+SELECT t.eq((SELECT count(*)::int FROM public.data_export_files_due(NULL)), 100, 'NULL means a batch of 100');
+SELECT t.eq((SELECT count(*)::int FROM public.data_export_files_due()), 100, 'and so does no batch size');
+SELECT t.throws(format('SELECT public.clear_data_export_files(%L)',
+                       (SELECT array_agg(id) FROM public.data_export_requests WHERE user_id = t.id('bulkone'))),
+                'INVALID_LIMIT', 'the 1001 ids at once are refused');
+SELECT t.eq((SELECT count(*)::int FROM public.data_export_files_due(5000)), 1000, 'and nothing was cleared');
+SELECT t.eq(public.clear_data_export_files((SELECT array_agg(d.id) FROM public.data_export_files_due(1000) d)), 1000,
+            'exactly 1000 ids at once are cleared');
+SELECT t.eq((SELECT count(*)::int FROM public.data_export_files_due(5000)), 1, 'one is left for the next batch');
+SELECT t.reset();
 
 ROLLBACK;

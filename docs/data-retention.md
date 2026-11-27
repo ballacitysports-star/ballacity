@@ -15,11 +15,20 @@ Canonical machine-readable source: `src/lib/retention.ts` (`RETENTION_RULES`) an
 - That expiry is enforced by the daily `expire-data-exports` job (04:27 UTC, migration
   `20261205110000_expire_data_exports.sql`), scheduled where pg_cron and pg_net are installed. It
   calls the worker route `/api/public/data-exports/expire`, which marks every export whose window
-  has ended `expired` and deletes its file from the `data-exports` bucket. A file is deleted at the
-  first run after its export expires, so up to a day later. The request row is kept (status, size
-  and times) with its file pointer cleared: it is the member's export history, and the rate limit
-  counts it. Deleted files cannot be restored. Until the migration is applied to production and the
-  app with the route is published, expired files stay in the bucket there.
+  has ended `expired` and deletes its file from the `data-exports` bucket. The window ends at the
+  export's `expires_at`, the time the app shows and checks before it signs a download (24 hours
+  after it is ready); an export with no `expires_at` ends 24 hours after `ready_at`. A run deletes
+  at most 1,000 files (fewer if it reaches its time limit), so a file is usually deleted at the
+  first run after its export expires, up to a day later; a larger backlog, such as the first
+  run's, is cleared over the following days. The request row is kept (status, size and times)
+  with its file pointer cleared: it is the member's export history, and the rate limit counts it.
+  Deleted files cannot be restored. Until the migration is applied to production and the app with
+  the route is published, expired files stay in the bucket there.
+- The job finds a file only through its row's file pointer, which is written when the export is
+  marked ready. A build that fails after storing the file (or while storing it) tries once to
+  delete the file itself. A build cut off between storing the file and marking the export ready
+  (the Worker stopped), or whose own delete fails, leaves a file with no pointer, which the job
+  does not find.
 - Rate limit: 3 requests per rolling 24 hours, enforced by the
   `enforce_data_export_rate_limit` trigger on `data_export_requests` (server-side, not UI-only).
 - Status machine: `requested → processing → ready | failed`, and `ready → expired`.

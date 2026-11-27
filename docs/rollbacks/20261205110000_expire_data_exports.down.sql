@@ -44,7 +44,7 @@ DECLARE
     ['public.expire_stale_data_exports()',                        '381f7d82ae83cbc7e27bd19635b9dab0', 'service_role:EXECUTE'],
     ['public.data_export_files_due(integer)',                     '318f94592489c6a3315203143ba756f8', 'service_role:EXECUTE'],
     ['public.clear_data_export_files(uuid[])',                    '0477238323fb1fb1f1256bf31f113157', 'service_role:EXECUTE'],
-    ['private_sec.data_export_lapsed(timestamptz,timestamptz)',   '7e0b7c9e1a4a955c1bb48e83592c7bbd', ''],
+    ['private_sec.data_export_lapsed(timestamptz,timestamptz)',   '39116da4d196310b4c593fda40967201', ''],
     ['private_sec.schedule_data_export_expiry()',                 '6cc3fd0e390822e9dc589795791bcbeb', '']];
   _callee_re CONSTANT text := '\m(data_export_files_due|clear_data_export_files|data_export_lapsed|schedule_data_export_expiry)\M';
   _route_re  CONSTANT text := '/api/public/data-exports/expire';
