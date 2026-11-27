@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
 import { restoreSession } from "./helpers/signed-in";
+import { payFixtureGameRow, serveFixtureGame } from "./helpers/pay-fixtures";
 
 /**
  * E2E: while a join request is still unapproved, the pay page must not let
@@ -150,6 +151,10 @@ test("payment submission is blocked while join request is unapproved", async ({ 
     },
   );
 
+  // The game itself: g2 is not a sample game, so the pay page looks it up in
+  // hosted_games. Served here, hosted by the spec's mocked host, so the screen
+  // never waits on the real row (unanswered, a slow read ended on "Game not found").
+  await serveFixtureGame(page, payFixtureGameRow(GAME_ID, { host_id: FAKE_HOST_ID }));
   await restoreSession(page);
   await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
 

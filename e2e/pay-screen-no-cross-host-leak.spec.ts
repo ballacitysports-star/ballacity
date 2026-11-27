@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { restoreSession } from "./helpers/signed-in";
+import { payFixtureGameRow, serveFixtureGame } from "./helpers/pay-fixtures";
 import { stubRiskAcknowledged } from "./helpers/risk-ack";
 
 /**
@@ -161,6 +162,10 @@ test("Pay screen for HOST_A never renders or requests HOST_B's payment methods",
   // Not a spec about "Before you join": the viewer has acknowledged it, so the pay page (which asks it
   // before any payment option, docs/paid-path-gates.md section 7) goes straight to the options.
   await stubRiskAcknowledged(page);
+  // The game itself: g2 is not a sample game, so the pay page looks it up in
+  // hosted_games. Served here, hosted by the spec's mocked host, so the screen
+  // never waits on the real row (unanswered, a slow read ended on "Game not found").
+  await serveFixtureGame(page, payFixtureGameRow(GAME_ID, { host_id: HOST_A }));
   await restoreSession(page);
 
   await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
