@@ -68,6 +68,42 @@ and pg_net's.
   the runs recorded before it is within the 7 days, and it gives no "last run" time.
 - At most 200 jobs are listed.
 
+## Run history retention
+
+pg_cron writes a row to `cron.job_run_details` for every run and deletes none. Production had about 260,000 rows
+(348 MB), most from `process-highlight-reels`, which runs every minute; all jobs together add about 2,000 rows a day.
+Migration `20261203100000_cron_run_history_retention.sql` keeps **30 days**:
+
+- **The job.** `purge-cron-run-history` runs daily at **03:57 UTC** (a free minute: the other daily jobs run at 03:17,
+  03:37, 04:17, 04:41, 04:47, 04:51 and 08:47) and calls `private_sec.purge_cron_run_details()`. It is scheduled only
+  where pg_cron is installed; elsewhere the migration says so in a notice and schedules nothing.
+- **What goes.** Finished runs (`succeeded` or `failed`) whose time is older than 30 days. A run's time is its
+  `end_time`, or its `start_time` when it has no end time (a run that could not connect has only an end time). Runs in
+  progress (`starting`, `connecting`, `sending`, `running`) and runs with neither time are never deleted.
+- **The card is covered.** The card counts failures over 7 days and reads the newest 100,000 runs (about 7 weeks at
+  today's rate). Whatever window is passed, the function keeps at least **14 days** (and at most 365), so the 7 days
+  always have a week of margin. A paused job whose last run is older than 30 days loses its history and reads as
+  "Never ran" as well as "Paused".
+- **Batches.** One call deletes at most 20,000 rows (oldest first, along the primary key), so each run is one short
+  transaction. It returns `deleted`, `remaining_older` (deletable rows still older than the cut-off) and `cutoff`. The
+  first runs drain the existing backlog over several nights (about 200,000 rows in production, so about 10 nights); a
+  person can also run `SELECT private_sec.purge_cron_run_details();` by hand, as the migration role, until
+  `remaining_older` is 0.
+- **Disk space.** Deleted rows free space inside the table, which autovacuum makes available for new runs; the file does
+  not shrink back, so the 348 MB stays allocated but stops growing. Only `VACUUM FULL cron.job_run_details` would return
+  it to the operating system, and that locks the table (pg_cron cannot record runs meanwhile); it is not part of this.
+- **Who can run it.** Nobody through the API: EXECUTE is revoked from PUBLIC, `anon`, `authenticated` and
+  `service_role`. The job runs it as the migration role. On Supabase, `cron.job_run_details` has row level security
+  (`username = current_user`), so it deletes the runs of jobs that role scheduled, which are all the jobs in
+  `supabase/migrations`; runs of a job scheduled by hand as another role stay.
+- **Deleted history cannot be restored.** A failure older than 30 days can no longer be looked up in the database.
+
+`supabase/tests/997_cron_run_history_retention.test.sql` checks these against stand-in tables shaped like pg_cron's,
+including that the card still counts the last 7 days' failures after a purge. The rollback,
+`docs/rollbacks/20261203100000_cron_run_history_retention.down.sql`, unschedules the job and drops both functions; it
+refuses unless both functions are exactly the definitions the migration created and it is confirmed with
+`SET app.confirm_cron_run_history_retention_rollback = 'yes'`. Rows already deleted stay deleted.
+
 ## Rollback
 
 `docs/rollbacks/20261201100000_scheduled_jobs_health.down.sql` drops the function and nothing else (pg_cron, its jobs
