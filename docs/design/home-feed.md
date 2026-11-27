@@ -64,15 +64,35 @@ post report written straight into `user_reports` by an API role):
   cannot read get the same answer, "That post isn't available.", so a report never tells whether a post exists.
 - Nobody reports their own post, including one they wrote as a team or venue ("You can't report your own post.").
 - The reason must be one `user_reports` allows. The reported user is the post's author: for a post made as a team or
-  venue, the person who wrote it. The report is stored with subject `post` and the post's id (`user_reports.post_id`,
-  cleared if the author later deletes the post for good, so the report stays).
-- While the member's earlier report of the same post is still open, reporting it again files nothing new and answers
-  with that report. Once a moderator resolves or dismisses it, a new report is a new row.
+  venue, the person who wrote it. The report is stored with subject `post`, the post's id (`user_reports.post_id`,
+  cleared once the post is deleted for good, by its author, a manager of its team, or with its team, venue or author,
+  so the report stays), and the md5 of the post's text at that moment (`user_reports.post_body_md5`). Only that
+  fingerprint is kept, never a copy of the text.
+- Reporting the same post again while the member's earlier report of it is still open (any status but resolved,
+  actioned or dismissed) files nothing only when it adds nothing: the same reason, about the same text, with no new
+  note. The dialog then says "You already reported this post for that reason. Our moderators will review it." Anything
+  else is a new report, and the dialog says "Report submitted": a different reason (a follow-up such as a child-safety
+  report), a new note, or a post edited since. Once a moderator closes a report, the same report again is a new one.
 - Only the reporter and moderators read a report; the author never does (the `user_reports` read rules are unchanged).
 
-In the moderation queue (`/admin/moderation`) a post report shows the post's text, who it was shared with, whether it
-is hidden, deleted or waiting for its check, and a link to the team or venue it was posted as; the author is linked as
-the reported user. The existing actions apply as they do to a reported game or reel: **Remove content** hides the post,
-**Restore** unhides it, and Warn, Suspend, Ban, Resolve and Dismiss act on the author and the report as before. The
-queue reads `post_id` only where the column exists, so it keeps working before the migration is applied and after its
-rollback (`docs/rollbacks/20261205100000_network_post_reports.down.sql`, which refuses while any post report exists).
+In the moderation queue (`/admin/moderation`) a post report shows the post as it is now: its text, who it is shared
+with, whether it is hidden, deleted by its author or waiting for its check, and a link to the team or venue it was
+posted as; the author is linked as the reported user. The author can edit a post after it is reported, so the card
+compares the text now with the report's fingerprint and says "Edited after this report: this is not the text that was
+reported." when they differ. The reported words themselves are not on the card once the post is edited or deleted;
+the reporter's note may describe them. A post that is gone shows "(the post was deleted for good)", without saying
+who deleted it.
+
+The existing actions apply as they do to a reported game or reel, with one difference for **Restore**:
+
+- **Remove content** hides the post and resolves the report.
+- **Restore** lifts the author's suspension or ban (as it does for every report), marks the report dismissed, and
+  unhides the post only when this report's own Remove content hid it and no other report about the same post has
+  been resolved or actioned. Otherwise the post stays hidden, the card says so before Restore runs, and the summary
+  says why ("another report about this post was acted on", or "this report did not hide it", for example a hide from
+  the superadmin content queue). A superadmin unhides such a post from the content queue.
+- Warn, Suspend, Ban, Resolve and Dismiss act on the author and the report as before.
+
+The queue reads `post_id` and `post_body_md5` only where the columns exist, so it keeps working before the migration is
+applied and after its rollback (`docs/rollbacks/20261205100000_network_post_reports.down.sql`, which refuses while any
+post report exists).

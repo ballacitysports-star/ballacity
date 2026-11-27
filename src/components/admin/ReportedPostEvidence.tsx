@@ -14,9 +14,11 @@ export function reportedPostState(post: ModerationPost): string | null {
 }
 
 /**
- * The reported network post on a moderation queue card (subject 'post', 20261205100000): its text, who could read it,
- * where it stands, and a link to the team or venue it was posted as. The reported user (its author) is linked on the
- * card already. The text is read with the service role, so a moderator sees it whatever its audience.
+ * The reported network post on a moderation queue card (subject 'post', 20261205100000): its text as it is now, whether
+ * that is still the text that was reported, who could read it, where it stands, what Restore would leave alone, and a
+ * link to the team or venue it was posted as. The reported user (its author) is linked on the card already. The text is
+ * read with the service role, so a moderator sees it whatever its audience. A report keeps only a fingerprint of the
+ * text, never a copy, so once a post is edited or deleted the reported words are not on the card.
  */
 export function ReportedPostEvidence({
   postId,
@@ -30,7 +32,8 @@ export function ReportedPostEvidence({
       <div className="sm:col-span-2">
         <dt className="text-muted-foreground">Network post</dt>
         <dd className="rounded-lg border border-border bg-surface p-2">
-          {postId ? "(post not found)" : "(the author deleted this post for good)"}
+          {/* Its author, a manager of its team, or the removal of its team, venue or author: the report cannot tell. */}
+          {postId ? "(post not found)" : "(the post was deleted for good)"}
         </dd>
       </div>
     );
@@ -39,11 +42,20 @@ export function ReportedPostEvidence({
   const state = reportedPostState(post);
   return (
     <div className="sm:col-span-2">
-      <dt className="text-muted-foreground">Network post</dt>
+      <dt className="text-muted-foreground">Network post, as it is now</dt>
       <dd className="space-y-1">
         <p className="rounded-lg border border-border bg-surface p-2 whitespace-pre-wrap">
           {post.body}
         </p>
+        {post.editedSinceReport === true ? (
+          <p className="font-medium text-destructive">
+            Edited after this report: this is not the text that was reported.
+          </p>
+        ) : post.editedSinceReport === null ? (
+          <p className="text-muted-foreground">
+            This report did not record the text it was about; it may have changed since.
+          </p>
+        ) : null}
         <p className="text-muted-foreground">
           Shared with: {audience}
           {state ? ` · ${state}` : ""}
@@ -64,6 +76,12 @@ export function ReportedPostEvidence({
             </>
           ) : null}
         </p>
+        {post.restoreKeepsHidden ? (
+          <p className="text-muted-foreground">
+            Restore lifts the author's suspension or ban and dismisses this report, but leaves the
+            post hidden: {post.restoreKeepsHidden}.
+          </p>
+        ) : null}
       </dd>
     </div>
   );

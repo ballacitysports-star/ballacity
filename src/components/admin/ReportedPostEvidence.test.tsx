@@ -32,6 +32,8 @@ const post = (over: Partial<ModerationPost> = {}): ModerationPost => ({
   hidden: false,
   deleted: false,
   moderationStatus: "approved",
+  editedSinceReport: false,
+  restoreKeepsHidden: null,
   ...over,
 });
 
@@ -47,7 +49,7 @@ afterEach(cleanup);
 describe("ReportedPostEvidence (moderation queue, post reports)", () => {
   it("shows the post's text and who could read it", () => {
     show("post-1", post());
-    expect(screen.getByText("Network post")).toBeTruthy();
+    expect(screen.getByText("Network post, as it is now")).toBeTruthy();
     expect(screen.getByText("Tryouts Sunday at 6")).toBeTruthy();
     expect(screen.getByText(/Shared with: Followers/)).toBeTruthy();
     expect(screen.queryByRole("link")).toBeNull();
@@ -75,8 +77,38 @@ describe("ReportedPostEvidence (moderation queue, post reports)", () => {
     expect(screen.getByText(/Shared with: Followers · hidden/)).toBeTruthy();
   });
 
-  it("keeps the report readable when the author deleted the post for good", () => {
+  it("keeps the report readable once the post was deleted for good, without naming who deleted it", () => {
     show(null, null);
-    expect(screen.getByText("(the author deleted this post for good)")).toBeTruthy();
+    expect(screen.getByText("(the post was deleted for good)")).toBeTruthy();
+    expect(screen.queryByText(/author/)).toBeNull();
+  });
+
+  it("says when the text was edited after the report, and when nobody can tell", () => {
+    show("post-1", post());
+    expect(screen.queryByText(/Edited after this report/)).toBeNull();
+    expect(screen.queryByText(/did not record the text/)).toBeNull();
+    cleanup();
+    show("post-1", post({ body: "Have a nice day", editedSinceReport: true }));
+    expect(
+      screen.getByText("Edited after this report: this is not the text that was reported."),
+    ).toBeTruthy();
+    cleanup();
+    show("post-1", post({ editedSinceReport: null }));
+    expect(screen.getByText(/did not record the text it was about/)).toBeTruthy();
+  });
+
+  it("says before Restore runs that it would leave a hidden post hidden, and why", () => {
+    show("post-1", post({ hidden: true }));
+    expect(screen.queryByText(/leaves the post hidden/)).toBeNull();
+    cleanup();
+    show(
+      "post-1",
+      post({ hidden: true, restoreKeepsHidden: "another report about this post was acted on" }),
+    );
+    expect(
+      screen.getByText(
+        /Restore lifts the author's suspension or ban and dismisses this report, but leaves the post hidden: another report about this post was acted on\./,
+      ),
+    ).toBeTruthy();
   });
 });

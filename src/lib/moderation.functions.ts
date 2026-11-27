@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
@@ -54,9 +55,9 @@ const STATUS = z.enum(["new", "investigating", "resolved", "dismissed", "escalat
 export const REPORT_SUBJECT_FILTERS = ["user", "game", "message", "reel", "post"] as const;
 
 /**
- * user_reports.post_id comes with 20261205100000. Before that migration is applied (and after its rollback) the
- * column is missing and a read that names it fails, so the queue reads it only where it exists: on this error it
- * reads again without it.
+ * user_reports.post_id and post_body_md5 come with 20261205100000. Before that migration is applied (and after its
+ * rollback) the columns are missing and a read that names them fails, so the queue reads them only where they exist: on
+ * this error it reads again without them.
  */
 export function isMissingPostIdColumn(
   error: { code?: string; message?: string } | null | undefined,
@@ -64,9 +65,48 @@ export function isMissingPostIdColumn(
   return (
     !!error &&
     (error.code === "42703" || error.code === "PGRST204") &&
-    /\bpost_id\b/.test(error.message ?? "")
+    /\bpost_(id|body_md5)\b/.test(error.message ?? "")
   );
 }
+
+/** md5 of a post's text, as Postgres md5(text) computes it (report_post keeps it as user_reports.post_body_md5). */
+export function postBodyMd5(body: string): string {
+  return createHash("md5").update(body, "utf8").digest("hex");
+}
+
+/**
+ * Whether a reported post's text changed after the report: its md5 now against the one report_post kept. null when the
+ * report kept none (a row written before 20261205100000 or by server code), so nobody can tell.
+ */
+export function postEditedSinceReport(
+  body: string,
+  reportedMd5: string | null | undefined,
+): boolean | null {
+  return reportedMd5 ? postBodyMd5(body) !== reportedMd5 : null;
+}
+
+/** The summary Remove content writes on a post report; Restore reads it back to know that this report hid the post. */
+export const POST_HIDDEN_SUMMARY = "Post hidden";
+
+/**
+ * Why Restore on a post report must leave a hidden post hidden, or null when it may unhide it. Restore undoes what this
+ * report did, so it unhides the post only when this report's own Remove content hid it (its notes start with
+ * POST_HIDDEN_SUMMARY) and no other report about the same post has been resolved or actioned: a moderator dismissing a
+ * weak second report never puts back a post another report (or a superadmin) took down.
+ */
+export function postRestoreBlocker(input: {
+  resolutionNotes: string | null;
+  otherClosedReports: number;
+}): string | null {
+  if (input.otherClosedReports > 0) return "another report about this post was acted on";
+  if (!(input.resolutionNotes ?? "").startsWith(POST_HIDDEN_SUMMARY)) {
+    return "this report did not hide it";
+  }
+  return null;
+}
+
+/** Report statuses that mean a moderator acted on the report (report-status.ts: the Resolved queue). */
+const ACTED_ON_STATUSES = ["resolved", "actioned"] as const;
 
 type QueryResult = { data: unknown; error: { code?: string; message?: string } | null };
 
@@ -111,6 +151,8 @@ type ReportRow = {
   reel_id: string | null;
   /** Missing before 20261205100000 and after its rollback. */
   post_id?: string | null;
+  /** md5 of the post's text when it was reported; missing before 20261205100000 and after its rollback. */
+  post_body_md5?: string | null;
 };
 
 type PostRow = {
@@ -136,6 +178,10 @@ export type ModerationPost = {
   hidden: boolean;
   deleted: boolean;
   moderationStatus: string;
+  /** The text changed after this report (true), is what was reported (false), or nobody can tell (null). */
+  editedSinceReport: boolean | null;
+  /** While the post is hidden: why Restore on this report would leave it hidden (postRestoreBlocker), else null. */
+  restoreKeepsHidden: string | null;
 };
 
 export type ModerationReport = {
@@ -163,7 +209,7 @@ export type ModerationReport = {
   reelId: string | null;
   reelTitle: string | null;
   reelHidden: boolean;
-  /** The reported network post (subject 'post'); null when the author has since deleted it for good. */
+  /** The reported network post (subject 'post') as it is now; null once it was deleted for good. */
   postId: string | null;
   post: ModerationPost | null;
 };
@@ -189,7 +235,7 @@ export const listReports = createServerFn({ method: "GET" })
 
     const { data: rows, error } = await withPostIdIfPresent((withPostId) => {
       let q = looseFrom(supabaseAdmin, "user_reports")
-        .select(withPostId ? `${REPORT_COLUMNS}, post_id` : REPORT_COLUMNS)
+        .select(withPostId ? `${REPORT_COLUMNS}, post_id, post_body_md5` : REPORT_COLUMNS)
         .order("created_at", { ascending: false })
         .limit(300);
       if (data.status !== "all") q = q.in("status", reportStatusesFor(data.status));
@@ -209,7 +255,7 @@ export const listReports = createServerFn({ method: "GET" })
     const reelIds = Array.from(new Set(list.map((r) => r.reel_id).filter(Boolean))) as string[];
     const postIds = Array.from(new Set(list.map((r) => r.post_id).filter(Boolean))) as string[];
 
-    const [profiles, games, messages, reels, posts] = await Promise.all([
+    const [profiles, games, messages, reels, posts, actedOn] = await Promise.all([
       userIds.length
         ? supabaseAdmin
             .from("profiles")
@@ -231,6 +277,13 @@ export const listReports = createServerFn({ method: "GET" })
       postIds.length
         ? looseFrom(supabaseAdmin, "posts").select(POST_COLUMNS).in("id", postIds)
         : Promise.resolve<QueryResult>({ data: [], error: null }),
+      // Every report about these posts that a moderator acted on, whatever the filter: what Restore must not overturn.
+      postIds.length
+        ? looseFrom(supabaseAdmin, "user_reports")
+            .select("id, post_id")
+            .in("post_id", postIds)
+            .in("status", ACTED_ON_STATUSES)
+        : Promise.resolve<QueryResult>({ data: [], error: null }),
     ]);
 
     const pMap = new Map((profiles.data ?? []).map((p: any) => [p.id, p]));
@@ -238,6 +291,9 @@ export const listReports = createServerFn({ method: "GET" })
     const mMap = new Map((messages.data ?? []).map((m: any) => [m.id, m]));
     const rMap = new Map((reels.data ?? []).map((r: any) => [r.id, r]));
     const postMap = new Map(((posts.data ?? []) as PostRow[]).map((p) => [p.id, p]));
+    const actedOnRows = (actedOn.data ?? []) as { id: string; post_id: string }[];
+    const otherActedOn = (r: ReportRow) =>
+      actedOnRows.filter((a) => a.post_id === r.post_id && a.id !== r.id).length;
 
     const reports: ModerationReport[] = list.map((r) => {
       const reporter = pMap.get(r.reporter_id);
@@ -285,6 +341,13 @@ export const listReports = createServerFn({ method: "GET" })
               hidden: !!post.hidden_at,
               deleted: !!post.deleted_at,
               moderationStatus: post.moderation_status,
+              editedSinceReport: postEditedSinceReport(post.body, r.post_body_md5),
+              restoreKeepsHidden: post.hidden_at
+                ? postRestoreBlocker({
+                    resolutionNotes: r.resolution_notes,
+                    otherClosedReports: otherActedOn(r),
+                  })
+                : null,
             }
           : null,
       };
@@ -353,7 +416,8 @@ export const applyModerationAction = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     await assertModerator(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const ACTION_COLUMNS = "id, reported_id, subject_type, game_id, message_id, reel_id, reason";
+    const ACTION_COLUMNS =
+      "id, reported_id, subject_type, game_id, message_id, reel_id, reason, resolution_notes";
     const { data: found, error: rErr } = await withPostIdIfPresent((withPostId) =>
       looseFrom(supabaseAdmin, "user_reports")
         .select(withPostId ? `${ACTION_COLUMNS}, post_id` : ACTION_COLUMNS)
@@ -372,6 +436,7 @@ export const applyModerationAction = createServerFn({ method: "POST" })
       | "reel_id"
       | "post_id"
       | "reason"
+      | "resolution_notes"
     >;
 
     const reason = data.reason?.trim() || null;
@@ -417,7 +482,7 @@ export const applyModerationAction = createServerFn({ method: "POST" })
       } else if (report.subject_type === "post" && report.post_id) {
         // The same hide the superadmin content queue uses (hidden_at, written with the service role).
         await looseFrom(supabaseAdmin, "posts").update({ hidden_at: now }).eq("id", report.post_id);
-        summary = "Post hidden";
+        summary = POST_HIDDEN_SUMMARY;
       } else {
         throw new Error("This report has no removable content attached");
       }
@@ -450,11 +515,35 @@ export const applyModerationAction = createServerFn({ method: "POST" })
           .from("highlight_reels")
           .update({ hidden_at: null })
           .eq("id", report.reel_id);
-      if (report.post_id)
-        await looseFrom(supabaseAdmin, "posts")
-          .update({ hidden_at: null })
-          .eq("id", report.post_id);
       summary = "Access and content restored";
+      if (report.post_id) {
+        // Restore undoes this report's own hide only, never one another report or a superadmin made.
+        const [{ data: post }, { data: acted }] = await Promise.all([
+          looseFrom(supabaseAdmin, "posts")
+            .select("id, hidden_at")
+            .eq("id", report.post_id)
+            .maybeSingle(),
+          looseFrom(supabaseAdmin, "user_reports")
+            .select("id")
+            .eq("post_id", report.post_id)
+            .in("status", ACTED_ON_STATUSES),
+        ]);
+        const blocker = (post as { hidden_at: string | null } | null)?.hidden_at
+          ? postRestoreBlocker({
+              resolutionNotes: report.resolution_notes,
+              otherClosedReports: ((acted ?? []) as { id: string }[]).filter(
+                (a) => a.id !== report.id,
+              ).length,
+            })
+          : null;
+        if (blocker) {
+          summary = `Access restored; the post stays hidden (${blocker})`;
+        } else {
+          await looseFrom(supabaseAdmin, "posts")
+            .update({ hidden_at: null })
+            .eq("id", report.post_id);
+        }
+      }
     }
 
     await supabaseAdmin

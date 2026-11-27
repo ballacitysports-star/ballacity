@@ -15,7 +15,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
+  POST_REPORT_ALREADY_OPEN_MESSAGE,
+  POST_REPORT_FAILED_MESSAGE,
   POST_REPORT_UNAVAILABLE_MESSAGE,
+  REPORT_SUBMITTED_MESSAGE,
   reasonsFor,
   reportPost,
   submitReport,
@@ -76,10 +79,13 @@ export function ReportDialog({
     if (!reason) return;
     setSubmitting(true);
     try {
+      let done = REPORT_SUBMITTED_MESSAGE;
       if (subjectType === "post") {
-        // report_post checks the post, the reporter and the author itself; nothing is written directly.
-        if (!postId) throw new Error("Couldn't submit your report. Please try again.");
-        await reportPost(postId, reason, details);
+        // report_post checks the post, the reporter and the author itself; nothing is written directly. It says when
+        // it filed nothing because the member's open report already says the same, and the member is told so.
+        if (!postId) throw new Error(POST_REPORT_FAILED_MESSAGE);
+        const { filed } = await reportPost(postId, reason, details);
+        if (!filed) done = POST_REPORT_ALREADY_OPEN_MESSAGE;
       } else {
         await submitReport({
           subjectType,
@@ -92,7 +98,7 @@ export function ReportDialog({
           reelId,
         });
       }
-      toast.success("Report submitted. Our moderators will review it.");
+      toast.success(done);
       onOpenChange(false);
       setReason(null);
       setDetails("");

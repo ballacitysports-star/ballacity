@@ -55,7 +55,7 @@ beforeEach(() => {
   state.user = { id: "me" };
   state.age = 30;
   state.teams = [];
-  report.post.mockReset().mockResolvedValue("report-1");
+  report.post.mockReset().mockResolvedValue({ reportId: "report-1", filed: true });
   report.submit.mockReset();
 });
 
@@ -180,6 +180,24 @@ describe("Reporting a post (20261205100000)", () => {
       expect(toast.success).toHaveBeenCalledWith(
         "Report submitted. Our moderators will review it.",
       ),
+    );
+  });
+
+  it("says so when the member's open report already says the same, never that a report was submitted", async () => {
+    report.post.mockResolvedValueOnce({ reportId: "report-0", filed: false });
+    const { toast } = await import("sonner");
+    vi.mocked(toast.success).mockClear();
+    await showFeed([feedPost({ authorName: "Jordan" })]);
+    fireEvent.click(screen.getByRole("button", { name: "Report post by Jordan" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Spam" }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit report" }));
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith(
+        "You already reported this post for that reason. Our moderators will review it.",
+      ),
+    );
+    expect(toast.success).not.toHaveBeenCalledWith(
+      "Report submitted. Our moderators will review it.",
     );
   });
 

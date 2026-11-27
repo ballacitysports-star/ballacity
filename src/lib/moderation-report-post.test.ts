@@ -8,8 +8,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 type Result = { data: unknown; error: unknown };
 
+const FILED = { report_id: "report-1", filed: true };
+
 const h = vi.hoisted(() => ({
-  result: { data: "report-1", error: null } as Result,
+  result: { data: { report_id: "report-1", filed: true }, error: null } as Result,
   calls: [] as { fn: string; args: unknown }[],
 }));
 
@@ -32,6 +34,7 @@ const {
   MESSAGE_REPORT_REASONS,
   POST_REPORT_FAILED_MESSAGE,
   POST_REPORT_UNAVAILABLE_MESSAGE,
+  parsePostReportResult,
   reasonsFor,
   reportPost,
 } = await import("@/lib/moderation");
@@ -39,7 +42,7 @@ const {
 const RAW = /POST_NOT_FOUND|CANNOT_REPORT_SELF|AUTH_REQUIRED|report_post|PGRST|relation|violates/;
 
 beforeEach(() => {
-  h.result = { data: "report-1", error: null };
+  h.result = { data: FILED, error: null };
   h.calls = [];
 });
 
@@ -54,16 +57,41 @@ async function refusal(error: unknown): Promise<string> {
 }
 
 describe("reportPost", () => {
-  it("calls report_post with the post, the reason and trimmed details, and answers the report id", async () => {
-    await expect(reportPost("post-1", "harassment", "  said something awful  ")).resolves.toBe(
-      "report-1",
-    );
+  it("calls report_post with the post, the reason and trimmed details, and answers what it did", async () => {
+    await expect(reportPost("post-1", "harassment", "  said something awful  ")).resolves.toEqual({
+      reportId: "report-1",
+      filed: true,
+    });
     expect(h.calls).toEqual([
       {
         fn: "report_post",
         args: { _post: "post-1", _reason: "harassment", _details: "said something awful" },
       },
     ]);
+  });
+
+  it("says when report_post filed nothing because the member's open report already says the same", async () => {
+    h.result = { data: { report_id: "report-0", filed: false }, error: null };
+    await expect(reportPost("post-1", "spam")).resolves.toEqual({
+      reportId: "report-0",
+      filed: false,
+    });
+  });
+
+  it("never reads an answer it does not know as filed (or as already there)", () => {
+    for (const data of [
+      null,
+      "report-1",
+      { report_id: "report-1" },
+      { filed: true },
+      { report_id: 1, filed: true },
+    ]) {
+      expect(() => parsePostReportResult(data)).toThrow(POST_REPORT_FAILED_MESSAGE);
+    }
+    expect(parsePostReportResult({ report_id: "r", filed: false })).toEqual({
+      reportId: "r",
+      filed: false,
+    });
   });
 
   it("sends no details for blank ones and cuts long ones to 1000 characters", async () => {

@@ -1,7 +1,10 @@
 -- P1-2a: a member reports a network post (supabase/migrations/20261205100000_network_post_reports.sql).
 --   * report_post answers POST_NOT_FOUND, word for word and code for code, for a post that does not exist and for every
 --     post the caller cannot read (audience, block either way, moderation, hidden, deleted, hidden team): no oracle;
---   * a reader of the post reports it once while that report is open; the report names the author (for a team or
+--   * a reader of the post reports it; while their report is open, a repeat that adds nothing (same reason, same text
+--     of the post, no new note) files nothing and says so (filed false), and any other repeat (a new reason, a new note,
+--     an edited post) is a new report (filed true), so nothing a member adds is dropped; legacy open statuses count as
+--     open; the report keeps the md5 of the post's text, not the text; the report names the author (for a team or
 --     facility post, the person who wrote it), never the caller; nobody reports their own post; signed-out visitors
 --     cannot call it; the reason is one user_reports_reason_check allows, checked before the post is looked up;
 --   * the author never reads the report; members cannot write a post report into the table directly;
@@ -53,6 +56,23 @@ CREATE FUNCTION t.reasons565() RETURNS text[] LANGUAGE sql AS $$
    WHERE c.conrelid = 'public.user_reports'::regclass AND c.conname = 'user_reports_reason_check' $$;
 CREATE FUNCTION t.rows565(_post text, _reporter text) RETURNS int LANGUAGE sql AS $$
   SELECT count(*)::int FROM public.user_reports WHERE post_id = t.id(_post) AND reporter_id = t.id(_reporter) $$;
+-- The caller's own report of a post, for a reason (read as the caller: a reporter reads their own reports).
+CREATE FUNCTION t.mine565(_post text, _reason text) RETURNS uuid LANGUAGE sql AS $$
+  SELECT r.id FROM public.user_reports r
+   WHERE r.reporter_id = auth.uid() AND r.post_id = t.id(_post) AND r.reason = _reason
+   ORDER BY r.created_at LIMIT 1 $$;
+-- 'other' and pp-as-gym: set 'other''s open report of it to _status, report it again as 'other' with the same reason and
+-- no note, and answer what report_post said it did (filed true or false). Runs as the superuser, like setup.
+CREATE FUNCTION t.cycle565(_status text) RETURNS text LANGUAGE plpgsql AS $$
+DECLARE _r jsonb;
+BEGIN
+  UPDATE public.user_reports SET status = _status
+   WHERE post_id = t.id('pp-as-gym') AND reporter_id = t.id('other') AND status NOT IN ('resolved', 'actioned', 'dismissed');
+  PERFORM t.as_user(t.id('other'));
+  _r := public.report_post(t.id('pp-as-gym'), 'spam');
+  PERFORM t.reset();
+  RETURN _r ->> 'filed';
+END $$;
 
 -- ---- no oracle: a missing post and a post the caller cannot read get one answer ---------------------------------------
 SELECT t.as_user(t.id('onlooker'));
@@ -113,33 +133,62 @@ SELECT t.eq((SELECT details FROM public.user_reports WHERE post_id = t.id('pp-as
 SELECT t.eq((SELECT length(details) FROM public.user_reports WHERE post_id = t.id('pp-as-gym') AND reporter_id = t.id('teammate')), 1000,
   'long details are cut to 1000 characters');
 
--- ---- one open report per reporter and post ---------------------------------------------------------------------------------
+-- ---- a repeat while the report is open: nothing new only when it adds nothing ---------------------------------------------
 SELECT t.as_user(t.id('onlooker'));
-SELECT t.ok(public.report_post(t.id('pp-public'), 'harassment', 'again')
-            = (SELECT r.id FROM public.user_reports r WHERE r.reporter_id = auth.uid() AND r.post_id = t.id('pp-public') LIMIT 1),
-  'reporting the same post again answers with the open report');
+SELECT t.eq(public.report_post(t.id('pp-public'), 'spam'), jsonb_build_object('report_id', t.mine565('pp-public', 'spam'), 'filed', false),
+  'the same reason again, with no note: it answers with the open report and says nothing was filed');
+SELECT t.eq(public.report_post(t.id('pp-public'), 'spam', '  first look '), jsonb_build_object('report_id', t.mine565('pp-public', 'spam'), 'filed', false),
+  'and with the note that report already has: the same');
 SELECT t.reset();
-SELECT t.eq(t.rows565('pp-public', 'onlooker'), 1, 'and writes no second row');
+SELECT t.eq(t.rows565('pp-public', 'onlooker'), 1, 'neither writes a second row');
 SELECT t.eq((SELECT string_agg(reason || '|' || coalesce(details, '<none>'), ',' ORDER BY reason) FROM public.user_reports
               WHERE post_id = t.id('pp-public')), 'spam|first look', 'nor changes the first one');
 
-UPDATE public.user_reports SET status = 'resolved' WHERE post_id = t.id('pp-public') AND reporter_id = t.id('onlooker');
 SELECT t.as_user(t.id('onlooker'));
-SELECT t.eq(t.report565('pp-public'), NULL, 'once a moderator resolves it, the member can report the post again');
+SELECT t.eq(public.report_post(t.id('pp-public'), 'spam', 'he did it again') ->> 'filed', 'true',
+  'the same reason with a new note: a new report, and it says so');
+SELECT t.eq(public.report_post(t.id('pp-public'), 'minor_safety', 'he is messaging my 14 year old') ->> 'filed', 'true',
+  'a follow-up with a reason that raises the stakes: a new report');
+SELECT t.ok((public.report_post(t.id('pp-public'), 'minor_safety') ->> 'report_id')::uuid = t.mine565('pp-public', 'minor_safety'),
+  'and that one again with no note answers with it');
 SELECT t.reset();
-SELECT t.eq(t.rows565('pp-public', 'onlooker'), 2, 'as a new report');
-UPDATE public.user_reports SET status = 'escalated' WHERE post_id = t.id('pp-public') AND reporter_id = t.id('onlooker') AND status = 'new';
-SELECT t.as_user(t.id('onlooker')); SELECT t.report565('pp-public'); SELECT t.reset();
-SELECT t.eq(t.rows565('pp-public', 'onlooker'), 2, 'an escalated report is still open: no new row');
-UPDATE public.user_reports SET status = 'actioned' WHERE post_id = t.id('pp-public') AND reporter_id = t.id('onlooker') AND status = 'escalated';
-SELECT t.as_user(t.id('onlooker')); SELECT t.report565('pp-public'); SELECT t.reset();
-SELECT t.eq(t.rows565('pp-public', 'onlooker'), 3, 'an actioned report is closed: a new row');
-UPDATE public.user_reports SET status = 'investigating' WHERE post_id = t.id('pp-public') AND reporter_id = t.id('onlooker') AND status = 'new';
-SELECT t.as_user(t.id('onlooker')); SELECT t.report565('pp-public'); SELECT t.reset();
-SELECT t.eq(t.rows565('pp-public', 'onlooker'), 3, 'an investigating report is still open: no new row');
-UPDATE public.user_reports SET status = 'dismissed' WHERE post_id = t.id('pp-public') AND reporter_id = t.id('onlooker') AND status = 'investigating';
-SELECT t.as_user(t.id('onlooker')); SELECT t.report565('pp-public'); SELECT t.reset();
-SELECT t.eq(t.rows565('pp-public', 'onlooker'), 4, 'a dismissed report is closed: a new row');
+SELECT t.eq(t.rows565('pp-public', 'onlooker'), 3, 'three reports: nothing the member added was dropped');
+SELECT t.eq((SELECT string_agg(reason || '|' || coalesce(details, '<none>') || '|' || status, ',' ORDER BY reason, details)
+               FROM public.user_reports WHERE post_id = t.id('pp-public') AND reporter_id = t.id('onlooker')),
+  'minor_safety|he is messaging my 14 year old|new,spam|first look|new,spam|he did it again|new',
+  'each with its own reason and note, each new for the moderators');
+
+-- The report keeps a fingerprint of the text it was about, never the text.
+SELECT t.eq((SELECT count(*)::int FROM public.user_reports r JOIN public.posts p ON p.id = r.post_id
+              WHERE r.subject_type = 'post' AND r.post_body_md5 IS DISTINCT FROM md5(p.body)), 0,
+  'every post report keeps the md5 of the post''s text when it was filed');
+SELECT t.eq((SELECT count(*)::int FROM public.user_reports r JOIN public.posts p ON p.id = r.post_id
+              WHERE r.details = p.body OR r.resolution_notes = p.body), 0, 'and no copy of the text');
+-- An edited post (as server code leaves it after its check) is new text: the same reason again is a new report.
+UPDATE public.posts SET body = 'Open run Sunday' WHERE id = t.id('pp-public');
+SELECT t.as_user(t.id('onlooker'));
+SELECT t.eq(public.report_post(t.id('pp-public'), 'spam') ->> 'filed', 'true', 'the post was edited since: the same reason again is a new report');
+SELECT t.reset();
+SELECT t.eq((SELECT string_agg(md5, ',' ORDER BY md5) FROM (SELECT CASE post_body_md5 WHEN md5('Open run Saturday') THEN 'saturday'
+                                                                          WHEN md5('Open run Sunday') THEN 'sunday' END AS md5
+                                                             FROM public.user_reports WHERE post_id = t.id('pp-public') AND reporter_id = t.id('onlooker')) x),
+  'saturday,saturday,saturday,sunday', 'the earlier reports keep the md5 of the text they were about, the new one the text now');
+
+-- Open is every status but resolved, actioned and dismissed, the legacy ones too; a closed report lets a new one in.
+SELECT t.as_user(t.id('other'));
+SELECT t.eq(t.report565('pp-as-gym'), NULL, 'a member reports a post');
+SELECT t.reset();
+SELECT t.eq(t.cycle565('new'), 'false', 'a new report is open: the same again files nothing');
+SELECT t.eq(t.cycle565('escalated'), 'false', 'an escalated report is still open');
+SELECT t.eq(t.cycle565('investigating'), 'false', 'an investigating report is still open');
+SELECT t.eq(t.cycle565('pending'), 'false', 'a legacy pending report is still open');
+SELECT t.eq(t.cycle565('open'), 'false', 'a legacy open report (the superadmin queue''s Reopen) is still open');
+SELECT t.eq(t.cycle565('reviewing'), 'false', 'a legacy reviewing report is still open');
+SELECT t.eq(t.rows565('pp-as-gym', 'other'), 1, 'and none of those wrote a row');
+SELECT t.eq(t.cycle565('resolved'), 'true', 'once a moderator resolves it, the same report is a new one');
+SELECT t.eq(t.cycle565('actioned'), 'true', 'an actioned report is closed: a new one');
+SELECT t.eq(t.cycle565('dismissed'), 'true', 'a dismissed report is closed: a new one');
+SELECT t.eq(t.rows565('pp-as-gym', 'other'), 4, 'one row for each closed report, and the open one');
 SELECT t.as_user(t.id('fan'));
 SELECT t.eq(t.report565('pp-public'), NULL, 'someone else reporting the same post');
 SELECT t.reset();
@@ -175,15 +224,19 @@ SELECT t.eq(t.count('SELECT 1 FROM public.user_reports'), 0, 'nor does the manag
 SELECT t.as_user(t.id('onlooker'));
 SELECT t.eq(t.count('SELECT 1 FROM public.user_reports'), t.count('SELECT 1 FROM public.user_reports WHERE reporter_id = auth.uid()'),
   'a reporter reads only their own reports');
-SELECT t.eq(t.count('SELECT 1 FROM public.user_reports'), 6, 'all six of them');
+-- pp-public: 4 above and 19 from the reasons (spam about the text now was open already), pp-as-team, pp-as-gym.
+SELECT t.eq(t.count('SELECT 1 FROM public.user_reports'), 25, 'all 25 of them');
 SELECT t.as_user(t.id('nobody'));
 SELECT t.eq(t.count('SELECT 1 FROM public.user_reports'), 0, 'anyone else reads none');
 SELECT t.as_user(t.id('modone'));
-SELECT t.eq(t.count('SELECT 1 FROM public.user_reports WHERE subject_type = ''post'''), 12, 'a moderator reads every post report');
+-- onlooker 25, fan 3, teammate 2, kinteen 1, other 4.
+SELECT t.eq(t.count('SELECT 1 FROM public.user_reports WHERE subject_type = ''post'''), 35, 'a moderator reads every post report');
 SELECT t.eq(t.changed(format('UPDATE public.user_reports SET status = ''investigating'' WHERE post_id = %L', t.id('pp-family'))), 1,
   'and can take one up');
 SELECT t.throws(format('UPDATE public.user_reports SET post_id = NULL WHERE post_id = %L', t.id('pp-family')), 'REPORT_FIELDS_FIXED',
   'but cannot change which post it is about');
+SELECT t.throws(format('UPDATE public.user_reports SET post_body_md5 = md5(''x'') WHERE post_id = %L', t.id('pp-family')), 'REPORT_FIELDS_FIXED',
+  'nor the fingerprint of the text it was about');
 SELECT t.reset();
 
 -- ---- post reports only through report_post ---------------------------------------------------------------------------------------
@@ -197,6 +250,9 @@ SELECT t.throws(format($$INSERT INTO public.user_reports (reporter_id, reported_
 SELECT t.throws(format($$INSERT INTO public.user_reports (reporter_id, reported_id, reason, subject_type) VALUES (auth.uid(), %L, 'spam', 'post')$$,
                        t.id('nobody')),
   'REPORT_POST_VIA_RPC', 'nor file a post report with no post');
+SELECT t.throws(format($$INSERT INTO public.user_reports (reporter_id, reported_id, reason, subject_type, post_body_md5) VALUES (auth.uid(), %L, 'spam', 'user', md5('x'))$$,
+                       t.id('nobody')),
+  'REPORT_POST_VIA_RPC', 'nor write a post text fingerprint onto another kind of report');
 SELECT t.eq(t.err565(format($$INSERT INTO public.user_reports (reporter_id, reported_id, reason, subject_type, post_id) VALUES (auth.uid(), %L, 'spam', 'user', %L)$$,
                             t.id('nobody'), t.id('pp-missing'))),
             t.err565(format($$INSERT INTO public.user_reports (reporter_id, reported_id, reason, subject_type, post_id) VALUES (auth.uid(), %L, 'spam', 'user', %L)$$,
@@ -249,6 +305,9 @@ SELECT t.throws($$INSERT INTO public.user_reports (reporter_id, reported_id, rea
 SELECT t.eq((SELECT format_type(a.atttypid, a.atttypmod) || '|' || a.attnotnull::text FROM pg_attribute a
               WHERE a.attrelid = 'public.user_reports'::regclass AND a.attname = 'post_id' AND NOT a.attisdropped),
   'uuid|false', 'post_id is a nullable uuid');
+SELECT t.eq((SELECT format_type(a.atttypid, a.atttypmod) || '|' || a.attnotnull::text || '|' || a.atthasdef::text FROM pg_attribute a
+              WHERE a.attrelid = 'public.user_reports'::regclass AND a.attname = 'post_body_md5' AND NOT a.attisdropped),
+  'text|false|false', 'post_body_md5 is a nullable text with no default');
 SELECT t.eq((SELECT c.confrelid::regclass::text || '|' || c.confdeltype::text FROM pg_constraint c
               WHERE c.conrelid = 'public.user_reports'::regclass AND c.contype = 'f'
                 AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.user_reports'::regclass AND attname = 'post_id')]),
