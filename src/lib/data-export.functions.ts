@@ -304,6 +304,9 @@ export const requestDataExport = createServerFn({ method: "POST" })
       .update({ status: "processing", started_at: new Date().toISOString() } as never)
       .eq("id", requestId);
 
+    // Set once the file may be in the bucket. The expiry job (20261205110000) finds a file only through the row's
+    // storage_path, so a build that fails after this point deletes the file itself rather than leave it there for good.
+    let filePath: string | null = null;
     try {
       const payload: Record<string, unknown> = {
         export_format: "openrun-data-export/v1",
@@ -335,6 +338,7 @@ export const requestDataExport = createServerFn({ method: "POST" })
       const bytes = new TextEncoder().encode(body);
       const path = `${userId}/${requestId}.json`;
 
+      filePath = path;
       const { error: upErr } = await supabaseAdmin.storage
         .from(EXPORT_BUCKET)
         .upload(path, bytes, { contentType: "application/json", upsert: true });
@@ -342,7 +346,7 @@ export const requestDataExport = createServerFn({ method: "POST" })
 
       const readyAt = new Date();
       const expiresAt = new Date(readyAt.getTime() + EXPORT_TTL_HOURS * 3600 * 1000);
-      await supabaseAdmin
+      const { error: readyErr } = await supabaseAdmin
         .from("data_export_requests")
         .update({
           status: "ready",
@@ -353,6 +357,7 @@ export const requestDataExport = createServerFn({ method: "POST" })
           expires_at: expiresAt.toISOString(),
         } as never)
         .eq("id", requestId);
+      if (readyErr) throw new Error(readyErr.message);
 
       await supabaseAdmin.from("notifications").insert({
         user_id: userId,
@@ -365,6 +370,14 @@ export const requestDataExport = createServerFn({ method: "POST" })
       return { id: requestId, status: "ready" as const };
     } catch (e) {
       const message = e instanceof Error ? e.message : "Export failed";
+      if (filePath) {
+        // Best effort: an upload that reported an error may still have stored the file.
+        try {
+          await supabaseAdmin.storage.from(EXPORT_BUCKET).remove([filePath]);
+        } catch {
+          // the export is marked failed either way
+        }
+      }
       await supabaseAdmin
         .from("data_export_requests")
         .update({ status: "failed", error_message: message.slice(0, 500) } as never)

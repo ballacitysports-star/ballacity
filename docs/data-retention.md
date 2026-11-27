@@ -12,6 +12,23 @@ Canonical machine-readable source: `src/lib/retention.ts` (`RETENTION_RULES`) an
 - One request builds a single JSON file (`openrun-data-export/v1`) stored in the private
   `data-exports` bucket at `<user_id>/<request_id>.json`.
 - Delivery is a signed URL valid for 1 hour; the export itself expires 24 hours after it is ready.
+- That expiry is enforced by the daily `expire-data-exports` job (04:27 UTC, migration
+  `20261205110000_expire_data_exports.sql`), scheduled where pg_cron and pg_net are installed. It
+  calls the worker route `/api/public/data-exports/expire`, which marks every export whose window
+  has ended `expired` and deletes its file from the `data-exports` bucket. The window ends at the
+  export's `expires_at`, the time the app shows and checks before it signs a download (24 hours
+  after it is ready); an export with no `expires_at` ends 24 hours after `ready_at`. A run deletes
+  at most 1,000 files (fewer if it reaches its time limit), so a file is usually deleted at the
+  first run after its export expires, up to a day later; a larger backlog, such as the first
+  run's, is cleared over the following days. The request row is kept (status, size and times)
+  with its file pointer cleared: it is the member's export history, and the rate limit counts it.
+  Deleted files cannot be restored. Until the migration is applied to production and the app with
+  the route is published, expired files stay in the bucket there.
+- The job finds a file only through its row's file pointer, which is written when the export is
+  marked ready. A build that fails after storing the file (or while storing it) tries once to
+  delete the file itself. A build cut off between storing the file and marking the export ready
+  (the Worker stopped), or whose own delete fails, leaves a file with no pointer, which the job
+  does not find.
 - Rate limit: 3 requests per rolling 24 hours, enforced by the
   `enforce_data_export_rate_limit` trigger on `data_export_requests` (server-side, not UI-only).
 - Status machine: `requested → processing → ready | failed`, and `ready → expired`.
@@ -80,3 +97,8 @@ These tables are not in `RETENTION_RULES`, so `/account/data` does not show them
   `storage_path` are written exclusively server-side.
 - `getDataExportDownloadUrl` re-verifies ownership, status, and expiry before signing, and flips
   a lapsed row to `expired` instead of signing it.
+- The expiry job's route needs the worker secret. The functions it calls
+  (`expire_stale_data_exports`, `data_export_files_due`, `clear_data_export_files`) are executable
+  by the service role only. The database picks the files to delete: only exports already `expired`
+  (or `failed`) whose window has ended, and only the file named after that export
+  (`<user_id>/<request_id>.json`), never a `ready` export's. The route answers counts only.
