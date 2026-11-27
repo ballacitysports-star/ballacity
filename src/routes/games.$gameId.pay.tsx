@@ -25,6 +25,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { isManagedUser } from "@/lib/managed-children";
 import { useParentMode } from "@/hooks/use-parent-mode";
 import { supabase } from "@/integrations/supabase/client";
+import { liveChannel, onLive } from "@/lib/realtime-channel";
 import {
   type GamePaymentSettings,
   type GamePaymentTerms,
@@ -144,6 +145,21 @@ const proofSchema = z.object({
     .optional(),
   notes: z.string().trim().max(500, { message: "Notes must be under 500 characters." }).optional(),
 });
+
+/** Send order for one kind of read: how many were sent, and the number of the newest one whose answer was applied. */
+type ReadOrder = { sent: number; newestApplied: number };
+
+/**
+ * Whether read `readNo`'s answer may be applied, recording it as applied when it may. Several reads of the same rows
+ * can be out at once (the lookup on load, a poll, a focus, a change, the catch-up on SUBSCRIBED) and they can answer
+ * in either order; each replaces the rows wholesale, so an answer from a read sent earlier is older and must not
+ * replace a later one's.
+ */
+function claimNewestRead(order: ReadOrder, readNo: number): boolean {
+  if (readNo < order.newestApplied) return false;
+  order.newestApplied = readNo;
+  return true;
+}
 
 function externalPaymentResumeKey(gameId: string, methodId: string) {
   return `pay-opened:${gameId}:${methodId}`;
@@ -413,16 +429,29 @@ function PayPage() {
     if (isParentMode) nav({ to: "/parent", hash: "activity", replace: true });
   }, [isParentMode, nav]);
 
+  // Send order of the reads of the viewer's request and of their payments (claimNewestRead).
+  const reqReadOrder = useRef<ReadOrder>({ sent: 0, newestApplied: 0 });
+  const subsReadOrder = useRef<ReadOrder>({ sent: 0, newestApplied: 0 });
+  // The viewer key whose request the page has already read once: an answer was applied, or the lookup on load settled
+  // (a failed lookup counts, so an approval read after it still toasts). Approval is only toasted after that: the
+  // catch-up on SUBSCRIBED can answer before the lookup on load, and an already approved player must not be told
+  // "You're approved!" on every visit.
+  const reqAnsweredForRef = useRef<string | null>(null);
+
   const refreshJoinRequest = useCallback(async () => {
     if (!userId) return;
     const key = `${gameId}:${userId}`;
+    const readNo = ++reqReadOrder.current.sent;
     try {
       const req = await getMyJoinRequest(gameId);
       if (viewerKeyRef.current !== key) return;
+      if (!claimNewestRead(reqReadOrder.current, readNo)) return;
       markLookup(key, "req", true);
+      const answeredBefore = reqAnsweredForRef.current === key;
+      reqAnsweredForRef.current = key;
       setMyReq((prev) => {
         // Toast on approval transition (pending/rejected/none → approved).
-        if (req?.status === "approved" && prev?.status !== "approved") {
+        if (answeredBefore && req?.status === "approved" && prev?.status !== "approved") {
           toast.success("You're approved! You can pay now.");
         }
         return req;
@@ -527,6 +556,8 @@ function PayPage() {
       setMyReq(null);
       setMyRemoved(false);
       setViewerLookup({ key, req: "loading", subs: "loading" });
+      // Back on a viewer seen before, the request counts as unread again (it was just cleared above).
+      reqAnsweredForRef.current = null;
     }
     let cancelled = false;
     const withTimeout = <T,>(p: Promise<T>, label: string): Promise<T> =>
@@ -536,6 +567,8 @@ function PayPage() {
           window.setTimeout(() => reject(new Error(`[pay] ${label} timed out after 6s`)), 6000),
         ),
       ]);
+    const subsReadNo = ++subsReadOrder.current.sent;
+    const reqReadNo = ++reqReadOrder.current.sent;
     void (async () => {
       const [subsResult, reqResult, removedResult] = await Promise.allSettled([
         withTimeout(listMySubmissionsForGame(gameId), "listMySubmissionsForGame"),
@@ -546,18 +579,27 @@ function PayPage() {
       ]);
       if (cancelled) return;
       setMyRemoved(removedResult.status === "fulfilled" && removedResult.value);
+      // An answer is skipped when a read sent after this lookup has already been applied: it is newer, and the lookup
+      // is marked ready by it.
       if (subsResult.status === "fulfilled") {
-        setMySubs(subsResult.value);
+        if (claimNewestRead(subsReadOrder.current, subsReadNo)) {
+          setMySubs(subsResult.value);
+          markLookup(key, "subs", true);
+        }
       } else {
         console.warn(`[pay] submissions lookup failed: ${subsResult.reason}`);
+        markLookup(key, "subs", false);
       }
-      markLookup(key, "subs", subsResult.status === "fulfilled");
+      reqAnsweredForRef.current = key;
       if (reqResult.status === "fulfilled") {
-        setMyReq(reqResult.value);
+        if (claimNewestRead(reqReadOrder.current, reqReadNo)) {
+          setMyReq(reqResult.value);
+          markLookup(key, "req", true);
+        }
       } else {
         console.warn(`[pay] join-request lookup failed: ${reqResult.reason}`);
+        markLookup(key, "req", false);
       }
-      markLookup(key, "req", reqResult.status === "fulfilled");
     })();
     return () => {
       cancelled = true;
@@ -592,8 +634,9 @@ function PayPage() {
   }, [refreshJoinRequest]);
   useEffect(() => {
     if (!userId) return;
-    const channel = supabase
-      .channel(`pay-join-req:${gameId}:${userId}`)
+    // join_requests is in the supabase_realtime publication, so the join can wait for the change stream. The topic
+    // stays as it is: e2e specs find this channel by "pay-join-req:".
+    const channel = liveChannel(`pay-join-req:${gameId}:${userId}`)
       .on(
         "postgres_changes",
         {
@@ -607,7 +650,9 @@ function PayPage() {
           if (row?.game_id === gameId) refreshRef.current();
         },
       )
-      .subscribe();
+      // Read again on every SUBSCRIBED: the lookup on load may have been answered before changes were live, and
+      // changes made while the channel was down are not replayed.
+      .subscribe(onLive(() => void refreshRef.current()));
 
     const poll = window.setInterval(() => refreshRef.current(), 15_000);
     const onFocus = () => refreshRef.current();
@@ -630,9 +675,11 @@ function PayPage() {
   const refreshSubs = useCallback(async () => {
     if (!userId) return;
     const key = `${gameId}:${userId}`;
+    const readNo = ++subsReadOrder.current.sent;
     try {
       const subs = await listMySubmissionsForGame(gameId);
       if (viewerKeyRef.current !== key) return;
+      if (!claimNewestRead(subsReadOrder.current, readNo)) return;
       markLookup(key, "subs", true);
       setMySubs((prev) => {
         const prevLatest = prev[0];
@@ -660,8 +707,8 @@ function PayPage() {
   }, [refreshSubs]);
   useEffect(() => {
     if (!userId) return;
-    const channel = supabase
-      .channel(`pay-subs:${gameId}:${userId}`)
+    // payment_submissions is in the supabase_realtime publication, so the join can wait for the change stream.
+    const channel = liveChannel(`pay-subs:${gameId}:${userId}`)
       .on(
         "postgres_changes",
         {
@@ -675,7 +722,8 @@ function PayPage() {
           if (row?.game_id === gameId) refreshSubsRef.current();
         },
       )
-      .subscribe();
+      // Read again on every SUBSCRIBED, as for the request above.
+      .subscribe(onLive(() => void refreshSubsRef.current()));
 
     const poll = window.setInterval(() => refreshSubsRef.current(), 15_000);
     const onFocus = () => refreshSubsRef.current();

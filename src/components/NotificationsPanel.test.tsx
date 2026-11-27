@@ -72,13 +72,29 @@ vi.mock("@/lib/deep-links", () => ({
   resolveNotificationTarget: (row: { link?: string }) => row.link ?? "/",
 }));
 
-vi.mock("@/integrations/supabase/client", () => {
-  const channel = {
-    on: () => channel,
-    subscribe: () => channel,
-  };
-  return { supabase: { channel: () => channel, removeChannel: () => {} } };
-});
+// Each channel() call gets its own channel, recorded with its name, options and subscribe callback. No status is
+// ever sent on its own: a test that needs SUBSCRIBED calls the recorded callback.
+type StatusCb = (status: string, err?: Error) => void;
+const rt = vi.hoisted(() => ({
+  opened: [] as { name: string; options: unknown; onStatus?: StatusCb }[],
+}));
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    channel: (name: string, options?: unknown) => {
+      const entry: (typeof rt.opened)[number] = { name, options };
+      rt.opened.push(entry);
+      const channel = {
+        on: () => channel,
+        subscribe: (cb?: StatusCb) => {
+          entry.onStatus = cb;
+          return channel;
+        },
+      };
+      return channel;
+    },
+    removeChannel: () => {},
+  },
+}));
 
 const toasts = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), plain: vi.fn() }));
 vi.mock("sonner", () => ({
@@ -99,6 +115,7 @@ const issue = {
 beforeEach(() => {
   delivery.load.mockResolvedValue([issue]);
   window.localStorage.clear();
+  rt.opened.length = 0;
 });
 
 afterEach(() => {
@@ -290,5 +307,109 @@ describe("NotificationsPanel opening an alert", () => {
     fireEvent.click(await screen.findByText("You're invited"));
     expect(n.markRead).not.toHaveBeenCalled();
     expect(router.nav).toHaveBeenCalledWith({ href: "/games/g1?invite=1" });
+  });
+});
+
+describe("NotificationsPanel live list", () => {
+  const listChannel = () => rt.opened.find((c) => c.name === "notif-list-me");
+  const sendStatus = async (status: string) => {
+    await act(async () => listChannel()!.onStatus!(status));
+  };
+
+  it("opens the list channel with wait, so SUBSCRIBED means changes are live", async () => {
+    await renderPanel();
+    expect(listChannel()?.options).toStrictEqual({
+      config: { postgres_changes_options: { wait: true } },
+    });
+  });
+
+  it("re-reads the list and the unread count on the first SUBSCRIBED and on each rejoin", async () => {
+    await renderPanel();
+    expect(n.refresh).not.toHaveBeenCalled();
+    // A row written after the mount load answered but before changes were live.
+    n.items = [
+      {
+        id: "late",
+        read_at: null,
+        created_at: "2026-11-19T10:00:00Z",
+        type: "system",
+        title: "Late",
+      },
+    ];
+    await sendStatus("SUBSCRIBED");
+    expect(await screen.findByText("Late")).toBeTruthy();
+    expect(n.refresh).toHaveBeenCalledTimes(1);
+
+    n.items = [
+      {
+        id: "gap",
+        read_at: null,
+        created_at: "2026-11-19T11:00:00Z",
+        type: "system",
+        title: "Gap",
+      },
+      ...n.items,
+    ];
+    await sendStatus("CHANNEL_ERROR");
+    await sendStatus("SUBSCRIBED");
+    expect(await screen.findByText("Gap")).toBeTruthy();
+    expect(n.refresh).toHaveBeenCalledTimes(2);
+  });
+
+  it("says Connecting before the first SUBSCRIBED, Live once joined, and Reconnecting after a drop", async () => {
+    await renderPanel();
+    expect(screen.getByText("Connecting…")).toBeTruthy();
+    // An error before the channel has ever joined is still the first connect.
+    await sendStatus("TIMED_OUT");
+    expect(screen.getByText("Connecting…")).toBeTruthy();
+    await sendStatus("SUBSCRIBED");
+    expect(screen.getByText("Live")).toBeTruthy();
+    await sendStatus("CHANNEL_ERROR");
+    expect(screen.getByText("Reconnecting…")).toBeTruthy();
+  });
+
+  it("keeps the newest list when an older load answers last", async () => {
+    let answerFirst: (rows: unknown[]) => void = () => {};
+    const first = new Promise<unknown[]>((resolve) => (answerFirst = resolve));
+    const newer = [
+      {
+        id: "new",
+        read_at: null,
+        created_at: "2026-11-19T12:00:00Z",
+        type: "system",
+        title: "Newer",
+      },
+    ];
+    let calls = 0;
+    const notifications = await import("@/lib/notifications");
+    const spy = vi
+      .spyOn(notifications, "listMyNotifications")
+      .mockImplementation(() => (++calls === 1 ? first : Promise.resolve(newer)) as never);
+    await renderPanel();
+    await sendStatus("SUBSCRIBED");
+    expect(await screen.findByText("Newer")).toBeTruthy();
+    await act(async () =>
+      answerFirst([
+        {
+          id: "old",
+          read_at: null,
+          created_at: "2026-11-19T09:00:00Z",
+          type: "system",
+          title: "Older",
+        },
+      ]),
+    );
+    expect(screen.getByText("Newer")).toBeTruthy();
+    expect(screen.queryByText("Older")).toBeNull();
+    spy.mockRestore();
+  });
+
+  it("opens the superadmin delivery-log channel without wait, since that table is not published", async () => {
+    staff.isSuperadmin = true;
+    await renderPanel();
+    await screen.findByText("Push delivery issue");
+    const deliv = rt.opened.find((c) => c.name === "notif-deliv-me");
+    expect(deliv).toBeTruthy();
+    expect(deliv!.options).toBeUndefined();
   });
 });

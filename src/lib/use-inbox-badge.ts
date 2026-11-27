@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { fetchInboxMessageCounts } from "@/lib/messages";
 import { useUnreadNotificationCount } from "@/lib/notifications";
+import { liveChannel, onLive } from "@/lib/realtime-channel";
 
 /**
  * The number on the Inbox tab: what is actually waiting in the Inbox.
@@ -31,8 +32,7 @@ export function useInboxBadgeCount(scope = "nav-"): number {
   useEffect(() => {
     if (!uid) return;
     const refresh = () => void qc.invalidateQueries({ queryKey: ["inbox-badge", uid] });
-    const channel = supabase
-      .channel(`inbox-badge-${uid}`)
+    const channel = liveChannel(`inbox-badge-${uid}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, refresh)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages" }, refresh)
       .on(
@@ -40,7 +40,9 @@ export function useInboxBadgeCount(scope = "nav-"): number {
         { event: "UPDATE", schema: "public", table: "conversations" },
         refresh,
       )
-      .subscribe();
+      // Count again on every SUBSCRIBED, the first included: the query on mount may have been answered before
+      // changes were live, and changes made while the channel was down are not replayed.
+      .subscribe(onLive(refresh));
     return () => {
       void supabase.removeChannel(channel);
     };

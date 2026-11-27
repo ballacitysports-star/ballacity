@@ -22,6 +22,10 @@ const h = vi.hoisted(() => ({
     filter: { event: string; table: string; filter?: string };
     cb: (p: { eventType: string; new: unknown; old: unknown }) => void;
   }>,
+  opened: [] as Array<{ name: string; options: unknown }>,
+  status: undefined as undefined | ((status: string) => void),
+  // When set, each read waits for this before answering, so a test can order the answers.
+  gate: null as null | ((n: number) => Promise<void>),
 }));
 
 vi.mock("@tanstack/react-router", () => ({
@@ -34,7 +38,10 @@ vi.mock("@/integrations/supabase/client", () => {
       h.bindings.push({ filter, cb });
       return channel;
     },
-    subscribe: () => channel,
+    subscribe: (cb?: (status: string) => void) => {
+      h.status = cb;
+      return channel;
+    },
   };
   return {
     supabase: {
@@ -42,11 +49,17 @@ vi.mock("@/integrations/supabase/client", () => {
         select: () => ({
           eq: async () => {
             h.reads += 1;
-            return { data: h.rows.map((r) => ({ ...r })), error: null };
+            const n = h.reads;
+            const data = h.rows.map((r) => ({ ...r }));
+            if (h.gate) await h.gate(n);
+            return { data, error: null };
           },
         }),
       }),
-      channel: () => channel,
+      channel: (name: string, options?: unknown) => {
+        h.opened.push({ name, options });
+        return channel;
+      },
       removeChannel: () => {},
     },
   };
@@ -80,6 +93,9 @@ afterEach(() => {
   h.rows = [];
   h.reads = 0;
   h.bindings = [];
+  h.opened = [];
+  h.status = undefined;
+  h.gate = null;
 });
 
 describe("PlayerOrgsSection", () => {
@@ -129,5 +145,50 @@ describe("PlayerOrgsSection", () => {
       { filtered: true },
     );
     expect(await screen.findByText("Peak Training")).toBeTruthy();
+  });
+
+  it("opens its channel holding SUBSCRIBED until the changes are live", () => {
+    render(<PlayerOrgsSection userId="u2" />);
+    expect(h.opened).toStrictEqual([
+      { name: "player-orgs:u2", options: { config: { postgres_changes_options: { wait: true } } } },
+    ]);
+  });
+
+  it("reads the memberships again on every SUBSCRIBED, the first included", async () => {
+    render(<PlayerOrgsSection userId="u2" />);
+    await waitFor(() => expect(h.reads).toBe(1));
+
+    // A membership added after the read on mount, before the changes were live.
+    h.rows = [{ id: "m3", org_id: "org-Peak", role: "member", org: org("Peak Training") }];
+    act(() => h.status?.("SUBSCRIBED"));
+    expect(await screen.findByText("Peak Training")).toBeTruthy();
+    expect(h.reads).toBe(2);
+
+    act(() => h.status?.("CHANNEL_ERROR"));
+    await new Promise((r) => setTimeout(r, 10));
+    expect(h.reads).toBe(2);
+
+    act(() => h.status?.("SUBSCRIBED"));
+    await waitFor(() => expect(h.reads).toBe(3));
+  });
+
+  it("keeps the newest read's answer when an older read answers after it", async () => {
+    const release: Array<() => void> = [];
+    h.gate = (n) => new Promise<void>((r) => (release[n] = r));
+    h.rows = [{ id: "m1", org_id: "org-Acme", role: "member", org: org("Acme Gym") }];
+    render(<PlayerOrgsSection userId="u2" />);
+    await waitFor(() => expect(h.reads).toBe(1));
+
+    h.rows = [{ id: "m2", org_id: "org-Peak", role: "member", org: org("Peak Training") }];
+    act(() => h.status?.("SUBSCRIBED"));
+    await waitFor(() => expect(h.reads).toBe(2));
+
+    // The catch-up answers first, then the read on mount, with the older list.
+    await act(async () => release[2]());
+    expect(await screen.findByText("Peak Training")).toBeTruthy();
+    await act(async () => release[1]());
+    await new Promise((r) => setTimeout(r, 10));
+    expect(screen.getByText("Peak Training")).toBeTruthy();
+    expect(screen.queryByText("Acme Gym")).toBeNull();
   });
 });

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 
 /**
  * WP 4.3: the Payments tab's realtime re-subscribe error. supabase-js hands back the existing channel when one with the
@@ -11,13 +11,18 @@ import { act, cleanup, render } from "@testing-library/react";
  * the old code.
  */
 
+type StatusHandler = (status: string, err?: Error) => void;
+
 type FakeChannel = {
   topic: string;
   subscribed: boolean;
   removed: boolean;
   handlers: number;
+  // The options the channel was opened with, and the status handler passed to subscribe.
+  options?: unknown;
+  status?: StatusHandler;
   on: (...args: unknown[]) => FakeChannel;
-  subscribe: () => FakeChannel;
+  subscribe: (cb?: StatusHandler) => FakeChannel;
 };
 
 const rt = vi.hoisted(() => ({
@@ -25,6 +30,11 @@ const rt = vi.hoisted(() => ({
   created: [] as FakeChannel[],
   removed: [] as FakeChannel[],
   uid: Promise.resolve("me" as string | null),
+  // Each table the panel reads, in order.
+  reads: [] as string[],
+  // listMySubmissionsForGame calls, numbered from 1, and, when set, what each one answers and when.
+  mySubsReads: 0,
+  mySubsAnswer: null as null | ((n: number) => Promise<unknown[]>),
 }));
 
 vi.mock("@/integrations/supabase/client", () => {
@@ -36,8 +46,11 @@ vi.mock("@/integrations/supabase/client", () => {
   };
   return {
     supabase: {
-      from: query,
-      channel: (name: string) => {
+      from: (table: string) => {
+        rt.reads.push(table);
+        return query();
+      },
+      channel: (name: string, options?: unknown) => {
         const topic = `realtime:${name}`;
         // realtime-js: an existing channel with this topic is returned instead of a new one.
         const existing = rt.channels.find((c) => c.topic === topic);
@@ -47,6 +60,7 @@ vi.mock("@/integrations/supabase/client", () => {
           subscribed: false,
           removed: false,
           handlers: 0,
+          options,
           on() {
             if (ch.subscribed) {
               throw new Error(
@@ -56,9 +70,10 @@ vi.mock("@/integrations/supabase/client", () => {
             ch.handlers += 1;
             return ch;
           },
-          subscribe() {
+          subscribe(cb?: StatusHandler) {
             if (ch.subscribed) throw new Error("tried to subscribe multiple times");
             ch.subscribed = true;
+            ch.status = cb;
             return ch;
           },
         };
@@ -77,7 +92,10 @@ vi.mock("@/integrations/supabase/client", () => {
 });
 vi.mock("@/lib/current-user-id", () => ({ getCurrentUserId: () => rt.uid }));
 vi.mock("@/lib/payments", () => ({
-  listMySubmissionsForGame: async () => [],
+  listMySubmissionsForGame: async () => {
+    rt.mySubsReads += 1;
+    return rt.mySubsAnswer ? rt.mySubsAnswer(rt.mySubsReads) : [];
+  },
   getSignedProofUrl: async () => null,
   listPaymentMethodsForHost: async () => [],
   paymentTypeMeta: () => ({ label: "", icon: null }),
@@ -112,6 +130,9 @@ beforeEach(() => {
   rt.created = [];
   rt.removed = [];
   rt.uid = Promise.resolve("me");
+  rt.reads = [];
+  rt.mySubsReads = 0;
+  rt.mySubsAnswer = null;
 });
 afterEach(() => cleanup());
 
@@ -182,5 +203,77 @@ describe("PlayerPaymentsPanel realtime (WP 4.3)", () => {
     render(<PlayerPaymentsPanel gameId="g5" settings={null} />);
     await flush();
     expect(rt.created).toHaveLength(0);
+  });
+});
+
+describe("payments panels catch up once changes are live", () => {
+  const WAIT = { config: { postgres_changes_options: { wait: true } } };
+  const submissionReads = () => rt.reads.filter((t) => t === "payment_submissions").length;
+
+  it("the host panel opens its channel with wait and reloads on every SUBSCRIBED only", async () => {
+    render(<HostPaymentsPanel gameId="g6" gameTitle="Game" settings={null} />);
+    await flush();
+    const [ch] = live();
+    // payment_submissions is in the supabase_realtime publication, so a join that waits is accepted.
+    expect(ch!.options).toStrictEqual(WAIT);
+    expect(submissionReads()).toBe(1);
+
+    // The load on mount may have been answered before changes were live.
+    await act(async () => ch!.status!("SUBSCRIBED"));
+    expect(submissionReads()).toBe(2);
+    await act(async () => ch!.status!("CHANNEL_ERROR"));
+    expect(submissionReads()).toBe(2);
+    // A rejoin after a drop: changes made while it was down are not replayed.
+    await act(async () => ch!.status!("SUBSCRIBED"));
+    expect(submissionReads()).toBe(3);
+  });
+
+  it("the player panel opens its channel with wait and reloads on every SUBSCRIBED only", async () => {
+    render(<PlayerPaymentsPanel gameId="g7" settings={null} />);
+    await flush();
+    const [ch] = live();
+    expect(ch!.options).toStrictEqual(WAIT);
+    expect(rt.mySubsReads).toBe(1);
+
+    await act(async () => ch!.status!("SUBSCRIBED"));
+    expect(rt.mySubsReads).toBe(2);
+    await act(async () => ch!.status!("TIMED_OUT"));
+    expect(rt.mySubsReads).toBe(2);
+    await act(async () => ch!.status!("SUBSCRIBED"));
+    expect(rt.mySubsReads).toBe(3);
+  });
+
+  it("in the player panel an older load answering last does not replace a newer one", async () => {
+    let releaseFirst: () => void = () => {};
+    const firstHeld = new Promise<void>((r) => {
+      releaseFirst = r;
+    });
+    const verified = {
+      id: "s1",
+      game_id: "g8",
+      player_id: "me",
+      status: "verified",
+      submitted_at: "2026-11-27T00:00:00Z",
+      paid_amount: 10,
+    };
+    // The load on mount saw no submission yet, but answers only after the catch-up saw the host's verification.
+    rt.mySubsAnswer = async (n) => {
+      if (n === 1) {
+        await firstHeld;
+        return [];
+      }
+      return [verified];
+    };
+    render(<PlayerPaymentsPanel gameId="g8" settings={null} />);
+    await flush();
+    await act(async () => live()[0]!.status!("SUBSCRIBED"));
+    expect(screen.getByText(/Payment confirmed/)).toBeTruthy();
+
+    await act(async () => {
+      releaseFirst();
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(screen.getByText(/Payment confirmed/)).toBeTruthy();
+    expect(screen.queryByText("Not submitted yet")).toBeNull();
   });
 });

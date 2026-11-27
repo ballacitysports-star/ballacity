@@ -9,6 +9,7 @@ import {
   type Sport,
 } from "./sample-data";
 import { supabase } from "@/integrations/supabase/client";
+import { liveChannel, onLive } from "@/lib/realtime-channel";
 import { trackIdentity, type SeenIdentity } from "@/lib/auth-identity";
 import { createTeam, deleteTeam, listTeams, updateTeam } from "./teams.functions";
 import { normalizeCutoff } from "@/lib/cancel-window";
@@ -257,6 +258,12 @@ async function refreshCurrentUser(): Promise<string | null> {
 // an empty list means "not here yet", not "there are none".
 let settled = false;
 
+// Team list calls, numbered as they are sent. A load after an identity change or after SUBSCRIBED
+// can be out while an earlier one still is, and they can answer in either order: an answer from a
+// call sent earlier must not merge its older rows over a later one's.
+let teamLoadsSent = 0;
+let newestTeamLoadApplied = 0;
+
 export async function hydrateOrgs(): Promise<void> {
   if (hydratePromise) return hydratePromise;
   // Each check below runs after an await, once `attempt` is set.
@@ -275,10 +282,14 @@ export async function hydrateOrgs(): Promise<void> {
       // is still booting (the auth client announces the stored session as SIGNED_IN at
       // startup), before TanStack Start has installed the global middleware that attaches it
       // (src/start.ts), and the call then reached the server with no token and failed.
+      const loadNo = ++teamLoadsSent;
       const rows = (await listTeams({
         headers: { Authorization: `Bearer ${token}` },
       })) as TeamRow[];
-      for (const row of rows) mergeRow(row);
+      if (loadNo > newestTeamLoadApplied) {
+        newestTeamLoadApplied = loadNo;
+        for (const row of rows) mergeRow(row);
+      }
       settled = true;
       emit();
     } catch (e) {
@@ -315,9 +326,9 @@ if (typeof window !== "undefined") {
     }
   });
 
-  // Realtime: reflect inserts/updates/deletes from any client instantly.
-  supabase
-    .channel("public:teams")
+  // Realtime: reflect inserts/updates/deletes from any client instantly. teams is in the
+  // supabase_realtime publication, so the join can wait until its changes are live.
+  liveChannel("public:teams")
     .on("postgres_changes", { event: "*", schema: "public", table: "teams" }, (payload) => {
       // A signed-out visitor only ever gets a few public columns, never a whole row.
       if (!currentUserId) return;
@@ -337,7 +348,19 @@ if (typeof window !== "undefined") {
       mergeRow(row);
       emit();
     })
-    .subscribe();
+    // A team list answered before the changes were live, or a change made while the channel was
+    // down, would otherwise be missed until the next identity change. So on every SUBSCRIBED,
+    // the first included, read the list again: hydrateOrgs is memoized, so clear it first, as an
+    // identity change does. This also covers a first load still in flight, since its call may
+    // have been sent before the changes were live. Signed out there is nothing to re-read, and
+    // signing in loads the list anyway.
+    .subscribe(
+      onLive(() => {
+        if (!currentUserId) return;
+        hydratePromise = null;
+        void hydrateOrgs();
+      }),
+    );
 }
 
 export async function addOrg(org: Org): Promise<Org> {

@@ -272,6 +272,63 @@ async function inviteLastPlaceRace() {
   ];
 }
 
+// 20261204110000: two invitees accept the last place of a paid game at the same moment. A paid accept writes no roster
+// row, so only the approval holds the place: the second waits for the first on the game-row lock, then counts the
+// first one's approval in a fresh snapshot and is told "full". One approval, never two, and the loser's invitation still
+// waits (no request, no error, no deadlock).
+const PAID_INVITE_RACE_CLEANUP = `
+  DELETE FROM public.hosted_games WHERE id = 'race-invite-paid';
+  DELETE FROM public.notifications WHERE user_id IN (t.id('racepayhost'), t.id('racepaya'), t.id('racepayb'));
+  DELETE FROM auth.users WHERE id IN (t.id('racepayhost'), t.id('racepaya'), t.id('racepayb'));`;
+
+async function paidInviteLastPlaceRace() {
+  psql(dbName, [], PAID_INVITE_RACE_CLEANUP);
+  r = psql(
+    dbName,
+    [],
+    `SELECT t.person('racepayhost', 35), t.person('racepaya', 25), t.person('racepayb', 26);
+     INSERT INTO public.hosted_games (id, host_id, sport, title, date, max_players)
+       VALUES ('race-invite-paid', t.id('racepayhost'), 'basketball', 'Last paid place', now() + interval '2 days', 1);
+     INSERT INTO public.game_payment_settings (game_id, host_id, entry_fee, requires_approval)
+       VALUES ('race-invite-paid', t.id('racepayhost'), 10, true);
+     INSERT INTO public.game_invites (id, game_id, host_id, invitee_id) VALUES
+       (t.id('race-pay-a'), 'race-invite-paid', t.id('racepayhost'), t.id('racepaya')),
+       (t.id('race-pay-b'), 'race-invite-paid', t.id('racepayhost'), t.id('racepayb'));`,
+  );
+  if (r.status !== 0) fail("The paid invitation race could not set up its game.", r.stderr);
+  const accept = (who, inv, hold) =>
+    `BEGIN; SELECT t.as_user(t.id('${who}'));
+     SELECT 'ANSWER:' || (public.game_respond_invite(t.id('${inv}'), true) ->> 'status');
+     ${hold ? "SELECT pg_sleep(3);" : ""} COMMIT;`;
+  const first = session(accept("racepaya", "race-pay-a", true));
+  await pause(1000);
+  const second = session(accept("racepayb", "race-pay-b", false));
+  const results = await Promise.all([first, second]);
+  // Counts, not a list of the roster: a paid accept writes no roster row, so the roster is empty.
+  const state = psql(dbName, [
+    "-At",
+    "-c",
+    `SELECT (SELECT count(*) FROM public.game_participants WHERE game_id = 'race-invite-paid') || '|' ||
+            (SELECT coalesce(string_agg(player_id::text || ':' || status, ','), '') FROM public.join_requests
+              WHERE game_id = 'race-invite-paid') || '|' ||
+            (SELECT string_agg(status, ',' ORDER BY id = t.id('race-pay-b')) FROM public.game_invites
+              WHERE game_id = 'race-invite-paid')`,
+  ]);
+  const winner = psql(dbName, ["-At", "-c", "SELECT t.id('racepaya')"]).stdout.trim();
+  psql(dbName, [], PAID_INVITE_RACE_CLEANUP);
+  const answers = results.map((x) => (x.out.match(/ANSWER:(\w+)/) ?? [])[1]);
+  return [
+    [
+      "two invitees accepting the last paid place: the first is approved, the other invitation waits",
+      state.status === 0 && state.stdout.trim() === `0|${winner}:approved|accepted,pending`,
+    ],
+    [
+      'and the second is told "full", without an error or a deadlock',
+      results.every((x) => x.code === 0) && answers[0] === "accepted" && answers[1] === "full",
+    ],
+  ];
+}
+
 // 20261129130000: a host's removal or decline against whoever holds the player's invitation at the same moment.
 // game_respond_invite takes the invitation, then the game, then the request. host_remove_player takes them in that order,
 // so the two queue at the invitation. The decline trigger already holds the request and waits for the invitation: for a
@@ -685,6 +742,7 @@ try {
       for (const [name, ok] of [
         ...(await lastSeatRace()),
         ...(await inviteLastPlaceRace()),
+        ...(await paidInviteLastPlaceRace()),
         ...(await hostRemovalRaces()),
         ...(await guardianCancelRace()),
         ...(await oldVsNewSignupRace(true)),

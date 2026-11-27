@@ -60,6 +60,7 @@ import { resolveNotificationTarget } from "@/lib/deep-links";
 import { useNotificationActorId, usePrefetchNotificationActors } from "@/lib/notification-actors";
 import { UserAvatarById } from "@/components/UserAvatar";
 import { supabase } from "@/integrations/supabase/client";
+import { liveChannel, onLive } from "@/lib/realtime-channel";
 import {
   loadPushDeliveryIssues,
   type DeliveryIssue,
@@ -95,7 +96,9 @@ export function NotificationsPanel() {
   } = useUnreadNotificationCountState("alerts-panel-");
   const [markingAll, setMarkingAll] = useState(false);
 
-  const [live, setLive] = useState(false);
+  // null until this channel's first SUBSCRIBED: with wait that can take seconds, and "Reconnecting…" would be wrong
+  // before it has ever connected.
+  const [live, setLive] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (loading) return;
@@ -104,10 +107,19 @@ export function NotificationsPanel() {
       return;
     }
     let cancelled = false;
+    setLive(null);
+    // Loads, numbered as they are sent. The load on mount, the reload on SUBSCRIBED and a resync can be out at once
+    // and answer in either order, and each replaces the list: an older answer must not replace a newer one.
+    let loadsSent = 0;
+    let newestLoadApplied = 0;
     const load = async () => {
+      const loadNo = ++loadsSent;
       try {
         const data = await listMyNotifications();
-        if (!cancelled) setItems(data);
+        if (!cancelled && loadNo > newestLoadApplied) {
+          newestLoadApplied = loadNo;
+          setItems(data);
+        }
       } finally {
         if (!cancelled) setFetching(false);
       }
@@ -124,8 +136,7 @@ export function NotificationsPanel() {
         return next;
       });
 
-    const channel = supabase
-      .channel(`notif-list-${user.id}`)
+    const channel = liveChannel(`notif-list-${user.id}`)
       .on(
         "postgres_changes",
         {
@@ -166,9 +177,22 @@ export function NotificationsPanel() {
           if (!cancelled && old?.id) setItems((prev) => prev.filter((x) => x.id !== old.id));
         },
       )
-      .subscribe((status) => {
-        if (!cancelled) setLive(status === "SUBSCRIBED");
-      });
+      .subscribe(
+        // Re-read on every SUBSCRIBED, the first included: the load on mount may have been answered before changes
+        // were live, and changes made while the channel was down are not replayed.
+        onLive(
+          () => {
+            if (cancelled) return;
+            void load();
+            refreshUnread();
+          },
+          (status) => {
+            // Before the first SUBSCRIBED an error is still "Connecting…"; after it, anything else is a drop.
+            if (!cancelled)
+              setLive((was) => (status === "SUBSCRIBED" ? true : was === null ? null : false));
+          },
+        ),
+      );
 
     // Catch up on anything missed while the tab was hidden or offline.
     const resync = () => {
@@ -297,7 +321,7 @@ export function NotificationsPanel() {
           <span
             className={`h-2 w-2 rounded-full ${live ? "bg-lime animate-pulse" : "bg-muted-foreground/40"}`}
           />
-          {live ? "Live" : "Reconnecting…"}
+          {live ? "Live" : live === null ? "Connecting…" : "Reconnecting…"}
         </span>
 
         <Link

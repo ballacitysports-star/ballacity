@@ -12,15 +12,22 @@ import { renderHook } from "@testing-library/react";
  * call and assert exact channel names and lifecycle transitions.
  */
 
+type StatusHandler = (status: string, err?: Error) => void;
+
 type Recorded = {
   subscribed: string[];
   removed: string[];
+  // The options each channel was opened with, and the status handler passed to its subscribe, by name.
+  options: Record<string, unknown>;
+  statusHandlers: Record<string, StatusHandler | undefined>;
   activeNames: () => string[];
 };
 
 const recorded: Recorded = {
   subscribed: [],
   removed: [],
+  options: {},
+  statusHandlers: {},
   activeNames() {
     const active: string[] = [];
     const removedCopy = [...recorded.removed];
@@ -38,14 +45,18 @@ vi.mock("@/integrations/supabase/client", () => {
     const ch: any = {
       _name: name,
       on: () => ch,
-      subscribe: () => ch,
+      subscribe: (cb?: StatusHandler) => {
+        recorded.statusHandlers[name] = cb;
+        return ch;
+      },
     };
     return ch;
   };
   return {
     supabase: {
-      channel: (name: string) => {
+      channel: (name: string, options?: unknown) => {
         recorded.subscribed.push(name);
+        recorded.options[name] = options;
         return makeChannel(name);
       },
       removeChannel: (ch: { _name: string }) => {
@@ -69,6 +80,8 @@ const defaultCallbacks = {
 beforeEach(() => {
   recorded.subscribed = [];
   recorded.removed = [];
+  recorded.options = {};
+  recorded.statusHandlers = {};
 });
 
 describe("useGameRealtimeChannels — channel key contract", () => {
@@ -242,5 +255,83 @@ describe("useGameRealtimeChannels — no leaks", () => {
       }),
     );
     expect(recorded.activeNames()).toEqual(["game_payment_settings:g1"]);
+  });
+});
+
+describe("useGameRealtimeChannels: catch-up once changes are live", () => {
+  const channels = [
+    ["join_requests:host:g1:u1", "onHostJoinRequestChange"],
+    ["join_requests:me:g1:u1", "onMyJoinRequestChange"],
+    ["game_payment_settings:g1", "onSettingsChange"],
+    ["payment_submissions:me:g1:u1", "onMyPaymentChange"],
+  ] as const;
+
+  const mountWithSpies = () => {
+    const spies = {
+      onHostJoinRequestChange: vi.fn(),
+      onMyJoinRequestChange: vi.fn(),
+      onSettingsChange: vi.fn(),
+      onMyPaymentChange: vi.fn(),
+    };
+    const view = renderHook(
+      (cbs: typeof spies) =>
+        useGameRealtimeChannels({ gameId: "g1", userId: "u1", hostsThisGame: true, ...cbs }),
+      { initialProps: spies },
+    );
+    return { spies, view };
+  };
+
+  it("opens every channel holding SUBSCRIBED until the server streams the changes", () => {
+    mountWithSpies();
+    // Every table here is in the supabase_realtime publication, so a join that waits is accepted.
+    for (const [name] of channels) {
+      expect(recorded.options[name]).toStrictEqual({
+        config: { postgres_changes_options: { wait: true } },
+      });
+    }
+  });
+
+  it.each(channels)(
+    "%s re-reads through %s on every SUBSCRIBED, and only that channel's callback",
+    (name, cb) => {
+      const { spies } = mountWithSpies();
+      const handler = recorded.statusHandlers[name];
+      expect(handler).toBeTypeOf("function");
+      handler!("SUBSCRIBED");
+      expect(spies[cb]).toHaveBeenCalledTimes(1);
+      for (const [, other] of channels) {
+        if (other !== cb) expect(spies[other]).not.toHaveBeenCalled();
+      }
+      // A rejoin after a drop is another SUBSCRIBED: changes made while down are not replayed.
+      handler!("SUBSCRIBED");
+      expect(spies[cb]).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it("still warns on other statuses, without re-reading", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const { spies } = mountWithSpies();
+      for (const [name] of channels) recorded.statusHandlers[name]!("CHANNEL_ERROR");
+      expect(warn).toHaveBeenCalledTimes(4);
+      expect(warn).toHaveBeenCalledWith(
+        "[realtime] join_requests:host channel status: CHANNEL_ERROR",
+      );
+      for (const [, cb] of channels) expect(spies[cb]).not.toHaveBeenCalled();
+      // SUBSCRIBED is not warned about.
+      recorded.statusHandlers["game_payment_settings:g1"]!("SUBSCRIBED");
+      expect(warn).toHaveBeenCalledTimes(4);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("calls the caller's latest callback, not the one from the first render", () => {
+    const { spies, view } = mountWithSpies();
+    const later = { ...spies, onSettingsChange: vi.fn() };
+    view.rerender(later);
+    recorded.statusHandlers["game_payment_settings:g1"]!("SUBSCRIBED");
+    expect(later.onSettingsChange).toHaveBeenCalledTimes(1);
+    expect(spies.onSettingsChange).not.toHaveBeenCalled();
   });
 });

@@ -9,15 +9,23 @@ export function blockConfirmText(name: string) {
   return `Block ${name}? This request is declined, and from now on they can't request a spot in your games, message you or follow you. You can unblock them any time under Settings → Blocked users.`;
 }
 
-/** Records the block on the server. The decline has already been saved by then. */
-export async function blockPlayer(playerId: string, name: string) {
+/**
+ * Records the block on the server. What came before it (a decline, or the roster's removal) has already been saved by
+ * then and stays, so a failed block says which of the two went through. Never throws.
+ */
+export async function blockPlayer(
+  playerId: string,
+  name: string,
+  after: "declined" | "removed" = "declined",
+) {
   try {
     await blockAccount(playerId);
     toast.success(`${name} blocked.`);
   } catch (e) {
+    const done = after === "removed" ? "Removed" : "Declined";
     // The catalog or generic sentence when there is one, never the raw database text (WP 4.0).
     toast.error(
-      `Declined, but couldn't block ${name}. ${userErrorMessage(e, "Try again from their profile.")}`,
+      `${done}, but couldn't block ${name}. ${userErrorMessage(e, "Try again from their profile.")}`,
     );
   }
 }

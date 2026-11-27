@@ -58,6 +58,7 @@ import { MessageAttachment } from "@/components/MessageAttachment";
 import { UserAvatar, UserAvatarById } from "@/components/UserAvatar";
 import { usePrefetchUserAvatars } from "@/lib/user-avatars";
 import { supabase } from "@/integrations/supabase/client";
+import { liveChannel, onLive } from "@/lib/realtime-channel";
 import { useAuthSearchHere } from "@/lib/auth-return";
 
 /**
@@ -176,16 +177,23 @@ function Thread() {
     return m;
   }, [reactions]);
 
-  const refreshReactions = async (ids: string[]) => {
-    const r = await listReactionsFor(ids);
-    setReactions(r);
-  };
-
   useEffect(() => {
     if (loading || !user) return;
     let cancelled = false;
     // Messages of the thread we just left must not linger once loads merge by id.
     setMsgs([]);
+    // Reaction reads, numbered as they are sent. The one on mount and the one
+    // on each SUBSCRIBED can be out at once and answer in either order, and
+    // each replaces the list: an older answer must not replace a newer one.
+    let reactionReadsSent = 0;
+    let newestReactionReadApplied = 0;
+    const loadReactions = async (ids: string[]) => {
+      const readNo = ++reactionReadsSent;
+      const r = await listReactionsFor(ids);
+      if (cancelled || readNo < newestReactionReadApplied) return;
+      newestReactionReadApplied = readNo;
+      setReactions(r);
+    };
     (async () => {
       try {
         const [m, o, conv] = await Promise.all([
@@ -204,26 +212,31 @@ function Thread() {
         setOther(o);
         const accepted: string[] = ((conv.data as any)?.accepted_by ?? []) as string[];
         setIsRequest(!accepted.includes(user.id));
-        if (m.length) await refreshReactions(m.map((x) => x.id));
+        if (m.length) await loadReactions(m.map((x) => x.id));
         await markConversationRead(conversationId);
       } catch (e: unknown) {
         toast.error(userErrorMessage(e, "Couldn't load this conversation. Please try again."));
       }
     })();
 
-    let hasSubscribed = false;
     const catchUp = async () => {
       try {
         const m = await listMessages(conversationId);
         if (cancelled) return;
+        // Merged by id, so a message that also arrived as an event shows once.
         setMsgs((prev) => upsertMessages(prev, m));
         void markConversationRead(conversationId);
+        // The channel keeps reactions fresh too, so a gap missed them as well.
+        if (m.length) await loadReactions(m.map((x) => x.id));
       } catch {
         /* the next event or return to the tab tries again */
       }
     };
 
-    const channel = supabase.channel(`thread-${conversationId}`, {
+    // liveChannel adds wait next to the presence key. Presence and typing
+    // then start only once the message stream is live, a few seconds later
+    // than before on a slow join.
+    const channel = liveChannel(`thread-${conversationId}`, {
       config: { presence: { key: user.id } },
     });
     channelRef.current = channel;
@@ -295,15 +308,18 @@ function Thread() {
         const typing = otherKeys.some((k) => state[k]?.some((s) => s.typing));
         setOtherTyping(typing);
       })
-      .subscribe(async (status) => {
-        if (status === "SUBSCRIBED") {
-          await channel.track({ typing: false, at: Date.now() });
-          // Joined again after a drop (a locked phone, a network change):
-          // anything sent in the gap never arrived as an event, so fetch it.
-          if (hasSubscribed) void catchUp();
-          hasSubscribed = true;
-        }
-      });
+      .subscribe(
+        onLive(() => {
+          if (cancelled) return;
+          // Fetch on every SUBSCRIBED, the first included: the load on mount
+          // may have been answered before changes were live, and after a drop
+          // (a locked phone, a network change) anything sent in the gap never
+          // arrived as an event. Started before track so a slow presence reply
+          // cannot hold it back.
+          void catchUp();
+          void channel.track({ typing: false, at: Date.now() });
+        }),
+      );
 
     // Coming back to the tab is the other moment events may have been missed.
     const onVisible = () => {
