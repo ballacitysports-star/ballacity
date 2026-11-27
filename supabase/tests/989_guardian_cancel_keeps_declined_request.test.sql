@@ -559,7 +559,26 @@ SELECT t.eq(has_function_privilege('anon', 'public.guardian_cancel_child_game(uu
 SELECT t.eq(has_function_privilege('authenticated', 'public.guardian_cancel_child_game(uuid,text)', 'EXECUTE'), true,
   'members can (the guardian check is inside)');
 
-SELECT t.eq((SELECT md5(replace(replace(replace(replace(pg_get_functiondef(p.oid),
+-- 20261204110000 (paid_invite_capacity) replaced game_respond_invite again, changing only its capacity block: the
+-- innermost replace puts that block back as 20261130110000 left it, so the rest of this pin is unchanged.
+SELECT t.eq((SELECT md5(replace(replace(replace(replace(replace(pg_get_functiondef(p.oid),
+                $b$  -- Free with no guardian step: the other players' rows. Otherwise, as before: every row.
+  -- On a paid game also every other player whose request is approved and who has no row yet (approved, not yet paid;
+  -- 20261204110000): an approval holds the place until the player pays, leaves, is removed or declined, or the payment
+  -- window releases it. Counting rows alone let more players be approved than there are places, and the last to pay
+  -- were then paid but not placed.
+  IF (SELECT count(*) FROM public.game_participants p
+       WHERE p.game_id = _i.game_id AND (NOT _seat OR p.user_id <> _me))
+     + (SELECT count(*) FROM public.join_requests r
+         WHERE COALESCE(_fee, 0) > 0
+           AND r.game_id = _i.game_id AND r.status = 'approved' AND r.player_id <> _me
+           AND NOT EXISTS (SELECT 1 FROM public.game_participants p2
+                            WHERE p2.game_id = r.game_id AND p2.user_id = r.player_id)) >= _g.max_players THEN
+$b$,
+                $b$  -- Free with no guardian step: the other players' rows. Otherwise, as before: every row.
+  IF (SELECT count(*) FROM public.game_participants p
+       WHERE p.game_id = _i.game_id AND (NOT _seat OR p.user_id <> _me)) >= _g.max_players THEN
+$b$),
                 E'  _guarded boolean;\n  _on   boolean;\n', ''),
                 E'  -- The roster trigger''s guardian rule, for the request as it stands once approved. A declined request carries no\n'
                 || E'  -- guardian approval once approved: the update below reopens it, and trg_join_request_reopen_needs_guardian clears it.\n'
@@ -579,8 +598,30 @@ SELECT t.eq((SELECT md5(replace(replace(replace(replace(pg_get_functiondef(p.oid
                FROM pg_proc p WHERE p.oid = 'public.game_respond_invite(uuid,boolean)'::regprocedure),
   '9c24daeafcdd5dd4443c612a7cf040d3',
   'apart from the declined-request tests (the guardian-held test and the reopen update, both sparing a guarded minor already on the roster), the guarded test worked out once, and their comment, game_respond_invite is 20261127120000''s character for character');
+-- 20261204110000 (paid_invite_capacity) replaced it with 20261130110000's body plus the paid capacity count; this
+-- pin undoes that block first, so it still shows the declined-request tests are 20261130110000's character for
+-- character. The exact md5 is now 20261204110000's (its rollback guard expects it; 999 pins it too).
+SELECT t.eq((SELECT md5(replace(pg_get_functiondef('public.game_respond_invite(uuid,boolean)'::regprocedure),
+                                $b$  -- Free with no guardian step: the other players' rows. Otherwise, as before: every row.
+  -- On a paid game also every other player whose request is approved and who has no row yet (approved, not yet paid;
+  -- 20261204110000): an approval holds the place until the player pays, leaves, is removed or declined, or the payment
+  -- window releases it. Counting rows alone let more players be approved than there are places, and the last to pay
+  -- were then paid but not placed.
+  IF (SELECT count(*) FROM public.game_participants p
+       WHERE p.game_id = _i.game_id AND (NOT _seat OR p.user_id <> _me))
+     + (SELECT count(*) FROM public.join_requests r
+         WHERE COALESCE(_fee, 0) > 0
+           AND r.game_id = _i.game_id AND r.status = 'approved' AND r.player_id <> _me
+           AND NOT EXISTS (SELECT 1 FROM public.game_participants p2
+                            WHERE p2.game_id = r.game_id AND p2.user_id = r.player_id)) >= _g.max_players THEN
+$b$,
+                                $b$  -- Free with no guardian step: the other players' rows. Otherwise, as before: every row.
+  IF (SELECT count(*) FROM public.game_participants p
+       WHERE p.game_id = _i.game_id AND (NOT _seat OR p.user_id <> _me)) >= _g.max_players THEN
+$b$))),
+  '79fa287fb3126c74dce0f902542d3e4e', 'REOPEN: apart from 20261204110000''s capacity block, game_respond_invite is the one 20261130110000 created');
 SELECT t.eq((SELECT md5(pg_get_functiondef('public.game_respond_invite(uuid,boolean)'::regprocedure))),
-  '79fa287fb3126c74dce0f902542d3e4e', 'REOPEN: game_respond_invite is the one 20261130110000 created (the rollback guard expects it)');
+  '7372bcebab32979448f5327cd9f74413', 'game_respond_invite is the one 20261204110000 created (its rollback guard expects it)');
 SELECT t.eq((SELECT proowner::regrole::text || '/' || prosecdef::text || '/' || proconfig::text || '/' || prorettype::regtype::text
                FROM pg_proc WHERE oid = 'public.game_respond_invite(uuid,boolean)'::regprocedure),
   'postgres/true/{"search_path=\"\""}/jsonb', 'game_respond_invite: same owner, SECURITY DEFINER, empty search_path and return type');

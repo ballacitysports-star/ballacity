@@ -8,7 +8,8 @@
 -- 3. The way back: an approved request for the game. An accepted invitation, or the host approving the player's request
 --    (on an open game the player sends one to ask back), deletes the record. A resend alone, a guardian's approval, an
 --    accept answered full, or leaving does not. The request's resend cooldown and attempt cap apply to a resend; a
---    deleted request sent again starts over (an older gap, pinned as NOT CLOSED; owner item).
+--    deleted request sent again no longer starts over: since 20261204100000 the limits also live on the removal record
+--    (the older gap this line pinned as NOT CLOSED is closed; supabase/tests/998_removal_ask_limits.test.sql covers it).
 -- 4. Paid games: no payment (PayPal, manual claim, terms) for a removed player; a verified payment stays and is not a
 --    way back.
 -- 5. Guarded minors go through their guardian as before; age ranges and capacity apply as before.
@@ -176,6 +177,28 @@ BEGIN
   UPDATE public.join_requests SET last_rejected_at = now() - interval '1 hour' WHERE game_id = game AND player_id = t.id(who);
   SET LOCAL session_replication_role = origin;
 END $$;
+-- Move the removal record's last ask back past its 15-minute cooldown (20261204100000). Does nothing on a database
+-- without the column, so the file still runs to the end there.
+CREATE FUNCTION pg_temp.past_ask_cooldown(game text, who text) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  IF to_regclass('public.game_removals') IS NULL OR NOT EXISTS (
+       SELECT 1 FROM pg_attribute WHERE attrelid = 'public.game_removals'::regclass AND attname = 'last_ask_at' AND NOT attisdropped) THEN
+    RETURN;
+  END IF;
+  EXECUTE 'UPDATE public.game_removals SET last_ask_at = now() - interval ''1 hour'' WHERE game_id = $1 AND user_id = $2'
+    USING game, t.id(who);
+END $$;
+-- The removal record's ask count (20261204100000), or -1 when there is no such column.
+CREATE FUNCTION pg_temp.asks(game text, who text) RETURNS int LANGUAGE plpgsql AS $$
+DECLARE n int;
+BEGIN
+  IF to_regclass('public.game_removals') IS NULL OR NOT EXISTS (
+       SELECT 1 FROM pg_attribute WHERE attrelid = 'public.game_removals'::regclass AND attname = 'asks' AND NOT attisdropped) THEN
+    RETURN -1;
+  END IF;
+  EXECUTE 'SELECT asks FROM public.game_removals WHERE game_id = $1 AND user_id = $2' INTO n USING game, t.id(who);
+  RETURN n;
+END $$;
 CREATE FUNCTION pg_temp.waitlist_told(game text) RETURNS text LANGUAGE sql AS $$
   SELECT string_agg(p.handle, ',' ORDER BY p.handle)
     FROM public.notifications n
@@ -302,6 +325,8 @@ SELECT t.eq(t.changed($q$UPDATE public.join_requests SET status = 'rejected', re
 SELECT t.reset();
 SELECT t.eq(pg_temp.rec('gopen', 'ana'), 1, 'a no keeps the record');
 SELECT pg_temp.past_cooldown('gopen', 'ana');
+-- Since 20261204100000 the removal record also has a cooldown, from her previous ask: move it back too.
+SELECT pg_temp.past_ask_cooldown('gopen', 'ana');
 SELECT t.eq(pg_temp.ask('gopen', 'ana'), 'sent', 'she asks once more');
 SELECT t.as_user(t.id('host'));
 SELECT t.eq(t.changed($q$UPDATE public.join_requests SET status = 'rejected', reviewed_at = now()
@@ -310,20 +335,27 @@ SELECT t.reset();
 SELECT pg_temp.past_cooldown('gopen', 'ana');
 SELECT t.ok(pg_temp.ask('gopen', 'ana') LIKE '%maximum of 3%', 'CAP: the third resend is refused (attempt cap)');
 SELECT t.eq(pg_temp.rec('gopen', 'ana'), 1, 'CAP: and the removal stays');
--- The cooldown and the cap live on the request row: a player may delete their own request ("Players withdraw own join
--- requests") and send a new one, which starts over. Older than this change (20261129130000, 20261130110000); owner item.
+-- The request row's cooldown and cap are reset when the player deletes her own request ("Players withdraw own join
+-- requests") and sends a new one. That older gap (20261129130000, 20261130110000) was pinned here as NOT CLOSED; since
+-- 20261204100000 the limits also live on the removal record, which she cannot delete, so it is closed.
 SELECT t.as_user(t.id('ana'));
 SELECT t.eq(t.changed($q$DELETE FROM public.join_requests WHERE game_id = 'gopen' AND player_id = t.id('ana')$q$), 1,
   'she deletes her declined request');
 SELECT t.reset();
-SELECT t.eq(pg_temp.ask('gopen', 'ana'), 'sent',
-  'NOT CLOSED: a new request after deleting the declined one skips the cooldown and the cap (older gap; owner item)');
+SELECT t.eq(pg_temp.ask('gopen', 'ana'), 'Please wait 900 seconds before resubmitting this request.',
+  'CLOSED (20261204100000): a new request after deleting the declined one meets the removal record''s cooldown');
+SELECT pg_temp.past_ask_cooldown('gopen', 'ana');
+SELECT t.eq(pg_temp.ask('gopen', 'ana'), 'sent', 'after that cooldown she may ask again: her third ask on this record');
+SELECT t.eq(pg_temp.asks('gopen', 'ana'), 3, 'CLOSED (20261204100000): the record counts it, three of three');
 SELECT t.eq(pg_temp.rec('gopen', 'ana'), 1, 'the removal itself stays: only the host''s approval or an invitation lifts it');
 SELECT t.eq(pg_temp.join_as('gopen', 'ana'), 'REMOVED_BY_HOST', 'and she still cannot join');
 SELECT t.as_user(t.id('ana'));
 SELECT t.eq(t.changed($q$DELETE FROM public.join_requests WHERE game_id = 'gopen' AND player_id = t.id('ana')$q$), 1,
   'she cancels that ask');
 SELECT t.reset();
+SELECT pg_temp.past_ask_cooldown('gopen', 'ana');
+SELECT t.eq(pg_temp.ask('gopen', 'ana'), 'You have reached the maximum of 3 resubmit attempts for this game.',
+  'CLOSED (20261204100000): deleting the request and asking a fourth time is refused by the record''s cap');
 -- d) An accept that answers full keeps the record; an approval on a full game lifts it but there is no seat.
 SELECT t.eq(pg_temp.remove('gfull', 'zed') ->> 'removed', 'true', 'zed removed from the small game');
 SELECT t.eq(pg_temp.join_as('gfull', 'fox'), 'joined 1', 'fox takes the place: full again');
