@@ -19,9 +19,11 @@ import {
   setReportStatus,
   applyModerationAction,
   listModerationAudit,
+  REPORT_SUBJECT_FILTERS,
   type ModerationReport,
 } from "@/lib/moderation.functions";
 import { reportReasonLabel, reportStatusLabel } from "@/lib/moderation";
+import { ReportedPostEvidence } from "@/components/admin/ReportedPostEvidence";
 
 export const Route = createFileRoute("/admin/moderation")({
   head: () =>
@@ -43,7 +45,7 @@ const STATUS_FILTERS = [
   "resolved",
   "dismissed",
 ] as const;
-const SUBJECT_FILTERS = ["all", "user", "game", "message", "reel"] as const;
+const SUBJECT_FILTERS = ["all", ...REPORT_SUBJECT_FILTERS] as const;
 
 function statusTone(status: string) {
   const s = reportStatusLabel(status);
@@ -295,6 +297,9 @@ function ReportCard({ report, onDone }: { report: ModerationReport; onDone: () =
                 {report.reelHidden ? " (hidden)" : ""}
               </dd>
             </div>
+          ) : null}
+          {report.subjectType === "post" ? (
+            <ReportedPostEvidence postId={report.postId} post={report.post} />
           ) : null}
           {report.details ? (
             <div className="sm:col-span-2">

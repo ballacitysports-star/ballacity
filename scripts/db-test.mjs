@@ -599,6 +599,48 @@ async function guardianCancelRace() {
   ];
 }
 
+// 20261205100000: a member sends the same post report twice at the same moment (a double tap, two tabs). report_post
+// takes a transaction advisory lock on (reporter, post) before it looks for the open report, so the second call waits
+// for the first to commit, finds its report and answers with it: one row, one id for both, no error.
+const POST_REPORT_RACE_CLEANUP = `
+  DELETE FROM public.user_reports WHERE reporter_id = t.id('racerepb');
+  DELETE FROM public.posts WHERE id = t.id('race-net-post');
+  DELETE FROM auth.users WHERE id IN (t.id('racerepa'), t.id('racerepb'));`;
+
+async function postReportRace() {
+  psql(dbName, [], POST_REPORT_RACE_CLEANUP);
+  r = psql(
+    dbName,
+    [],
+    `SELECT t.person('racerepa', 30), t.person('racerepb', 31);
+     INSERT INTO public.posts (id, author_id, audience, body, moderation_status)
+       VALUES (t.id('race-net-post'), t.id('racerepa'), 'public', 'Race me', 'approved');`,
+  );
+  if (r.status !== 0) fail("The post report race could not set up its post.", r.stderr);
+  const report = (hold) =>
+    `BEGIN; SELECT t.as_user(t.id('racerepb'));
+     SELECT 'ANSWER:' || public.report_post(t.id('race-net-post'), 'spam');
+     ${hold ? "SELECT pg_sleep(3);" : ""} COMMIT;`;
+  const first = session(report(true));
+  await pause(1000);
+  const second = session(report(false));
+  const results = await Promise.all([first, second]);
+  const rows = psql(dbName, [
+    "-At",
+    "-c",
+    "SELECT count(*) FROM public.user_reports WHERE reporter_id = t.id('racerepb') AND post_id = t.id('race-net-post')",
+  ]).stdout.trim();
+  psql(dbName, [], POST_REPORT_RACE_CLEANUP);
+  const answers = results.map((x) => (x.out.match(/ANSWER:([0-9a-f-]{36})/) ?? [])[1]);
+  return [
+    ["one member reporting the same post twice at once files one report", rows === "1"],
+    [
+      "and both calls answer with that report, without an error",
+      results.every((x) => x.code === 0) && !!answers[0] && answers[0] === answers[1],
+    ],
+  ];
+}
+
 // P2-1 stage 4a: one family signs up through the old path (rsvp_tryout) and another through
 // events (register_for_event) for the last seat of the same copied tryout. Both lock the post
 // first, so the second waits for the first and is told it is full: one seat is taken, never two,
@@ -743,6 +785,7 @@ try {
         ...(await lastSeatRace()),
         ...(await inviteLastPlaceRace()),
         ...(await paidInviteLastPlaceRace()),
+        ...(await postReportRace()),
         ...(await hostRemovalRaces()),
         ...(await guardianCancelRace()),
         ...(await oldVsNewSignupRace(true)),

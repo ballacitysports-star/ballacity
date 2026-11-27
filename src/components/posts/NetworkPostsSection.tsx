@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, Trash2 } from "lucide-react";
+import { Flag, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useMyAge } from "@/lib/use-my-age";
@@ -23,8 +23,20 @@ import {
 } from "@/lib/network-posts";
 import { createNetworkPost } from "@/lib/network-posts.functions";
 import { HighlightsStrip } from "@/components/reels/HighlightsStrip";
+import { ReportDialog } from "@/components/ReportDialog";
 
 const FEED_KEY = ["network-posts-feed"];
+
+/**
+ * Whether the viewer is offered Report on this item: a network post (not a team announcement merged into Following,
+ * whose id is "news-…") written by someone else. Signed-out visitors see no feed at all. report_post (20261205100000)
+ * still decides: it refuses the author and answers "not available" for a post the viewer cannot read.
+ */
+export function canReportPost(post: FeedPost, viewerId: string | null | undefined): boolean {
+  return (
+    !!viewerId && !!post.authorId && post.authorId !== viewerId && !post.id.startsWith("news-")
+  );
+}
 
 type FeedView = "all" | "following";
 
@@ -213,6 +225,8 @@ function PostList({ viewerId, view }: { viewerId: string; view: FeedView }) {
     onError: (e) => toast.error(postErrorMessage(e instanceof Error ? e.message : String(e))),
   });
 
+  const [reporting, setReporting] = useState<FeedPost | null>(null);
+
   const posts = (feed.data?.pages ?? []).flat();
   if (feed.isLoading)
     return <Loader2 className="mx-auto h-5 w-5 animate-spin" aria-label="Loading posts" />;
@@ -227,28 +241,43 @@ function PostList({ viewerId, view }: { viewerId: string; view: FeedView }) {
     );
 
   return (
-    <ul className="space-y-2">
-      {posts.map((p) => (
-        <PostItem
-          key={p.id}
-          post={p}
-          mine={p.authorId === viewerId}
-          onDelete={() => remove.mutate(p.id)}
+    <>
+      <ul className="space-y-2">
+        {posts.map((p) => (
+          <PostItem
+            key={p.id}
+            post={p}
+            mine={p.authorId === viewerId}
+            onDelete={() => remove.mutate(p.id)}
+            onReport={canReportPost(p, viewerId) ? () => setReporting(p) : undefined}
+          />
+        ))}
+        {feed.hasNextPage && (
+          <li>
+            <button
+              type="button"
+              onClick={() => feed.fetchNextPage()}
+              disabled={feed.isFetchingNextPage}
+              className="w-full rounded-lg border border-border py-2 text-sm font-semibold"
+            >
+              {feed.isFetchingNextPage ? "Loading…" : "Show more"}
+            </button>
+          </li>
+        )}
+      </ul>
+      {reporting && (
+        <ReportDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setReporting(null);
+          }}
+          subjectType="post"
+          postId={reporting.id}
+          reportedId={reporting.authorId}
+          subjectLabel={reporting.authorName}
         />
-      ))}
-      {feed.hasNextPage && (
-        <li>
-          <button
-            type="button"
-            onClick={() => feed.fetchNextPage()}
-            disabled={feed.isFetchingNextPage}
-            className="w-full rounded-lg border border-border py-2 text-sm font-semibold"
-          >
-            {feed.isFetchingNextPage ? "Loading…" : "Show more"}
-          </button>
-        </li>
       )}
-    </ul>
+    </>
   );
 }
 
@@ -256,10 +285,13 @@ export function PostItem({
   post,
   mine,
   onDelete,
+  onReport,
 }: {
   post: FeedPost;
   mine: boolean;
   onDelete: () => void;
+  /** Offered only for someone else's network post (canReportPost); never on the viewer's own. */
+  onReport?: () => void;
 }) {
   return (
     <li className="rounded-xl border border-border bg-background p-3">
@@ -276,6 +308,16 @@ export function PostItem({
             className="ml-auto grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:text-coral"
           >
             <Trash2 className="h-4 w-4" />
+          </button>
+        )}
+        {!mine && onReport && (
+          <button
+            type="button"
+            onClick={onReport}
+            aria-label={`Report post by ${post.authorName}`}
+            className="ml-auto grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:text-coral"
+          >
+            <Flag className="h-4 w-4" aria-hidden />
           </button>
         )}
       </div>

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
@@ -17,6 +17,13 @@ vi.mock("@tanstack/react-start", () => ({ useServerFn: () => vi.fn() }));
 vi.mock("@/lib/network-posts.functions", () => ({ createNetworkPost: vi.fn() }));
 vi.mock("@/components/reels/HighlightsStrip", () => ({ HighlightsStrip: () => null }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn(), message: vi.fn() } }));
+const report = vi.hoisted(() => ({ post: vi.fn(), submit: vi.fn() }));
+vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
+vi.mock("@/lib/moderation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/moderation")>()),
+  reportPost: report.post,
+  submitReport: report.submit,
+}));
 vi.mock("@/lib/network-posts", async () => {
   const rules = await vi.importActual<typeof import("@/lib/network-posts-rules")>(
     "@/lib/network-posts-rules",
@@ -31,7 +38,8 @@ vi.mock("@/lib/network-posts", async () => {
   };
 });
 
-import { NetworkPostsSection, PostComposer } from "./NetworkPostsSection";
+import { NetworkPostsSection, PostComposer, canReportPost } from "./NetworkPostsSection";
+import type { FeedPost } from "@/lib/network-posts";
 
 function wrap(node: ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -47,7 +55,31 @@ beforeEach(() => {
   state.user = { id: "me" };
   state.age = 30;
   state.teams = [];
+  report.post.mockReset().mockResolvedValue("report-1");
+  report.submit.mockReset();
 });
+
+const feedPost = (over: Partial<FeedPost>): FeedPost => ({
+  id: "post-1",
+  authorId: "someone",
+  postedAs: "person",
+  teamId: null,
+  orgId: null,
+  audience: "public",
+  body: "Open run Saturday",
+  moderationStatus: "approved",
+  createdAt: "2026-11-27T10:00:00Z",
+  authorName: "Jordan",
+  authorAvatar: null,
+  ...over,
+});
+
+async function showFeed(posts: FeedPost[]) {
+  const mod = await import("@/lib/network-posts");
+  vi.mocked(mod.listFeedPosts).mockResolvedValueOnce(posts);
+  wrap(<NetworkPostsSection />);
+  await screen.findByText(posts[0].body);
+}
 afterEach(cleanup);
 
 describe("NetworkPostsSection", () => {
@@ -116,5 +148,63 @@ describe("PostComposer audiences", () => {
     state.age = null;
     wrap(<PostComposer />);
     expect(screen.getByText("Posting isn't available for your account.")).toBeTruthy();
+  });
+});
+
+describe("Reporting a post (20261205100000)", () => {
+  it("offers Report on someone else's post, not on your own", async () => {
+    await showFeed([
+      feedPost({ id: "theirs", authorId: "someone", authorName: "Jordan", body: "Their post" }),
+      feedPost({ id: "mine", authorId: "me", authorName: "Me", body: "My post" }),
+    ]);
+    expect(screen.getByRole("button", { name: "Report post by Jordan" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Report post by Me" })).toBeNull();
+    expect(screen.getAllByRole("button", { name: /^Report post/ })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Delete post" })).toBeTruthy();
+  });
+
+  it("reports the post by its id through report_post, with the reason picked", async () => {
+    await showFeed([feedPost({ id: "post-42", authorId: "someone", authorName: "Jordan" })]);
+    fireEvent.click(screen.getByRole("button", { name: "Report post by Jordan" }));
+    expect(await screen.findByText("Report post")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Harassment" }));
+    fireEvent.change(screen.getByLabelText("Additional details (optional)"), {
+      target: { value: "Keeps posting about me" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Submit report" }));
+    await waitFor(() => expect(report.post).toHaveBeenCalledTimes(1));
+    expect(report.post).toHaveBeenCalledWith("post-42", "harassment", "Keeps posting about me");
+    expect(report.submit).not.toHaveBeenCalled();
+    const { toast } = await import("sonner");
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith(
+        "Report submitted. Our moderators will review it.",
+      ),
+    );
+  });
+
+  it("shows report_post's refusal as the sentence it already is", async () => {
+    report.post.mockRejectedValueOnce(new Error("That post isn't available."));
+    await showFeed([feedPost({ authorName: "Jordan" })]);
+    fireEvent.click(screen.getByRole("button", { name: "Report post by Jordan" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Spam" }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit report" }));
+    const { toast } = await import("sonner");
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("That post isn't available."));
+  });
+
+  it("is shown only for a network post by someone else, to someone signed in", () => {
+    expect(canReportPost(feedPost({ authorId: "someone" }), "me")).toBe(true);
+    expect(canReportPost(feedPost({ authorId: "me" }), "me")).toBe(false);
+    expect(canReportPost(feedPost({ authorId: "someone" }), null)).toBe(false);
+    // A team announcement merged into Following is a team post, not a network post.
+    expect(canReportPost(feedPost({ id: "news-7", authorId: "" }), "me")).toBe(false);
+    expect(canReportPost(feedPost({ id: "news-7", authorId: "someone" }), "me")).toBe(false);
+  });
+
+  it("is not there for a signed-out visitor, who sees no feed", () => {
+    state.user = null;
+    wrap(<NetworkPostsSection />);
+    expect(screen.queryByRole("button", { name: /^Report post/ })).toBeNull();
   });
 });

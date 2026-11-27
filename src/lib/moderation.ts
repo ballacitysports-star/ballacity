@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { isMissingFunctionError } from "@/lib/managed-profile-names";
+import { userErrorMessage } from "@/lib/user-error";
 
 export type ReportReason =
   | "spam"
@@ -25,7 +26,7 @@ export type ReportReason =
   | "unsafe_conditions"
   | "injury_risk";
 
-export type ReportSubjectType = "user" | "game" | "message" | "reel" | "payment";
+export type ReportSubjectType = "user" | "game" | "message" | "reel" | "payment" | "post";
 
 type ReasonOption = { value: ReportReason; label: string };
 
@@ -73,6 +74,9 @@ export const PAYMENT_REPORT_REASONS: ReasonOption[] = [
   { value: "other", label: "Other" },
 ];
 
+/** A network post is reported for what it says, as a message is: the same reasons, in the same words. */
+export const POST_REPORT_REASONS: ReasonOption[] = MESSAGE_REPORT_REASONS;
+
 /** Back-compat alias used by older call sites. */
 export const REPORT_REASONS = USER_REPORT_REASONS;
 
@@ -80,6 +84,7 @@ export function reasonsFor(subject: ReportSubjectType): ReasonOption[] {
   if (subject === "game") return GAME_REPORT_REASONS;
   if (subject === "message") return MESSAGE_REPORT_REASONS;
   if (subject === "payment") return PAYMENT_REPORT_REASONS;
+  if (subject === "post") return POST_REPORT_REASONS;
   return USER_REPORT_REASONS;
 }
 
@@ -221,6 +226,44 @@ export async function submitReport(input: SubmitReportInput) {
 
 export async function reportUser(reportedId: string, reason: ReportReason, details?: string) {
   await submitReport({ subjectType: "user", reportedId, reason, details });
+}
+
+/** What a member reads when report_post is not there (before 20261205100000, or after its rollback). */
+export const POST_REPORT_UNAVAILABLE_MESSAGE = "Reporting a post isn't available right now.";
+export const POST_REPORT_FAILED_MESSAGE = "Couldn't submit your report. Please try again.";
+
+/**
+ * report_post's refusals in the member's words, never the database's text: the catalog sentence for its codes
+ * (POST_NOT_FOUND, CANNOT_REPORT_SELF, AUTH_REQUIRED), the unavailable sentence while the function is missing, and
+ * the fallback for anything else.
+ */
+export function reportPostErrorMessage(error: unknown): string {
+  if (isMissingFunctionError(error as { code?: string } | null)) {
+    return POST_REPORT_UNAVAILABLE_MESSAGE;
+  }
+  return userErrorMessage(error, POST_REPORT_FAILED_MESSAGE);
+}
+
+/**
+ * Reports a network post (20261205100000). The database decides everything: the post must be one the member can read
+ * (a post that does not exist and one they cannot see get the same answer), it is never their own, the reported user
+ * is the post's author, and while their earlier report of this post is open the call answers with that report instead
+ * of filing a second one. The author never sees the report. Resolves to the report's id; throws an Error whose message
+ * is already a sentence for the member.
+ */
+export async function reportPost(
+  postId: string,
+  reason: ReportReason,
+  details?: string,
+): Promise<string> {
+  const rpc = (supabase.rpc as unknown as RpcCall).bind(supabase);
+  const { data, error } = await rpc("report_post", {
+    _post: postId,
+    _reason: reason,
+    _details: details?.trim().slice(0, 1000) || null,
+  });
+  if (error) throw new Error(reportPostErrorMessage(error));
+  return data as string;
 }
 
 /** One row of the signed-in member's block list. */

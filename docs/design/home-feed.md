@@ -47,3 +47,32 @@ Slice F notes: a trainer (a `teams` row with kind `coach`) lists group clinics a
 moderation work as for venue events. Sign-ups ask for the trainer's own published waiver: `get_event_waiver` shows its
 text to a signed-in member, and `register_for_event` signs it with the sign-up. 1-on-1 sessions stay booking requests
 (D7). The feed shows them with the trainer's name, and a sport filter uses the trainer's sports.
+
+## Post reports
+
+Backlog P1-2a (migration `20261205100000_network_post_reports`, test `565_network_post_reports`). A signed-in member
+can report a post on Home with the **Report** (flag) button on someone else's post. The button is not shown on the
+member's own posts, on team announcements merged into Following (those are team posts, not network posts), or to
+signed-out visitors, who see no posts section. The dialog offers the same reasons, in the same words, as a reported
+message, and an optional note of up to 1,000 characters.
+
+The report goes through `public.report_post(_post, _reason, _details)`, never a direct insert (a trigger refuses a
+post report written straight into `user_reports` by an API role):
+
+- The member must be able to read the post under the `posts` read rules (audience, a block either way, a hidden team
+  or venue, the author's age cap, and approved, not hidden, not deleted). A post that does not exist and one they
+  cannot read get the same answer, "That post isn't available.", so a report never tells whether a post exists.
+- Nobody reports their own post, including one they wrote as a team or venue ("You can't report your own post.").
+- The reason must be one `user_reports` allows. The reported user is the post's author: for a post made as a team or
+  venue, the person who wrote it. The report is stored with subject `post` and the post's id (`user_reports.post_id`,
+  cleared if the author later deletes the post for good, so the report stays).
+- While the member's earlier report of the same post is still open, reporting it again files nothing new and answers
+  with that report. Once a moderator resolves or dismisses it, a new report is a new row.
+- Only the reporter and moderators read a report; the author never does (the `user_reports` read rules are unchanged).
+
+In the moderation queue (`/admin/moderation`) a post report shows the post's text, who it was shared with, whether it
+is hidden, deleted or waiting for its check, and a link to the team or venue it was posted as; the author is linked as
+the reported user. The existing actions apply as they do to a reported game or reel: **Remove content** hides the post,
+**Restore** unhides it, and Warn, Suspend, Ban, Resolve and Dismiss act on the author and the report as before. The
+queue reads `post_id` only where the column exists, so it keeps working before the migration is applied and after its
+rollback (`docs/rollbacks/20261205100000_network_post_reports.down.sql`, which refuses while any post report exists).

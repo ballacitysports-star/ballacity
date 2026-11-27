@@ -50,6 +50,94 @@ export const moderationCheck = createServerFn({ method: "GET" })
 
 const STATUS = z.enum(["new", "investigating", "resolved", "dismissed", "escalated"]);
 
+/** The report kinds the queue filters by. */
+export const REPORT_SUBJECT_FILTERS = ["user", "game", "message", "reel", "post"] as const;
+
+/**
+ * user_reports.post_id comes with 20261205100000. Before that migration is applied (and after its rollback) the
+ * column is missing and a read that names it fails, so the queue reads it only where it exists: on this error it
+ * reads again without it.
+ */
+export function isMissingPostIdColumn(
+  error: { code?: string; message?: string } | null | undefined,
+): boolean {
+  return (
+    !!error &&
+    (error.code === "42703" || error.code === "PGRST204") &&
+    /\bpost_id\b/.test(error.message ?? "")
+  );
+}
+
+type QueryResult = { data: unknown; error: { code?: string; message?: string } | null };
+
+/**
+ * The query-builder calls these reads and writes make, for what the generated client types do not know yet
+ * (user_reports.post_id, the posts table).
+ */
+type LooseQuery = PromiseLike<QueryResult> & {
+  select(columns: string): LooseQuery;
+  eq(column: string, value: unknown): LooseQuery;
+  in(column: string, values: readonly unknown[]): LooseQuery;
+  order(column: string, options: { ascending: boolean }): LooseQuery;
+  limit(count: number): LooseQuery;
+  update(values: Record<string, unknown>): LooseQuery;
+  maybeSingle(): PromiseLike<QueryResult>;
+};
+const looseFrom = (admin: unknown, table: string): LooseQuery =>
+  (admin as { from(table: string): LooseQuery }).from(table);
+
+/** Runs `read` naming post_id, and again without it while the column does not exist. */
+async function withPostIdIfPresent(
+  read: (withPostId: boolean) => PromiseLike<QueryResult>,
+): Promise<QueryResult> {
+  const first = await read(true);
+  return isMissingPostIdColumn(first.error) ? read(false) : first;
+}
+
+type ReportRow = {
+  id: string;
+  subject_type: string;
+  reason: string;
+  details: string | null;
+  status: string;
+  created_at: string;
+  reviewed_at: string | null;
+  resolution_notes: string | null;
+  reporter_id: string;
+  reported_id: string;
+  game_id: string | null;
+  conversation_id: string | null;
+  message_id: string | null;
+  reel_id: string | null;
+  /** Missing before 20261205100000 and after its rollback. */
+  post_id?: string | null;
+};
+
+type PostRow = {
+  id: string;
+  body: string;
+  posted_as: ModerationPost["postedAs"];
+  team_id: string | null;
+  org_id: string | null;
+  audience: string;
+  hidden_at: string | null;
+  deleted_at: string | null;
+  moderation_status: string;
+};
+
+/** A reported network post as a moderator sees it (read with the service role: RLS does not hide it here). */
+export type ModerationPost = {
+  id: string;
+  body: string;
+  postedAs: "person" | "team" | "org";
+  teamId: string | null;
+  orgId: string | null;
+  audience: string;
+  hidden: boolean;
+  deleted: boolean;
+  moderationStatus: string;
+};
+
 export type ModerationReport = {
   id: string;
   subjectType: string;
@@ -75,7 +163,15 @@ export type ModerationReport = {
   reelId: string | null;
   reelTitle: string | null;
   reelHidden: boolean;
+  /** The reported network post (subject 'post'); null when the author has since deleted it for good. */
+  postId: string | null;
+  post: ModerationPost | null;
 };
+
+const REPORT_COLUMNS =
+  "id, subject_type, reason, details, status, created_at, reviewed_at, resolution_notes, reporter_id, reported_id, game_id, conversation_id, message_id, reel_id";
+const POST_COLUMNS =
+  "id, body, posted_as, team_id, org_id, audience, hidden_at, deleted_at, moderation_status";
 
 export const listReports = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -83,9 +179,7 @@ export const listReports = createServerFn({ method: "GET" })
     z
       .object({
         status: z.union([STATUS, z.literal("all")]).default("all"),
-        subjectType: z
-          .union([z.enum(["user", "game", "message", "reel"]), z.literal("all")])
-          .default("all"),
+        subjectType: z.union([z.enum(REPORT_SUBJECT_FILTERS), z.literal("all")]).default("all"),
       })
       .parse(d ?? {}),
   )
@@ -93,19 +187,17 @@ export const listReports = createServerFn({ method: "GET" })
     await assertModerator(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    let q = supabaseAdmin
-      .from("user_reports")
-      .select(
-        "id, subject_type, reason, details, status, created_at, reviewed_at, resolution_notes, reporter_id, reported_id, game_id, conversation_id, message_id, reel_id",
-      )
-      .order("created_at", { ascending: false })
-      .limit(300);
-    if (data.status !== "all") q = q.in("status", reportStatusesFor(data.status));
-    if (data.subjectType !== "all") q = q.eq("subject_type", data.subjectType);
-
-    const { data: rows, error } = await q;
+    const { data: rows, error } = await withPostIdIfPresent((withPostId) => {
+      let q = looseFrom(supabaseAdmin, "user_reports")
+        .select(withPostId ? `${REPORT_COLUMNS}, post_id` : REPORT_COLUMNS)
+        .order("created_at", { ascending: false })
+        .limit(300);
+      if (data.status !== "all") q = q.in("status", reportStatusesFor(data.status));
+      if (data.subjectType !== "all") q = q.eq("subject_type", data.subjectType);
+      return q;
+    });
     if (error) throw new Error(error.message);
-    const list = rows ?? [];
+    const list = (rows ?? []) as ReportRow[];
 
     const userIds = Array.from(
       new Set(list.flatMap((r) => [r.reporter_id, r.reported_id]).filter(Boolean)),
@@ -115,8 +207,9 @@ export const listReports = createServerFn({ method: "GET" })
       new Set(list.map((r) => r.message_id).filter(Boolean)),
     ) as string[];
     const reelIds = Array.from(new Set(list.map((r) => r.reel_id).filter(Boolean))) as string[];
+    const postIds = Array.from(new Set(list.map((r) => r.post_id).filter(Boolean))) as string[];
 
-    const [profiles, games, messages, reels] = await Promise.all([
+    const [profiles, games, messages, reels, posts] = await Promise.all([
       userIds.length
         ? supabaseAdmin
             .from("profiles")
@@ -135,12 +228,16 @@ export const listReports = createServerFn({ method: "GET" })
       reelIds.length
         ? supabaseAdmin.from("highlight_reels").select("id, title, hidden_at").in("id", reelIds)
         : Promise.resolve({ data: [] as any[] }),
+      postIds.length
+        ? looseFrom(supabaseAdmin, "posts").select(POST_COLUMNS).in("id", postIds)
+        : Promise.resolve<QueryResult>({ data: [], error: null }),
     ]);
 
     const pMap = new Map((profiles.data ?? []).map((p: any) => [p.id, p]));
     const gMap = new Map((games.data ?? []).map((g: any) => [g.id, g]));
     const mMap = new Map((messages.data ?? []).map((m: any) => [m.id, m]));
     const rMap = new Map((reels.data ?? []).map((r: any) => [r.id, r]));
+    const postMap = new Map(((posts.data ?? []) as PostRow[]).map((p) => [p.id, p]));
 
     const reports: ModerationReport[] = list.map((r) => {
       const reporter = pMap.get(r.reporter_id);
@@ -148,6 +245,7 @@ export const listReports = createServerFn({ method: "GET" })
       const game = r.game_id ? gMap.get(r.game_id) : null;
       const msg = r.message_id ? mMap.get(r.message_id) : null;
       const reel = r.reel_id ? rMap.get(r.reel_id) : null;
+      const post = r.post_id ? postMap.get(r.post_id) : null;
       return {
         id: r.id,
         subjectType: r.subject_type,
@@ -175,6 +273,20 @@ export const listReports = createServerFn({ method: "GET" })
         reelId: r.reel_id,
         reelTitle: reel?.title ?? null,
         reelHidden: !!reel?.hidden_at,
+        postId: r.post_id ?? null,
+        post: post
+          ? {
+              id: post.id,
+              body: post.body,
+              postedAs: post.posted_as,
+              teamId: post.team_id ?? null,
+              orgId: post.org_id ?? null,
+              audience: post.audience,
+              hidden: !!post.hidden_at,
+              deleted: !!post.deleted_at,
+              moderationStatus: post.moderation_status,
+            }
+          : null,
       };
     });
 
@@ -241,13 +353,26 @@ export const applyModerationAction = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     await assertModerator(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: report, error: rErr } = await supabaseAdmin
-      .from("user_reports")
-      .select("id, reported_id, subject_type, game_id, message_id, reel_id, reason")
-      .eq("id", data.reportId)
-      .maybeSingle();
+    const ACTION_COLUMNS = "id, reported_id, subject_type, game_id, message_id, reel_id, reason";
+    const { data: found, error: rErr } = await withPostIdIfPresent((withPostId) =>
+      looseFrom(supabaseAdmin, "user_reports")
+        .select(withPostId ? `${ACTION_COLUMNS}, post_id` : ACTION_COLUMNS)
+        .eq("id", data.reportId)
+        .maybeSingle(),
+    );
     if (rErr) throw new Error(rErr.message);
-    if (!report) throw new Error("Report not found");
+    if (!found) throw new Error("Report not found");
+    const report = found as Pick<
+      ReportRow,
+      | "id"
+      | "reported_id"
+      | "subject_type"
+      | "game_id"
+      | "message_id"
+      | "reel_id"
+      | "post_id"
+      | "reason"
+    >;
 
     const reason = data.reason?.trim() || null;
     const now = new Date().toISOString();
@@ -289,6 +414,10 @@ export const applyModerationAction = createServerFn({ method: "POST" })
           .update({ hidden_at: now })
           .eq("id", report.reel_id);
         summary = "Reel hidden";
+      } else if (report.subject_type === "post" && report.post_id) {
+        // The same hide the superadmin content queue uses (hidden_at, written with the service role).
+        await looseFrom(supabaseAdmin, "posts").update({ hidden_at: now }).eq("id", report.post_id);
+        summary = "Post hidden";
       } else {
         throw new Error("This report has no removable content attached");
       }
@@ -321,6 +450,10 @@ export const applyModerationAction = createServerFn({ method: "POST" })
           .from("highlight_reels")
           .update({ hidden_at: null })
           .eq("id", report.reel_id);
+      if (report.post_id)
+        await looseFrom(supabaseAdmin, "posts")
+          .update({ hidden_at: null })
+          .eq("id", report.post_id);
       summary = "Access and content restored";
     }
 
@@ -344,7 +477,9 @@ export const applyModerationAction = createServerFn({ method: "POST" })
             ? report.message_id
             : report.subject_type === "reel"
               ? report.reel_id
-              : report.reported_id,
+              : report.subject_type === "post" && report.post_id
+                ? report.post_id
+                : report.reported_id,
       reason,
       before: { reportId: report.id, reportReason: report.reason },
       after: { summary, reportedUserId: report.reported_id },
