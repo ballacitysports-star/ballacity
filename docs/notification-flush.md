@@ -170,12 +170,13 @@ For each queued row that is due (up to 50 per call), oldest first:
 Alert when `overdue` is above 0 on consecutive calls (queued rows more than an
 hour past due: the scheduler or the provider is down), when `failed` rises, or
 when the call stops arriving. A `401` means the secret is wrong; `500` carries
-the error text. Each `500` is also filed in the superadmin error view as
-`flush-held-notifications: <error>` (scrubbed), under the endpoint's path; a
-`401` and a call that works are not. `send-game-reminders` does the same for
-`/api/public/reminders/run` (`send-game-reminders: <error>`, one message for
-each job that failed). See "Worker failures in the error view" in
-`docs/scheduled-jobs-health.md`.
+the error text. A `500` is also filed in the superadmin error view as
+`flush-held-notifications: <error>` (scrubbed), under the endpoint's path, the
+same error at most once every 30 minutes; a `401` and a call that works are
+not. `send-game-reminders` does the same for `/api/public/reminders/run`: one
+row per failed run, `send-game-reminders: <error>`, where `<error>` lists each
+failed job's message, separated by `; `. See "Worker failures in the error
+view" in `docs/scheduled-jobs-health.md`.
 
 ## Needs ONESIGNAL_REST_API_KEY
 

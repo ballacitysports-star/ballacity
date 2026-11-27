@@ -3,12 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 /**
  * P2-7a, through the real worker routes: a 5xx answer from a scheduled worker is filed once in app_error_events as
  * "<job>: <error>" under the route, with nothing of the request; a run that works, or a caller without the worker secret,
- * files nothing; and a reporter that breaks never changes the answer. The sweeps, the worker check and the database are
- * stood in; the reporter is the real one, counted, and broken on request.
+ * files nothing; the same failure on the next runs files nothing more for 30 minutes; and a reporter that breaks never
+ * changes the answer. The sweeps, the worker check and the database are stood in; the reporter is the real one,
+ * counted, and broken on request.
  */
 const h = vi.hoisted(() => ({
   auth: "ok" as "ok" | "unauthorized",
   rows: [] as Record<string, unknown>[],
+  saved: [] as { fingerprint: unknown; route: unknown; created_at: string }[],
   reporterThrows: false,
   reporterCalls: [] as unknown[][],
   sweeps: vi.fn(),
@@ -29,6 +31,31 @@ vi.mock("@/integrations/supabase/client.server", () => {
     q.limit = async () => h.reelsQueue;
     return q;
   };
+  // app_error_events: the insert, and the check for a row with the same fingerprint and route since a time.
+  const recentRows = () => {
+    const eq: Record<string, unknown> = {};
+    let since = "";
+    const q = {
+      eq: (col: string, v: unknown) => {
+        eq[col] = v;
+        return q;
+      },
+      gte: (_col: string, v: string) => {
+        since = v;
+        return q;
+      },
+      limit: async (n: number) => ({
+        data: h.saved
+          .filter(
+            (r) =>
+              r.fingerprint === eq.fingerprint && r.route === eq.route && r.created_at >= since,
+          )
+          .slice(0, n),
+        error: null,
+      }),
+    };
+    return q;
+  };
   return {
     supabaseAdmin: {
       from: (table: string) =>
@@ -36,8 +63,14 @@ vi.mock("@/integrations/supabase/client.server", () => {
           ? {
               insert: async (row: Record<string, unknown>) => {
                 h.rows.push(row);
+                h.saved.push({
+                  fingerprint: row.fingerprint,
+                  route: row.route,
+                  created_at: new Date().toISOString(),
+                });
                 return { error: null };
               },
+              select: () => recentRows(),
             }
           : reelsQuery(),
       rpc: (...args: unknown[]) => h.rpc(...args),
@@ -117,6 +150,7 @@ const summary = { sent: 1, checked: 2, pushed: 1, removed: 0, deferred: 0 };
 beforeEach(() => {
   h.auth = "ok";
   h.rows.length = 0;
+  h.saved.length = 0;
   h.reporterThrows = false;
   h.reporterCalls.length = 0;
   h.sweeps.mockReset();
@@ -127,6 +161,7 @@ beforeEach(() => {
   vi.stubEnv("LOVABLE_API_KEY", "test-key");
 });
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
@@ -287,6 +322,28 @@ describe("the other worker routes (P2-7a)", () => {
       ["process-highlight-reels: Missing LOVABLE_API_KEY", REELS],
       ["process-highlight-reels: queue_read_failed", REELS],
     ]);
+  });
+
+  it("reels: a key that stays missing (a run every minute) is filed once in 30 minutes, every run still answers 500", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-27T10:00:00.000Z"));
+    vi.stubEnv("LOVABLE_API_KEY", "");
+    for (let minute = 0; minute < 30; minute += 1) {
+      vi.setSystemTime(new Date(Date.UTC(2026, 10, 27, 10, minute)));
+      expect(await call(ReelsRoute, REELS)).toEqual({
+        status: 500,
+        body: { error: "Missing LOVABLE_API_KEY" },
+      });
+    }
+    expect(h.rows.map((r) => r.message)).toEqual([
+      "process-highlight-reels: Missing LOVABLE_API_KEY",
+    ]);
+    expect(h.reporterCalls).toHaveLength(1);
+
+    // 30 minutes and a bit after the first row: one more.
+    vi.setSystemTime(new Date(Date.UTC(2026, 10, 27, 10, 30, 0, 1)));
+    await call(ReelsRoute, REELS);
+    expect(h.rows).toHaveLength(2);
   });
 
   it("reels: an empty queue, or a 401, reports nothing", async () => {
