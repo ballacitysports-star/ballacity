@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { claimNewestRead, newReadOrder } from "./read-order";
+import { claimLocalWrite, claimNewestRead, newReadOrder } from "./read-order";
 
 describe("claimNewestRead", () => {
   it("applies answers that arrive in send order", () => {
@@ -32,5 +32,55 @@ describe("claimNewestRead", () => {
     const older = ++order.sent;
     ++order.sent; // sent, then failed: never claimed
     expect(claimNewestRead(order, older)).toBe(true);
+  });
+});
+
+describe("claimLocalWrite", () => {
+  it("takes the next number and claims it", () => {
+    const order = newReadOrder();
+    ++order.sent;
+    const writeNo = claimLocalWrite(order);
+    expect(writeNo).toBe(2);
+    expect(order.sent).toBe(2);
+    expect(order.newestApplied).toBe(2);
+  });
+
+  it("drops a read sent before the local write that answers after it", () => {
+    const order = newReadOrder();
+    const before = ++order.sent;
+    claimLocalWrite(order);
+    expect(claimNewestRead(order, before)).toBe(false);
+  });
+
+  it("still applies a read sent after the local write", () => {
+    const order = newReadOrder();
+    claimLocalWrite(order);
+    const after = ++order.sent;
+    expect(claimNewestRead(order, after)).toBe(true);
+  });
+
+  it("keeps a read sent before the write dropped after the write is undone", () => {
+    // The undo claims nothing and gives nothing back, so the write's claim still holds.
+    const order = newReadOrder();
+    const before = ++order.sent;
+    claimLocalWrite(order);
+    // ...the write fails and the page puts the old row back without touching the order...
+    expect(claimNewestRead(order, before)).toBe(false);
+  });
+
+  it("lets a read sent between the write and its undo land after the undo", () => {
+    const order = newReadOrder();
+    claimLocalWrite(order);
+    const between = ++order.sent;
+    // ...the write fails and the page puts the old row back without touching the order...
+    expect(claimNewestRead(order, between)).toBe(true);
+  });
+
+  it("is never blocked by an earlier local write", () => {
+    const order = newReadOrder();
+    const first = claimLocalWrite(order);
+    const second = claimLocalWrite(order);
+    expect(second).toBeGreaterThan(first);
+    expect(order.newestApplied).toBe(second);
   });
 });
