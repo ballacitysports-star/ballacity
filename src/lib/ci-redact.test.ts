@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 // @ts-expect-error plain ESM without types
-import { redact, sanitizeLog } from "../../.github/ci-redact-lib.mjs";
+import { redact, redactJsonReport, sanitizeLog } from "../../.github/ci-redact-lib.mjs";
 
 /** Synthetic values only. */
 const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
@@ -552,5 +552,427 @@ describe("the redactor files", () => {
   it("never prints the caught error", () => {
     const src = readFileSync(".github/ci-redact.mjs", "utf8");
     expect(src).not.toMatch(/catch\s*\((?!\))/);
+  });
+});
+
+/** Every string (keys included) in a parsed JSON document. */
+const stringsOf = (doc: unknown): string[] => {
+  if (typeof doc === "string") return [doc];
+  if (Array.isArray(doc)) return doc.flatMap(stringsOf);
+  if (doc && typeof doc === "object")
+    return Object.entries(doc).flatMap(([k, v]) => [k, ...stringsOf(v)]);
+  return [];
+};
+/** The forms the redactor searches for: raw, slash-escaped, 1-3 layers of escaping, long lines. */
+const formsOf = (value: string) => {
+  const bases = new Set([value]);
+  for (const l of value.split(/\r\n|\n|\r/)) if (l.trim().length >= 12) bases.add(l.trim());
+  return [...bases].flatMap((b) => [b, b.replace(/\//g, "\\/"), enc(b, 1), enc(b, 2), enc(b, 3)]);
+};
+/** File mode, checked: the output parses and holds no form of any env value, raw or decoded. */
+const fileRedact = (raw: string, env: Record<string, string> = {}) => {
+  const out = redactJsonReport(raw, env) as string;
+  const views = [out, ...stringsOf(JSON.parse(out))];
+  for (const v of Object.values(env))
+    for (const f of formsOf(v.trim()))
+      if (f.length >= 8) for (const view of views) expect(view).not.toContain(f);
+  return out;
+};
+
+describe("redactJsonReport: the #486 failure", () => {
+  // Playwright 1.63 writes the PR's own diff into the report (config.metadata.gitDiff) and
+  // the JSON reporter writes JSON.stringify(report, undefined, 2). Escaped, the diff line
+  // is `case \"check_worker_secret\":\n`; the old file mode turned `\n` into
+  // `\[REDACTED]` (an invalid escape), so the report could not be parsed and nothing was
+  // uploaded after 283 passing tests.
+  const gitDiff = [
+    "diff --git a/src/lib/data-export.test.ts b/src/lib/data-export.test.ts",
+    "+      switch (fn) {",
+    '+        case "check_worker_secret":',
+    "+          return { data: false, error: null };",
+    '+        case "expire_stale_data_exports": {',
+    '+    expect(fake.rpcs.filter((f) => f !== "check_worker_secret")).toEqual([]);',
+    "",
+  ].join("\n");
+  const report = {
+    config: { metadata: { actualWorkers: 1, ci: { prTitle: "x" }, gitDiff } },
+    suites: [],
+    errors: [],
+    stats: { expected: 283 },
+  };
+  const raw = JSON.stringify(report, undefined, 2);
+
+  it("is reproduced: the report holds the escaped line the old rule broke", () => {
+    expect(raw).toContain('case \\"check_worker_secret\\":\\n');
+  });
+
+  it("gives valid JSON with nothing lost", () => {
+    const out = fileRedact(raw);
+    expect(out).toBe(raw);
+    expect(JSON.parse(out)).toEqual(report);
+  });
+
+  it("through the CLI: exit 0 and the same report", () => {
+    const root = checkout();
+    const input = join(root, "results.json");
+    const output = join(root, "clean.json");
+    writeFileSync(input, raw);
+    const r = cli(root, ["--in", input, "--out", output]);
+    expect(r.status).toBe(0);
+    expect(readFileSync(output, "utf8")).toBe(raw);
+  });
+
+  it("log mode no longer leaves a backslash in front of the marker", () => {
+    const line = 'case \\"check_worker_secret\\":\\n          return x';
+    const out = redact(line, {});
+    expect(out).not.toMatch(/\\\[REDACTED/);
+    expect(out).toContain("return x");
+  });
+});
+
+describe("redactJsonReport: credential-named keys", () => {
+  const doc = {
+    token: "opaque-token-aaaa",
+    secret: 1234567890123,
+    jwt: null,
+    password: true,
+    passwd: false,
+    access_token: { value: "nested-value-bbbb", n: 7, ok: null, deep: [{ x: "deep-cccc" }, 42] },
+    refresh_token: ["arr-dddd", -1.5e3, null, false, ["inner-eeee"]],
+    "x-api-key": "header-key-ffff",
+    Authorization: "Basic synthetic-credentials",
+    cookie: "sb-ref-auth-token=gggg1111; other=hhhh2222",
+    "set-cookie": ["a=iiii3333"],
+    worker_secret: "worker-jjjj",
+    db_password: "dbpass-kkkk",
+    userpassword: "userpass-llll",
+    token_type: "bearer",
+    tokens_used: 12,
+    title: "keep me",
+    list: [{ password: "in-array-mmmm" }, { ok: "keep too" }],
+  };
+  const leaks = [
+    "opaque-token-aaaa",
+    "1234567890123",
+    "nested-value-bbbb",
+    "deep-cccc",
+    "arr-dddd",
+    "-1.5e3",
+    "inner-eeee",
+    "header-key-ffff",
+    "synthetic-credentials",
+    "gggg1111",
+    "hhhh2222",
+    "iiii3333",
+    "worker-jjjj",
+    "dbpass-kkkk",
+    "userpass-llll",
+    "in-array-mmmm",
+  ];
+
+  it.each([0, 2])(
+    "replaces string and number values at any depth, keeps structure (indent %i)",
+    (indent) => {
+      const out = fileRedact(JSON.stringify(doc, undefined, indent));
+      for (const leak of leaks) expect(out).not.toContain(leak);
+      const p = JSON.parse(out);
+      expect(p.token).toBe("[REDACTED]");
+      expect(p.secret).toBe("[REDACTED]");
+      expect(p.jwt).toBeNull();
+      expect(p.password).toBe(true);
+      expect(p.passwd).toBe(false);
+      expect(p.access_token).toEqual({
+        value: "[REDACTED]",
+        n: "[REDACTED]",
+        ok: null,
+        deep: [{ x: "[REDACTED]" }, "[REDACTED]"],
+      });
+      expect(p.refresh_token).toEqual(["[REDACTED]", "[REDACTED]", null, false, ["[REDACTED]"]]);
+      expect(p.cookie).toBe("[REDACTED]");
+      expect(p.token_type).toBe("bearer");
+      expect(p.tokens_used).toBe(12);
+      expect(p.title).toBe("keep me");
+      expect(p.list).toEqual([{ password: "[REDACTED]" }, { ok: "keep too" }]);
+    },
+  );
+
+  it("finds a key written with escapes, as the text rules did", () => {
+    // `\u0074oken` is "token" decoded; `x\token` is "x", a tab, "oken" (the text rule matched it).
+    for (const raw of [
+      '{"\\u0074oken": "escaped-key-nnnn"}',
+      '{"x\\token": "tab-key-oooo"}',
+      '{"my_token\\\\": "backslash-key-pppp"}',
+    ]) {
+      const out = fileRedact(raw);
+      expect(out).not.toMatch(/nnnn|oooo|pppp/);
+      JSON.parse(out);
+    }
+  });
+
+  it("through the CLI: exit 0, valid JSON, no value left", () => {
+    const root = checkout();
+    const input = join(root, "results.json");
+    const output = join(root, "clean.json");
+    writeFileSync(input, JSON.stringify(doc, undefined, 2));
+    const r = cli(root, ["--in", input, "--out", output]);
+    expect(r.status).toBe(0);
+    const out = readFileSync(output, "utf8");
+    for (const leak of leaks) expect(out).not.toContain(leak);
+    expect(JSON.parse(out).title).toBe("keep me");
+  });
+
+  it("keeps numbers, literals, unusual keys and formatting outside credential keys exactly", () => {
+    const raw =
+      '{"n": 12345678901234567890, "f": 1.0, "e": 1E+2, "z": -0, "b": [true, false, null],\n "__proto__": {"k": "v"}, "dup": 1, "dup": 2}';
+    expect(fileRedact(raw)).toBe(raw);
+  });
+});
+
+describe("redactJsonReport: escapes next to separators and exact values", () => {
+  const ESCAPES = ["\\n", "\\t", "\\r", "\\b", "\\f", '\\"', "\\\\", "\\/", "\\u0041", "\\u0022"];
+  // Escapes that decode to a line break leave the value on the next line, which is not
+  // treated as the field's value; every other one must not shield the value.
+  const LINE_BREAKS = new Set(["\\n", "\\r"]);
+  const inString = (content: string) => `{"m": "${content}"}`;
+
+  it.each(ESCAPES)("%s right after a field separator", (e) => {
+    for (const content of [
+      `token:${e}value-after-escape-1`,
+      `token: ${e}value-after-escape-2`,
+      `password=${e}value-after-escape-3`,
+      `\\"secret\\":${e}value-after-escape-4`,
+      `cookie: ${e}a=value-after-escape-5; b=x`,
+      `case \\"check_worker_secret\\":${e}          return { data: false };`,
+    ]) {
+      const out = fileRedact(inString(content));
+      const value = (JSON.parse(out) as { m: string }).m;
+      if (!LINE_BREAKS.has(e)) expect(value).not.toMatch(/value-after-escape/);
+      expect(value).not.toMatch(/\\$/);
+    }
+  });
+
+  it.each(ESCAPES)("%s right before and after an exact value", (e) => {
+    const env = { E2E_SUPABASE_SERVICE_ROLE_KEY: "synthetic-exact-value-0042" };
+    const v = env.E2E_SUPABASE_SERVICE_ROLE_KEY;
+    for (const content of [`${e}${v}${e}`, `x${e}${v}`, `${v}${e}y`, `${e}${e}${v}${e}${e}`]) {
+      const out = fileRedact(inString(content), env);
+      expect(out).toContain("[REDACTED:E2E_SUPABASE_SERVICE_ROLE_KEY]");
+    }
+  });
+
+  it.each(["n", "t", "r", "b", "f", "u"])(
+    "an exact value starting with %s right after a backslash is removed whole, not split",
+    (first) => {
+      // "\n" + "ightly-..." contains "nightly-..." as written, from inside the escape.
+      const tail = first === "u" ? "0041ightly-synthetic-0042" : "ightly-synthetic-0042";
+      const env = { SOME_TOKEN: `${first}${tail}` };
+      const raw = inString(`x\\${first}${tail} y`);
+      expect(raw).toContain(env.SOME_TOKEN);
+      const out = fileRedact(raw, env);
+      expect(out).not.toContain("ightly-synthetic-0042");
+    },
+  );
+
+  it("an exact value ending in a backslash, cut through an escape, is removed", () => {
+    const env = { SOME_TOKEN: "synthetic-trailing-0042\\" };
+    for (const content of [
+      "synthetic-trailing-0042\\n after",
+      'synthetic-trailing-0042\\" after',
+    ]) {
+      const out = fileRedact(inString(content), env);
+      expect(out).not.toContain("synthetic-trailing-0042");
+      expect((JSON.parse(out) as { m: string }).m).toContain("after");
+    }
+  });
+
+  it("patterns never start inside an escape (\\r before rk_, \\b before earer, \\n before a host)", () => {
+    for (const content of [
+      "x\\rk_live_abcdef123 y",
+      "x\\bearer abcdefghijkl y",
+      "x\\nabcdefghijklmnopqrs.supabase.co y",
+      "x\\u00e9abcdefghijklmno.supabase.co y",
+    ]) {
+      const out = fileRedact(inString(content));
+      JSON.parse(out);
+    }
+  });
+
+  it("still catches what the text rules caught through escapes", () => {
+    // \u0020 inside a value and a scheme ending in a unicode escape: the text rules saw these.
+    const out = fileRedact(
+      inString("token: abc\\u0020def-parity-1 and \\u00e9://user:pw-parity-2@host.test/x"),
+    );
+    expect(out).not.toMatch(/parity-1|pw-parity-2/);
+  });
+
+  it("finds keys a word boundary misses after an escape, once the string is decoded", () => {
+    const raw = JSON.stringify({
+      m: `Error\n${JWT}\n\tsb_secret_after_tab_123\nBearer after-newline-1234567`,
+    });
+    const out = fileRedact(raw);
+    for (const leak of [JWT, "sb_secret_after_tab_123", "after-newline-1234567"])
+      expect(out).not.toContain(leak);
+  });
+
+  it("does not redact a marker twice", () => {
+    const out = fileRedact(
+      JSON.stringify({ m: 'const SECRET = "worker-secret-987"; headers: { authorization: x' }),
+    );
+    expect(out).toContain('SECRET = \\"[REDACTED]\\";');
+    expect(out).not.toContain("[REDACTED]]");
+  });
+});
+
+describe("redactJsonReport: multi-layer escaped JSON inside strings", () => {
+  const body = {
+    access_token: "layered-token-value-1",
+    refresh_token: OPAQUE,
+    password: "layered-password-2",
+    api_key: "layered-api-key-3",
+    cookie: "sb-a=layered-cookie-4",
+    note: "keep me",
+  };
+  it.each([1, 2, 3, 4])("at %i layer(s)", (n) => {
+    let inner = JSON.stringify(body);
+    for (let i = 1; i < n; i++) inner = JSON.stringify(inner);
+    const raw = JSON.stringify({ suites: [{ error: { message: `failed: ${inner}` } }], n: 1 });
+    const out = fileRedact(raw);
+    for (const v of Object.values(body).filter((x) => x !== "keep me"))
+      expect(out).not.toContain(v.replace(/^sb-a=/, ""));
+    expect(out).toContain("keep me");
+    expect(JSON.parse(out).n).toBe(1);
+  });
+});
+
+describe("redactJsonReport: fails closed", () => {
+  it("on an exact value outside a string (a number)", () => {
+    const raw = JSON.stringify({ duration: 1234567890123 });
+    expect(() => redactJsonReport(raw, { E2E_RUN_ID: "1234567890123" })).toThrow();
+  });
+
+  it("on an exact value that spans JSON structure, even when the strings in it change", () => {
+    const value = '{"a":"opaque-synthetic-77","b":"token: zzz12345"}';
+    const raw = `{"session":${value}}`;
+    expect(() => redactJsonReport(raw, { SOME_TOKEN: value })).toThrow();
+  });
+
+  it("on invalid input", () => {
+    for (const bad of ["", "{", '{"a": "\\x"}', "[1,]", "\uFEFF{}"])
+      expect(() => redactJsonReport(bad, {})).toThrow();
+  });
+
+  it("through the CLI: exit 1, no output file, one fixed line without the value", () => {
+    const root = checkout();
+    const input = join(root, "results.json");
+    const output = join(root, "clean.json");
+    writeFileSync(input, JSON.stringify({ duration: 1234567890123 }));
+    const r = cli(root, ["--in", input, "--out", output], "", { E2E_RUN_ID: "1234567890123" });
+    expect(r.status).toBe(1);
+    expect(existsSync(output)).toBe(false);
+    expect(r.stderr.trim()).toBe(
+      "ci-redact: the report could not be sanitized; nothing will be uploaded.",
+    );
+    expect(`${r.stdout}${r.stderr}`).not.toContain("1234567890123");
+  });
+});
+
+describe("redactJsonReport: fuzz (seeded)", () => {
+  // Random reports mixing credential-like names, separators, escapes and env values. Every
+  // output must parse and hold no form of any env value; credential-key values must go.
+  let seed = 486;
+  const rnd = () => {
+    seed = (seed + 0x6d2b79f5) >>> 0;
+    let t = seed;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const pick = <T>(a: readonly T[]): T => a[Math.floor(rnd() * a.length)];
+  const word = (n = 12) =>
+    Array.from({ length: n }, () => pick([..."abcdefghijkmnpqrstuvwxyzABCDEFGH23456789"])).join("");
+  const NAMES = ["token", "access_token", "password", "secret", "worker_secret", "x-api-key"];
+  const OTHER = ["title", "token_type", "tokens_used", "message", "note"];
+  const SEPS = [":", "=", ": ", " = ", ":\n", ":\t", ":\\n", "=\\t", ": \\u0020"];
+  const ESC = [
+    "",
+    "\\n",
+    "\\t",
+    "\\r",
+    "\\b",
+    "\\f",
+    '\\"',
+    "\\\\",
+    "\\/",
+    "\\u0041",
+    "\\",
+    "\n",
+    "\t",
+    '"',
+  ];
+  const QUOTES = ["", '"', '\\"', "'", '\\\\\\"'];
+
+  it("1000 reports: always valid JSON, never an env value, never a credential-key value", () => {
+    for (let i = 0; i < 1000; i++) {
+      const env: Record<string, string> = {};
+      const values = [word(), `${pick(["n", "t", "r", "b", "f", "u"])}${word()}`, `${word()}\\`];
+      env.E2E_SUPABASE_SERVICE_ROLE_KEY = pick(values);
+      if (rnd() < 0.5) env.SOME_TOKEN = `${word()}${pick(["/", '"', "\n", "\t", "\\"])}${word()}`;
+      const secrets: string[] = [];
+      const frag = () => {
+        const v = pick([word(), ...Object.values(env), enc(pick(Object.values(env)), 1), JWT]);
+        return pick([
+          `${pick(QUOTES)}${pick([...NAMES, ...OTHER])}${pick(QUOTES)}${pick(SEPS)}${pick(QUOTES)}${pick(ESC)}${v}`,
+          `${pick(ESC)}${v}${pick(ESC)}`,
+          enc(JSON.stringify({ [pick(NAMES)]: v, note: word() }), Math.floor(rnd() * 3)),
+        ]);
+      };
+      const text = () => Array.from({ length: 1 + Math.floor(rnd() * 4) }, frag).join(pick(ESC));
+      const secretValue = () => {
+        const s = `cred-${word()}`;
+        secrets.push(s);
+        return pick<unknown>([s, { v: s, n: 5, z: null }, [s, true], s]);
+      };
+      const obj: Record<string, unknown> = { message: text(), [pick(OTHER)]: text() };
+      for (let k = 0; k < 3; k++) obj[pick(NAMES)] = secretValue();
+      obj.nested = JSON.stringify({ [pick(NAMES)]: text(), m: text() });
+      const raw = JSON.stringify({ suites: [obj], stats: { n: i } }, undefined, pick([0, 2]));
+      const out = fileRedact(raw, env);
+      for (const s of secrets) expect(out).not.toContain(s);
+      expect(JSON.parse(out).stats.n).toBe(i);
+    }
+  });
+});
+
+describe("redactJsonReport: time", () => {
+  it("is linear on long values and long backslash runs", () => {
+    const t = Date.now();
+    fileRedact(JSON.stringify({ a: "x".repeat(2_000_000), access_token: "y".repeat(2_000_000) }));
+    // Sized so that a quadratic rule takes well over the limit (seconds, not hours).
+    fileRedact(JSON.stringify({ m: `token: ${"\\".repeat(100_000)},` }));
+    fileRedact(JSON.stringify({ m: `${"\\".repeat(40_000)}x` }));
+    redact(`token: ${"\\".repeat(100_000)},`, {});
+    redact(`${"\\".repeat(40_000)}x`, {});
+    expect(Date.now() - t).toBeLessThan(4000);
+  });
+});
+
+describe("redact (logs): a value that starts with an escape", () => {
+  it.each([
+    ["password=\\hunter2hunter2", "hunter2hunter2"],
+    ['"secret":\\nnext-line-value', "next-line-value"],
+    ["token: \\u0041bcdef-unicode", "bcdef-unicode"],
+    ["cookie: \\nsb-a=cookie-value-1; b=2", "cookie-value-1"],
+    ['set-cookie: \\"sb-a=cookie-value-2', "cookie-value-2"],
+  ])("%s is redacted with the escape, leaving no dangling backslash", (text, secret) => {
+    const out = redact(text, {});
+    expect(out).not.toContain(secret);
+    expect(out).not.toMatch(/(^|[^\\])(\\\\)*\\\[REDACTED\]/);
+  });
+
+  it("still catches the same credential field names", () => {
+    for (const name of ["worker_secret", "db_password", "userpassword", "x-api-key", "MY_TOKEN"]) {
+      expect(redact(`${name}=field-value-zzzz`, {})).not.toContain("field-value-zzzz");
+      expect(redact(`{"${name}":"field-value-yyyy"}`, {})).not.toContain("field-value-yyyy");
+    }
   });
 });

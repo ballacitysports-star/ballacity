@@ -16,16 +16,18 @@
  * line. Run it as the right-hand side of a pipe under `pipefail` so its failure fails the
  * step and the left-hand command's exit status is preserved.
  *
- * File mode reads --in and writes a DIFFERENT file, --out. The input must be valid JSON
- * and so must the redacted output. On any failure it removes --out, prints one fixed
- * message (never the error, never content) and exits 1. It does not depend on being able
- * to overwrite the original, and the caller must gate any upload on this process's
- * success, so a failure cannot leave an unredacted file at the upload path.
+ * File mode reads --in and writes a DIFFERENT file, --out. The input must be valid JSON;
+ * it is redacted string by string (redactJsonReport), so the output is valid JSON too and
+ * no escape sequence is cut. On any failure, including an exact value that is outside a
+ * single string or still in the output, it removes --out, prints one fixed message (never
+ * the error, never content) and exits 1. It does not depend on being able to overwrite
+ * the original, and the caller must gate any upload on this process's success, so a
+ * failure cannot leave an unredacted file at the upload path.
  */
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createInterface } from "node:readline";
-import { makeRedactor, redact, sanitizeLog } from "./ci-redact-lib.mjs";
+import { makeRedactor, redactJsonReport, sanitizeLog } from "./ci-redact-lib.mjs";
 
 // A downstream consumer that closes early (`... | head -1`, or a runner that stopped reading)
 // makes stdout emit EPIPE. Without a listener Node prints an uncaught-exception stack trace.
@@ -82,7 +84,7 @@ if (argv.includes("--stream")) {
     rmSync(output, { force: true });
     const raw = readFileSync(input, "utf8");
     JSON.parse(raw);
-    const clean = redact(raw, process.env);
+    const clean = redactJsonReport(raw, process.env);
     JSON.parse(clean);
     writeFileSync(output, clean);
   } catch {

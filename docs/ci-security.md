@@ -212,10 +212,12 @@ check this. Production payment code and `vite.config.ts` are unchanged.
   user's session is injected into the page.
 - **Report.** The only artifact is `ci-sanitized/results.json`, a separate file written by
   `ci-redact.mjs --in playwright-report/results.json --out ci-sanitized/results.json`. Input
-  and output must both be valid JSON. On any failure the tool removes the output, prints one
-  fixed line and exits 1. The step sets `sanitized=true` only after the redactor exits 0, and
-  the upload runs only when that output is `true` and uploads exactly that file with 3-day
-  retention. The raw report, `test-results/` (screenshots, per-test files) and logs are
+  and output must both be valid JSON. The report is redacted string by string, so the output
+  is always valid JSON (a text-level redaction once cut the `\n` escape after
+  `case "check_worker_secret":` in the diff Playwright puts in the report, and the run lost
+  its report). On any failure the tool removes the output, prints one fixed line and
+  exits 1. The step sets `sanitized=true` only after the redactor exits 0, and the upload
+  runs only when that output is `true` and uploads exactly that file with 3-day retention. The raw report, `test-results/` (screenshots, per-test files) and logs are
   never upload candidates. Failure screenshots and traces are not available from CI.
 - **What is in the report.** `results.json` contains Playwright's serialized config,
   including `webServer.env.E2E_DEV_SERVER_SPEC`. That has the Supabase URL, project id and
@@ -234,10 +236,18 @@ check this. Production payment code and `vite.config.ts` are unchanged.
   `id_token`, `password`, `secret`, `token`, `api_key`, `service_role_key`,
   `authorization`, at any depth of backslash escaping, including unicode-escaped values.
   The report step has no exact values, so it relies on these.
+- **The report, specifically.** Each string is redacted as written in the file and again
+  decoded, so a JWT or key right after an escaped newline and a unicode-escaped field name
+  are found there too, and no escape sequence is ever split. A credential-named key's value
+  is replaced whole: every string and number in it, at any depth, becomes `"[REDACTED]"`;
+  null and booleans are kept. The step fails (nothing uploaded) if an exact value occurs
+  outside a single string, such as in a number or across JSON structure, or is still in the
+  output. A value on the line after its field name (`secret:` then a line break) is not
+  treated as that field's value in the report; in logs it still is.
 - **Not reliably caught:** an opaque value with no recognizable format that is neither a
-  known environment value nor next to a credential-looking field name; a field _name_ that
-  is itself escaped; secrets split across lines or fields; base64- or URL-re-encoded
-  secrets; and tokens minted at run time. The fixture user's session tokens are created
+  known environment value nor next to a credential-looking field name; in logs, a field
+  _name_ that is itself escaped; secrets split across lines or fields; base64- or
+  URL-re-encoded secrets; and tokens minted at run time. The fixture user's session tokens are created
   inside the Playwright process and are deliberately not handed to the report step (that
   would widen secret scope for convenience). JWT-form tokens are still caught by shape; an
   opaque refresh token only next to its field name.
