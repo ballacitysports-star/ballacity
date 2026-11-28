@@ -5,10 +5,20 @@ import type { AuditAction } from "@/lib/audit-actions";
 import { assertModerator } from "@/lib/moderation.server";
 import { postEditedSinceReport } from "@/lib/post-fingerprint.server";
 import {
+  ACCOUNT_BANNED_SUMMARY,
+  ACCOUNT_SUSPENDED_SUMMARY,
   POST_HIDDEN_SUMMARY,
+  RESTORE_KEEPS_ACCOUNT,
   RESTORE_KEEPS_HIDDEN,
+  RESTORE_READ_FAILED,
+  accountRestoreBlocker,
+  accountRestricted,
+  keptAccountSentence,
+  keptPostSentence,
+  notesClaimAccountAction,
   postRestoreBlocker,
   restoreKeepsHidden,
+  restoreSummary,
 } from "@/lib/post-restore";
 import { reportStatusesFor } from "@/lib/report-status";
 
@@ -88,6 +98,7 @@ type LooseQuery = PromiseLike<QueryResult> & {
   select(columns: string): LooseQuery;
   eq(column: string, value: unknown): LooseQuery;
   in(column: string, values: readonly unknown[]): LooseQuery;
+  like(column: string, pattern: string): LooseQuery;
   order(column: string, options: { ascending: boolean }): LooseQuery;
   limit(count: number): LooseQuery;
   update(values: Record<string, unknown>): LooseQuery;
@@ -369,6 +380,142 @@ export const setReportStatus = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+type ActionReport = Pick<
+  ReportRow,
+  | "id"
+  | "reported_id"
+  | "subject_type"
+  | "game_id"
+  | "message_id"
+  | "reel_id"
+  | "post_id"
+  | "reason"
+  | "resolution_notes"
+  | "reviewed_at"
+>;
+
+/** The notes of a report whose action suspended or banned its account start with "Account " (post-restore.ts). */
+const ACCOUNT_NOTES_LIKE = "Account %";
+
+/**
+ * Restore on a post report (owner decision 2026-11-28): undoes only this report's own action, never what anyone else
+ * did. It reads everything first, and a failed read changes nothing (RESTORE_READ_FAILED). Then:
+ * - the author's suspension or ban is lifted only by accountRestoreBlocker's rule, and only while suspended_at still
+ *   holds the value read; otherwise it, and moderation_state, stay as they are. A warning ('warned') limits nothing, so
+ *   it is still cleared, as before, but only while the state is still 'warned';
+ * - the post is unhidden only by postRestoreBlocker's rule, and only while hidden_at still holds the value read; a post
+ *   that is not hidden is not written.
+ * Returns the summary: what was undone, then each thing kept with why and where a superadmin undoes it.
+ */
+async function restorePostReport(admin: unknown, report: ActionReport): Promise<string> {
+  const none = Promise.resolve<QueryResult>({ data: null, error: null });
+  const reads = await Promise.all([
+    report.post_id
+      ? looseFrom(admin, "posts").select("id, hidden_at").eq("id", report.post_id).maybeSingle()
+      : none,
+    report.post_id
+      ? looseFrom(admin, "user_reports")
+          .select("id")
+          .eq("post_id", report.post_id)
+          .in("status", ACTED_ON_STATUSES)
+      : none,
+    looseFrom(admin, "profiles")
+      .select("id, suspended_at, moderation_state")
+      .eq("id", report.reported_id)
+      .maybeSingle(),
+    looseFrom(admin, "user_reports")
+      .select("id, resolution_notes")
+      .eq("reported_id", report.reported_id)
+      .in("status", ACTED_ON_STATUSES)
+      .like("resolution_notes", ACCOUNT_NOTES_LIKE),
+  ]);
+  // Fail closed: without every read, Restore cannot tell whose change it would undo.
+  if (reads.some((r) => r.error)) throw new Error(RESTORE_READ_FAILED);
+  const [post, postActed, profile, accountActed] = reads;
+  const others = (res: QueryResult) =>
+    ((res.data ?? []) as { id: string; resolution_notes?: string | null }[]).filter(
+      (r) => r.id !== report.id,
+    );
+
+  const undone: string[] = [];
+  const kept: string[] = [];
+
+  const p = profile.data as { suspended_at: string | null; moderation_state: string | null } | null;
+  if (p) {
+    const suspendedAt = p.suspended_at ?? null;
+    const state = p.moderation_state ?? "active";
+    let lifted = false;
+    if (accountRestricted(suspendedAt, state)) {
+      const block = accountRestoreBlocker({
+        resolutionNotes: report.resolution_notes,
+        reviewedAt: report.reviewed_at,
+        suspendedAt,
+        otherAccountReports: others(accountActed).filter((r) =>
+          notesClaimAccountAction(r.resolution_notes ?? null),
+        ).length,
+      });
+      if (block || suspendedAt === null) {
+        kept.push(keptAccountSentence(state, block ?? RESTORE_KEEPS_ACCOUNT.changedSince));
+      } else {
+        // Only while suspended_at still holds what was read: a suspension or lift made since is kept.
+        const { data: rows, error } = await looseFrom(admin, "profiles")
+          .update({ suspended_at: null, suspended_reason: null, moderation_state: "active" })
+          .eq("id", report.reported_id)
+          .eq("suspended_at", suspendedAt)
+          .select("id");
+        if (!error && ((rows ?? []) as unknown[]).length) {
+          lifted = true;
+          undone.push(
+            (report.resolution_notes ?? "").startsWith(ACCOUNT_BANNED_SUMMARY)
+              ? "ban lifted"
+              : "suspension lifted",
+          );
+        } else {
+          kept.push(
+            keptAccountSentence(
+              state,
+              error ? "lifting it failed" : RESTORE_KEEPS_ACCOUNT.changedSince,
+            ),
+          );
+        }
+      }
+    }
+    if (!lifted && state === "warned") {
+      // Only while the account is still just warned: a suspension or ban that lands meanwhile is never overwritten.
+      const { data: rows, error } = await looseFrom(admin, "profiles")
+        .update({ moderation_state: "active" })
+        .eq("id", report.reported_id)
+        .eq("moderation_state", "warned")
+        .select("id");
+      if (!error && ((rows ?? []) as unknown[]).length) undone.push("warning cleared");
+    }
+  }
+
+  const hiddenAt = (post.data as { hidden_at: string | null } | null)?.hidden_at ?? null;
+  // A post that is not hidden (or is gone) is not written.
+  if (report.post_id && hiddenAt) {
+    let blocker = postRestoreBlocker({
+      resolutionNotes: report.resolution_notes,
+      reviewedAt: report.reviewed_at,
+      hiddenAt,
+      otherClosedReports: others(postActed).length,
+    });
+    if (!blocker) {
+      // Only while hidden_at still holds what was read: a hide made since then is kept.
+      const { data: unhidden, error: unhideErr } = await looseFrom(admin, "posts")
+        .update({ hidden_at: null })
+        .eq("id", report.post_id)
+        .eq("hidden_at", hiddenAt)
+        .select("id");
+      if (unhideErr) blocker = "unhiding it failed";
+      else if (!((unhidden ?? []) as unknown[]).length) blocker = RESTORE_KEEPS_HIDDEN.hiddenSince;
+      else undone.push("post unhidden");
+    }
+    if (blocker) kept.push(keptPostSentence(blocker));
+  }
+  return restoreSummary(undone, kept);
+}
+
 const ACTION = z.enum(["warn", "remove_content", "suspend", "ban", "restore"]);
 export type ModerationActionKind = z.infer<typeof ACTION>;
 
@@ -396,19 +543,7 @@ export const applyModerationAction = createServerFn({ method: "POST" })
     );
     if (rErr) throw new Error(rErr.message);
     if (!found) throw new Error("Report not found");
-    const report = found as Pick<
-      ReportRow,
-      | "id"
-      | "reported_id"
-      | "subject_type"
-      | "game_id"
-      | "message_id"
-      | "reel_id"
-      | "post_id"
-      | "reason"
-      | "resolution_notes"
-      | "reviewed_at"
-    >;
+    const report = found as ActionReport;
 
     const reason = data.reason?.trim() || null;
     const now = new Date().toISOString();
@@ -469,10 +604,14 @@ export const applyModerationAction = createServerFn({ method: "POST" })
           moderation_state: data.action === "ban" ? "banned" : "suspended",
         })
         .eq("id", report.reported_id);
-      summary = data.action === "ban" ? "Account banned" : "Account suspended";
+      summary = data.action === "ban" ? ACCOUNT_BANNED_SUMMARY : ACCOUNT_SUSPENDED_SUMMARY;
     }
 
-    if (data.action === "restore") {
+    if (data.action === "restore" && report.subject_type === "post") {
+      // A post report (new with 20261205100000) undoes only its own action, never what anyone else did, whether or not
+      // the post still exists (post-restore.ts).
+      summary = await restorePostReport(supabaseAdmin, report);
+    } else if (data.action === "restore") {
       await supabaseAdmin
         .from("profiles")
         .update({ suspended_at: null, suspended_reason: null, moderation_state: "active" })
@@ -488,44 +627,6 @@ export const applyModerationAction = createServerFn({ method: "POST" })
           .update({ hidden_at: null })
           .eq("id", report.reel_id);
       summary = "Access and content restored";
-      if (report.post_id) {
-        // Restore undoes this report's own hide only (post-restore.ts), never one anyone else made after it.
-        const [{ data: post }, { data: acted }] = await Promise.all([
-          looseFrom(supabaseAdmin, "posts")
-            .select("id, hidden_at")
-            .eq("id", report.post_id)
-            .maybeSingle(),
-          looseFrom(supabaseAdmin, "user_reports")
-            .select("id")
-            .eq("post_id", report.post_id)
-            .in("status", ACTED_ON_STATUSES),
-        ]);
-        const hiddenAt = (post as { hidden_at: string | null } | null)?.hidden_at ?? null;
-        // A post that is not hidden (or is gone) is not written.
-        if (hiddenAt) {
-          let blocker = postRestoreBlocker({
-            resolutionNotes: report.resolution_notes,
-            reviewedAt: report.reviewed_at,
-            hiddenAt,
-            otherClosedReports: ((acted ?? []) as { id: string }[]).filter(
-              (a) => a.id !== report.id,
-            ).length,
-          });
-          if (!blocker) {
-            // Only while hidden_at still holds what was read: a hide made since then is kept.
-            const { data: unhidden, error: unhideErr } = await looseFrom(supabaseAdmin, "posts")
-              .update({ hidden_at: null })
-              .eq("id", report.post_id)
-              .eq("hidden_at", hiddenAt)
-              .select("id");
-            if (unhideErr) blocker = "unhiding it failed";
-            else if (!((unhidden ?? []) as unknown[]).length) {
-              blocker = RESTORE_KEEPS_HIDDEN.hiddenSince;
-            }
-          }
-          if (blocker) summary = `Access restored; the post stays hidden (${blocker})`;
-        }
-      }
     }
 
     await supabaseAdmin

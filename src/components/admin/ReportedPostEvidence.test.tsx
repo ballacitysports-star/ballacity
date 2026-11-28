@@ -108,9 +108,11 @@ describe("ReportedPostEvidence (moderation queue, post reports)", () => {
     );
     expect(
       screen.getByText(
-        /Restore lifts the author's suspension or ban and dismisses this report, but leaves the post hidden: another report about this post was acted on\./,
+        "Restore dismisses this report but leaves the post hidden: another report about this post was acted on. A superadmin unhides it on /superadmin, Content, Network posts.",
       ),
     ).toBeTruthy();
+    // Restore on a post report lifts only this report's own suspension or ban: the card never promises a lift
+    expect(screen.queryByText(/lifts the author's suspension or ban/)).toBeNull();
   });
 
   describe("what it says before Restore, from the same rule Restore runs (post-restore.ts)", () => {
@@ -131,7 +133,7 @@ describe("ReportedPostEvidence (moderation queue, post reports)", () => {
       );
     };
     const warning = (why: string) =>
-      `Restore lifts the author's suspension or ban and dismisses this report, but leaves the post hidden: ${why}.`;
+      `Restore dismisses this report but leaves the post hidden: ${why}. A superadmin unhides it on /superadmin, Content, Network posts.`;
 
     it("warns of nothing when this report's own hide is the one Restore would undo", () => {
       card({});

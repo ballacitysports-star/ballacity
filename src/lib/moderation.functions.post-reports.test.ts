@@ -4,8 +4,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * Post reports in the moderation queue (20261205100000): a moderator sees the reported post as it is now, whether its
  * text changed after the report, and its context. Remove content hides it; Restore unhides it only when this report's own
  * Remove content hid it, the post's hidden_at is still that hide's timestamp (the report's reviewed_at), and no other
- * report about it was acted on (owner decision 2026-11-28). user_reports.post_id is read only where it exists, so the
- * queue keeps working before the migration is applied and after its rollback.
+ * report about it was acted on, and lifts the author's suspension or ban only by the same rule for this report's own
+ * Suspend or Ban (owner decision 2026-11-28). A failed read changes nothing. user_reports.post_id is read only where it
+ * exists, so the queue keeps working before the migration is applied and after its rollback.
  */
 
 // A server function is its handler for these tests: validate the input, then run it.
@@ -53,7 +54,7 @@ vi.mock("@/integrations/supabase/client.server", () => {
       const call: Call = { table, ops: [] };
       h.calls.push(call);
       const q: Record<string, unknown> = {};
-      for (const m of ["select", "eq", "in", "order", "limit", "update", "insert"]) {
+      for (const m of ["select", "eq", "in", "like", "order", "limit", "update", "insert"]) {
         q[m] = (...args: unknown[]) => {
           call.ops.push([m, ...args]);
           return q;
@@ -83,9 +84,15 @@ import {
 } from "@/lib/moderation.functions";
 import { postBodyMd5, postEditedSinceReport } from "@/lib/post-fingerprint.server";
 import {
+  RESTORE_KEEPS_ACCOUNT,
   RESTORE_KEEPS_HIDDEN,
+  RESTORE_READ_FAILED,
+  accountRestoreBlocker,
+  keptAccountSentence,
+  keptPostSentence,
   postRestoreBlocker,
   restoreKeepsHidden,
+  restoreSummary,
   timestampMicros,
 } from "@/lib/post-restore";
 
@@ -384,6 +391,67 @@ describe("postRestoreBlocker and the text fingerprint", () => {
     );
   });
 
+  it("says notThisReport only in words that are true after a second action or a refused Restore", () => {
+    // this report hid the post, then a Warn (or a refused Restore) rewrote its notes: it did hide it once
+    expect(RESTORE_KEEPS_HIDDEN.notThisReport).toBe("this report's latest action did not hide it");
+    expect(RESTORE_KEEPS_ACCOUNT.notThisReport).toBe(
+      "this report's latest action did not suspend or ban it",
+    );
+  });
+
+  it("lifts the author's suspension or ban only for this report's own, unchanged action", () => {
+    const ownBan = {
+      resolutionNotes: "Account banned — abuse",
+      reviewedAt: T_MINE,
+      suspendedAt: T_MINE,
+      otherAccountReports: 0,
+    };
+    expect(accountRestoreBlocker(ownBan)).toBeNull();
+    expect(accountRestoreBlocker({ ...ownBan, resolutionNotes: "Account suspended" })).toBeNull();
+    expect(
+      accountRestoreBlocker({ ...ownBan, suspendedAt: "2026-11-27T11:00:00.123Z" }),
+    ).toBeNull();
+    expect(accountRestoreBlocker({ ...ownBan, otherAccountReports: 1 })).toBe(
+      RESTORE_KEEPS_ACCOUNT.otherReport,
+    );
+    for (const notes of [null, "Post hidden — abuse", "Warning issued", "Ban lifted."]) {
+      expect(accountRestoreBlocker({ ...ownBan, resolutionNotes: notes })).toBe(
+        RESTORE_KEEPS_ACCOUNT.notThisReport,
+      );
+    }
+    expect(accountRestoreBlocker({ ...ownBan, suspendedAt: T_LATER })).toBe(
+      RESTORE_KEEPS_ACCOUNT.changedSince,
+    );
+    expect(accountRestoreBlocker({ ...ownBan, reviewedAt: T_LATER })).toBe(
+      RESTORE_KEEPS_ACCOUNT.changedSince,
+    );
+    expect(accountRestoreBlocker({ ...ownBan, suspendedAt: null })).toBe(
+      RESTORE_KEEPS_ACCOUNT.changedSince,
+    );
+  });
+
+  it("writes a summary that says what was undone and kept, and never claims an action", () => {
+    expect(restoreSummary(["ban lifted", "post unhidden"], [])).toBe("Ban lifted, post unhidden.");
+    expect(restoreSummary([], [])).toBe("Nothing to undo.");
+    const kept = keptPostSentence(RESTORE_KEEPS_HIDDEN.otherReport);
+    expect(kept).toBe(
+      "The post stays hidden: another report about this post was acted on. A superadmin unhides it on /superadmin, Content, Network posts.",
+    );
+    expect(restoreSummary([], [kept])).toBe(`Nothing undone. ${kept}`);
+    expect(keptAccountSentence("suspended", "x")).toBe(
+      "The account stays suspended: x. A superadmin lifts the suspension on /superadmin, Users & profiles, Restore account.",
+    );
+    expect(keptAccountSentence("warned", "x")).toMatch(/^The account stays suspended: x\./);
+    expect(keptAccountSentence("banned", "x")).toMatch(/^The account stays banned: x\./);
+    for (const s of [
+      restoreSummary(["post unhidden"], []),
+      restoreSummary(["warning cleared"], [kept]),
+      restoreSummary([], [kept]),
+    ]) {
+      expect(s).not.toMatch(/^(Post hidden|Account suspended|Account banned)/);
+    }
+  });
+
   it("reads a timestamptz to the microsecond, whatever its spelling", () => {
     const at = Date.parse("2026-11-27T11:00:00Z") * 1000;
     expect(timestampMicros("2026-11-27T11:00:00Z")).toBe(at);
@@ -457,6 +525,12 @@ describe("applyModerationAction on a post report", () => {
     data: [{ id: "post-1", hidden_at: at }],
     error: null,
   });
+  /** The author's profile as Restore reads it. */
+  const author = (suspended_at: string | null, moderation_state: string) => ({
+    data: [{ id: "author", suspended_at, moderation_state }],
+    error: null,
+  });
+  const ACTIVE = author(null, "active");
   /** This report, after its own Remove content: its notes, and reviewed_at = the hide's `now`. */
   const mine = (over: Record<string, unknown> = {}) =>
     report({
@@ -466,10 +540,18 @@ describe("applyModerationAction on a post report", () => {
       ...over,
     });
   const OTHER_ID = "22222222-2222-4222-8222-222222222222";
-  /** Every write to posts, with all its filters. */
-  const postWrites = () =>
-    h.calls.filter((c) => c.table === "posts" && c.ops.some((o) => o[0] === "update"));
-  const staysHidden = (why: string) => `Access restored; the post stays hidden (${why})`;
+  /** Every write to a table, with all its filters. */
+  const writesTo = (table: string) =>
+    h.calls.filter((c) => c.table === table && c.ops.some((o) => o[0] === "update"));
+  const postWrites = () => writesTo("posts");
+  const anyWrites = () => h.calls.filter((c) => c.ops.some((o) => o[0] === "update"));
+  /** Restore's answers for user_reports: the report, then the post's acted-on reports, then the author's. */
+  const reports = (r: unknown, postActed: unknown[], accountActed: unknown[] = []) => [
+    { data: [r], error: null },
+    { data: postActed, error: null },
+    { data: accountActed, error: null },
+  ];
+  const nothingUndone = (...kept: string[]) => ["Nothing undone.", ...kept].join(" ");
 
   it("Remove content writes one timestamp to the post's hidden_at and the report's reviewed_at", async () => {
     h.answers.user_reports = [{ data: [report()], error: null }];
@@ -481,13 +563,11 @@ describe("applyModerationAction on a post report", () => {
 
   it("Restore unhides the post when this report's own Remove content hid it", async () => {
     const r = mine();
-    h.answers.user_reports = [
-      { data: [r], error: null },
-      { data: [{ id: r.id }], error: null },
-    ];
+    h.answers.user_reports = reports(r, [{ id: r.id }]);
+    h.answers.profiles = [ACTIVE];
     h.answers.posts = [hiddenAt(T_MINE)];
     const out = await act("restore");
-    expect(out.summary).toBe("Access and content restored");
+    expect(out.summary).toBe("Post unhidden.");
     expect(selectsOf("user_reports")[0]).toMatch(/\breviewed_at\b/);
     // only while hidden_at still holds this report's hide
     expect(postWrites().map((c) => c.ops)).toEqual([
@@ -499,49 +579,37 @@ describe("applyModerationAction on a post report", () => {
       ],
     ]);
     expect(updatesOf("user_reports").at(-1)?.set).toMatchObject({ status: "dismissed" });
-    expect(updatesOf("profiles")[0]).toMatchObject({
-      set: { suspended_at: null, moderation_state: "active" },
-      where: ["id", "author"],
-    });
+    // an account nobody restricted is not written
+    expect(writesTo("profiles")).toEqual([]);
   });
 
   it("Restore leaves a post hidden that a superadmin hid after this report's Remove content", async () => {
     const r = mine();
-    h.answers.user_reports = [
-      { data: [r], error: null },
-      { data: [{ id: r.id }], error: null },
-    ];
+    h.answers.user_reports = reports(r, [{ id: r.id }]);
     h.answers.posts = [hiddenAt(T_LATER)];
     const out = await act("restore");
     expect(postWrites()).toEqual([]);
-    expect(out.summary).toBe(staysHidden(RESTORE_KEEPS_HIDDEN.hiddenSince));
-    expect(h.audit.mock.calls[0][2]).toMatchObject({
-      after: { summary: staysHidden(RESTORE_KEEPS_HIDDEN.hiddenSince) },
-    });
+    const summary = nothingUndone(keptPostSentence(RESTORE_KEEPS_HIDDEN.hiddenSince));
+    expect(out.summary).toBe(summary);
+    expect(h.audit.mock.calls[0][2]).toMatchObject({ after: { summary } });
   });
 
   it("Restore leaves a post hidden that another moderator hid later through another report", async () => {
     const r = mine();
-    h.answers.user_reports = [
-      { data: [r], error: null },
-      { data: [{ id: r.id }, { id: OTHER_ID }], error: null },
-    ];
+    h.answers.user_reports = reports(r, [{ id: r.id }, { id: OTHER_ID }]);
     h.answers.posts = [hiddenAt(T_LATER)];
     const out = await act("restore");
     expect(postWrites()).toEqual([]);
-    expect(out.summary).toBe(staysHidden(RESTORE_KEEPS_HIDDEN.otherReport));
+    expect(out.summary).toBe(nothingUndone(keptPostSentence(RESTORE_KEEPS_HIDDEN.otherReport)));
   });
 
   it("Restore leaves the post hidden while another report about it is resolved, even with this report's own hide", async () => {
     const r = mine();
-    h.answers.user_reports = [
-      { data: [r], error: null },
-      { data: [{ id: r.id }, { id: OTHER_ID }], error: null },
-    ];
+    h.answers.user_reports = reports(r, [{ id: r.id }, { id: OTHER_ID }]);
     h.answers.posts = [hiddenAt(T_MINE)];
     const out = await act("restore");
     expect(postWrites()).toEqual([]);
-    expect(out.summary).toBe(staysHidden(RESTORE_KEEPS_HIDDEN.otherReport));
+    expect(out.summary).toBe(nothingUndone(keptPostSentence(RESTORE_KEEPS_HIDDEN.otherReport)));
     const acted = h.calls.filter((c) => c.table === "user_reports")[1];
     expect(acted.ops).toEqual([
       ["select", "id"],
@@ -552,80 +620,302 @@ describe("applyModerationAction on a post report", () => {
 
   it("Restore on a weak second report leaves a post another report took down hidden", async () => {
     const weak = report({ id: OTHER_ID });
-    h.answers.user_reports = [
-      { data: [weak], error: null },
-      { data: [{ id: "11111111-1111-4111-8111-111111111111" }], error: null },
-    ];
+    h.answers.user_reports = reports(weak, [{ id: "11111111-1111-4111-8111-111111111111" }]);
     h.answers.posts = [hiddenAt(T_MINE)];
     const out = await act("restore");
     expect(postWrites()).toEqual([]);
-    expect(out.summary).toBe(staysHidden(RESTORE_KEEPS_HIDDEN.otherReport));
+    expect(out.summary).toBe(nothingUndone(keptPostSentence(RESTORE_KEEPS_HIDDEN.otherReport)));
   });
 
   it("Restore leaves a post hidden that this report's notes do not say it hid, even at the same instant", async () => {
-    for (const notes of [null, "Warning issued — abuse", "Access and content restored"]) {
+    for (const notes of [null, "Warning issued — abuse", "Post unhidden."]) {
       h.calls = [];
       const r = mine({ resolution_notes: notes });
-      h.answers.user_reports = [
-        { data: [r], error: null },
-        { data: [{ id: r.id }], error: null },
-      ];
+      h.answers.user_reports = reports(r, [{ id: r.id }]);
       h.answers.posts = [hiddenAt(T_MINE)];
       const out = await act("restore");
       expect(postWrites()).toEqual([]);
-      expect(out.summary).toBe(staysHidden(RESTORE_KEEPS_HIDDEN.notThisReport));
+      expect(out.summary).toBe(nothingUndone(keptPostSentence(RESTORE_KEEPS_HIDDEN.notThisReport)));
     }
   });
 
   it("Restore leaves the post hidden once this report's reviewed_at changed after its Remove content", async () => {
     // a status change or a second action on the report re-stamps reviewed_at: the rule fails safe
     const r = mine({ status: "escalated", reviewed_at: T_LATER });
-    h.answers.user_reports = [
-      { data: [r], error: null },
-      { data: [], error: null },
-    ];
+    h.answers.user_reports = reports(r, []);
     h.answers.posts = [hiddenAt(T_MINE)];
     const out = await act("restore");
     expect(postWrites()).toEqual([]);
-    expect(out.summary).toBe(staysHidden(RESTORE_KEEPS_HIDDEN.hiddenSince));
+    expect(out.summary).toBe(nothingUndone(keptPostSentence(RESTORE_KEEPS_HIDDEN.hiddenSince)));
   });
 
   it("Restore keeps a hide made between its read and its write", async () => {
     const r = mine();
-    h.answers.user_reports = [
-      { data: [r], error: null },
-      { data: [{ id: r.id }], error: null },
-    ];
+    h.answers.user_reports = reports(r, [{ id: r.id }]);
     // the read sees this report's hide; the guarded unhide then matches no row
     h.answers.posts = [hiddenAt(T_MINE), { data: [], error: null }];
     const out = await act("restore");
     expect(postWrites()).toHaveLength(1);
-    expect(out.summary).toBe(staysHidden(RESTORE_KEEPS_HIDDEN.hiddenSince));
+    expect(out.summary).toBe(nothingUndone(keptPostSentence(RESTORE_KEEPS_HIDDEN.hiddenSince)));
   });
 
   it("Restore says so when unhiding the post failed", async () => {
     const r = mine();
-    h.answers.user_reports = [
-      { data: [r], error: null },
-      { data: [{ id: r.id }], error: null },
-    ];
+    h.answers.user_reports = reports(r, [{ id: r.id }]);
     h.answers.posts = [hiddenAt(T_MINE), { data: null, error: { message: "boom" } }];
     const out = await act("restore");
-    expect(out.summary).toBe(staysHidden("unhiding it failed"));
+    expect(out.summary).toBe(nothingUndone(keptPostSentence("unhiding it failed")));
     expect(updatesOf("user_reports").at(-1)?.set).toMatchObject({ status: "dismissed" });
   });
 
-  it("Restore writes nothing to a post that is already visible, and still restores access", async () => {
+  it("Restore writes nothing to a post that is already visible", async () => {
     const r = mine();
-    h.answers.user_reports = [
-      { data: [r], error: null },
-      { data: [{ id: r.id }], error: null },
-    ];
+    h.answers.user_reports = reports(r, [{ id: r.id }]);
+    h.answers.profiles = [ACTIVE];
     h.answers.posts = [hiddenAt(null)];
     const out = await act("restore");
-    expect(out.summary).toBe("Access and content restored");
+    expect(out.summary).toBe("Nothing to undo.");
     expect(postWrites()).toEqual([]);
-    expect(updatesOf("profiles")[0].where).toEqual(["id", "author"]);
+    expect(writesTo("profiles")).toEqual([]);
+  });
+
+  describe("Restore and the author's account (only this report's own Suspend or Ban is lifted)", () => {
+    /** This report, after its own Ban: notes, and reviewed_at = suspended_at = the ban's `now`. */
+    const banned = (over: Record<string, unknown> = {}) =>
+      mine({ resolution_notes: "Account banned — abuse", ...over });
+    const keptBan = (why: string) => keptAccountSentence("banned", why);
+
+    it("lifts this report's own ban, only while suspended_at still holds it", async () => {
+      const r = banned();
+      h.answers.user_reports = reports(
+        r,
+        [{ id: r.id }],
+        [{ id: r.id, resolution_notes: "Account banned — abuse" }],
+      );
+      h.answers.profiles = [author(T_MINE, "banned"), { data: [{ id: "author" }], error: null }];
+      h.answers.posts = [hiddenAt(null)];
+      const out = await act("restore");
+      expect(out.summary).toBe("Ban lifted.");
+      expect(writesTo("profiles").map((c) => c.ops)).toEqual([
+        [
+          ["update", { suspended_at: null, suspended_reason: null, moderation_state: "active" }],
+          ["eq", "id", "author"],
+          ["eq", "suspended_at", T_MINE],
+          ["select", "id"],
+        ],
+      ]);
+      const accountActed = h.calls.filter((c) => c.table === "user_reports")[2];
+      expect(accountActed.ops).toEqual([
+        ["select", "id, resolution_notes"],
+        ["eq", "reported_id", "author"],
+        ["in", "status", ["resolved", "actioned"]],
+        ["like", "resolution_notes", "Account %"],
+      ]);
+    });
+
+    it("lifts this report's own suspension", async () => {
+      const r = banned({ resolution_notes: "Account suspended — abuse" });
+      h.answers.user_reports = reports(r, []);
+      h.answers.profiles = [
+        author("2026-11-27T11:00:00.123Z", "suspended"),
+        { data: [{ id: "author" }], error: null },
+      ];
+      const out = await act("restore");
+      expect(out.summary).toBe("Suspension lifted.");
+      expect(writesTo("profiles")).toHaveLength(1);
+    });
+
+    it("never lifts a ban this report did not make, even while this report's own hide is undone", async () => {
+      // this report hid the post; the author was banned by someone else (a superadmin, another moderator)
+      const r = mine();
+      h.answers.user_reports = reports(r, [{ id: r.id }]);
+      h.answers.profiles = [author(T_LATER, "banned")];
+      h.answers.posts = [hiddenAt(T_MINE)];
+      const out = await act("restore");
+      expect(writesTo("profiles")).toEqual([]);
+      expect(postWrites()).toHaveLength(1);
+      expect(out.summary).toBe(`Post unhidden. ${keptBan(RESTORE_KEEPS_ACCOUNT.notThisReport)}`);
+    });
+
+    it("keeps this report's own ban while another report about the author banned or suspended them", async () => {
+      const r = banned();
+      h.answers.user_reports = reports(
+        r,
+        [],
+        [
+          { id: r.id, resolution_notes: "Account banned — abuse" },
+          { id: OTHER_ID, resolution_notes: "Account suspended — spam" },
+        ],
+      );
+      h.answers.profiles = [author(T_MINE, "banned")];
+      const out = await act("restore");
+      expect(writesTo("profiles")).toEqual([]);
+      expect(out.summary).toBe(nothingUndone(keptBan(RESTORE_KEEPS_ACCOUNT.otherReport)));
+    });
+
+    it("does not count another report whose notes claim no suspension or ban", async () => {
+      const r = banned();
+      h.answers.user_reports = reports(
+        r,
+        [],
+        [{ id: OTHER_ID, resolution_notes: "Accountability note" }],
+      );
+      h.answers.profiles = [author(T_MINE, "banned"), { data: [{ id: "author" }], error: null }];
+      const out = await act("restore");
+      expect(out.summary).toBe("Ban lifted.");
+    });
+
+    it("keeps a ban made or changed after this report's own (a later superadmin suspension, reviewed_at changed)", async () => {
+      for (const [suspendedAt, reviewedAt] of [
+        [T_LATER, T_MINE],
+        [T_MINE, T_LATER],
+        ["2026-11-27T11:00:00.123001+00:00", T_MINE],
+      ]) {
+        h.calls = [];
+        h.answers.user_reports = reports(banned({ reviewed_at: reviewedAt }), []);
+        h.answers.profiles = [author(suspendedAt, "banned")];
+        const out = await act("restore");
+        expect(writesTo("profiles")).toEqual([]);
+        expect(out.summary).toBe(nothingUndone(keptBan(RESTORE_KEEPS_ACCOUNT.changedSince)));
+      }
+    });
+
+    it("keeps a ban whose suspension a superadmin lifted (still 'banned', suspended_at cleared)", async () => {
+      h.answers.user_reports = reports(banned(), []);
+      h.answers.profiles = [author(null, "banned")];
+      const out = await act("restore");
+      expect(writesTo("profiles")).toEqual([]);
+      expect(out.summary).toBe(nothingUndone(keptBan(RESTORE_KEEPS_ACCOUNT.changedSince)));
+    });
+
+    it("keeps a ban or lift made between its read and its write", async () => {
+      h.answers.user_reports = reports(banned(), []);
+      h.answers.profiles = [author(T_MINE, "banned"), { data: [], error: null }];
+      const out = await act("restore");
+      expect(writesTo("profiles")).toHaveLength(1);
+      expect(out.summary).toBe(nothingUndone(keptBan(RESTORE_KEEPS_ACCOUNT.changedSince)));
+    });
+
+    it("says so when lifting the ban failed", async () => {
+      h.answers.user_reports = reports(banned(), []);
+      h.answers.profiles = [author(T_MINE, "banned"), { data: null, error: { message: "boom" } }];
+      const out = await act("restore");
+      expect(out.summary).toBe(nothingUndone(keptBan("lifting it failed")));
+    });
+
+    it("still clears a warning, only while the author is still just warned", async () => {
+      h.answers.user_reports = reports(mine({ resolution_notes: "Warning issued — abuse" }), []);
+      h.answers.profiles = [author(null, "warned"), { data: [{ id: "author" }], error: null }];
+      const out = await act("restore");
+      expect(out.summary).toBe("Warning cleared.");
+      expect(writesTo("profiles").map((c) => c.ops)).toEqual([
+        [
+          ["update", { moderation_state: "active" }],
+          ["eq", "id", "author"],
+          ["eq", "moderation_state", "warned"],
+          ["select", "id"],
+        ],
+      ]);
+    });
+
+    it("does not lift the author by id on a post report whose post was deleted for good", async () => {
+      h.answers.user_reports = reports(mine({ post_id: null }), []);
+      h.answers.profiles = [author(T_LATER, "banned")];
+      const out = await act("restore");
+      expect(h.calls.some((c) => c.table === "posts")).toBe(false);
+      expect(writesTo("profiles")).toEqual([]);
+      expect(out.summary).toBe(nothingUndone(keptBan(RESTORE_KEEPS_ACCOUNT.notThisReport)));
+      expect(updatesOf("user_reports").at(-1)?.set).toMatchObject({ status: "dismissed" });
+    });
+  });
+
+  describe("Restore changes nothing when a read fails (fail closed)", () => {
+    const READS = [
+      ["the post", "posts", 0],
+      ["the post's acted-on reports", "user_reports", 1],
+      ["the author's profile", "profiles", 0],
+      ["the author's acted-on reports", "user_reports", 2],
+    ] as const;
+    for (const [what, table, index] of READS) {
+      it(`when reading ${what} fails`, async () => {
+        const r = mine();
+        // R2 about the same post was resolved without a re-hide; this report's own hide is still in place
+        h.answers.user_reports = reports(r, [{ id: r.id }, { id: OTHER_ID }]);
+        h.answers.profiles = [author(T_LATER, "banned")];
+        h.answers.posts = [hiddenAt(T_MINE)];
+        const failed = { data: null, error: { message: "timeout" } };
+        if (table === "user_reports") h.answers.user_reports[index] = failed;
+        else h.answers[table] = [failed];
+        await expect(act("restore")).rejects.toThrow(RESTORE_READ_FAILED);
+        expect(anyWrites()).toEqual([]);
+        expect(h.audit).not.toHaveBeenCalled();
+      });
+    }
+  });
+
+  describe("what a Restore after a second action or a refused Restore says (always true)", () => {
+    it("Remove content then Warn on the same report: the post stays hidden, and the reason says why truly", async () => {
+      const r = mine({ resolution_notes: "Warning issued — abuse", reviewed_at: T_LATER });
+      h.answers.user_reports = reports(r, [{ id: r.id }]);
+      h.answers.profiles = [author(null, "warned"), { data: [{ id: "author" }], error: null }];
+      h.answers.posts = [hiddenAt(T_MINE)];
+      const out = await act("restore");
+      expect(postWrites()).toEqual([]);
+      expect(out.summary).toBe(
+        `Warning cleared. ${keptPostSentence(RESTORE_KEEPS_HIDDEN.notThisReport)}`,
+      );
+      expect(out.summary).not.toMatch(/this report did not hide it/);
+    });
+
+    it("Remove content then Ban on the same report: the ban is lifted, the post stays hidden", async () => {
+      const r = mine({ resolution_notes: "Account banned — abuse", reviewed_at: T_LATER });
+      h.answers.user_reports = reports(r, [{ id: r.id }]);
+      h.answers.profiles = [author(T_LATER, "banned"), { data: [{ id: "author" }], error: null }];
+      h.answers.posts = [hiddenAt(T_MINE)];
+      const out = await act("restore");
+      expect(postWrites()).toEqual([]);
+      expect(out.summary).toBe(
+        `Ban lifted. ${keptPostSentence(RESTORE_KEEPS_HIDDEN.notThisReport)}`,
+      );
+    });
+
+    it("a refused Restore writes notes that claim no action, so a later Restore undoes nothing more", async () => {
+      const r = mine();
+      h.answers.user_reports = reports(r, [{ id: r.id }, { id: OTHER_ID }]);
+      h.answers.profiles = [ACTIVE];
+      h.answers.posts = [hiddenAt(T_MINE)];
+      await act("restore");
+      const refused = updatesOf("user_reports").at(-1)?.set as {
+        resolution_notes: string;
+        reviewed_at: string;
+        status: string;
+      };
+      expect(refused.status).toBe("dismissed");
+      expect(refused.resolution_notes).toBe(
+        `${nothingUndone(keptPostSentence(RESTORE_KEEPS_HIDDEN.otherReport))} — abuse`,
+      );
+      expect(refused.resolution_notes).not.toMatch(
+        /^(Post hidden|Account suspended|Account banned)/,
+      );
+
+      // the other report is dismissed later; Restore on this report again
+      h.calls = [];
+      h.answers.user_reports = reports(
+        mine({
+          status: "dismissed",
+          resolution_notes: refused.resolution_notes,
+          reviewed_at: refused.reviewed_at,
+        }),
+        [],
+      );
+      h.answers.profiles = [ACTIVE];
+      h.answers.posts = [hiddenAt(T_MINE)];
+      const again = await act("restore");
+      expect(postWrites()).toEqual([]);
+      expect(again.summary).toBe(
+        nothingUndone(keptPostSentence(RESTORE_KEEPS_HIDDEN.notThisReport)),
+      );
+    });
   });
 
   it("Remove content refuses a report whose post is gone", async () => {
@@ -641,6 +931,19 @@ describe("applyModerationAction on a post report", () => {
     await act("warn");
     expect(updatesOf("posts")).toEqual([]);
     expect(updatesOf("profiles")[0].where).toEqual(["id", "author"]);
+  });
+
+  it("Restore on any other kind of report is unchanged here", async () => {
+    // Part of owner decision (b), not of post reports: the user, game, reel and message paths stay as on main.
+    h.answers.user_reports = [
+      { data: [report({ subject_type: "user", post_id: null })], error: null },
+    ];
+    const out = await act("restore");
+    expect(out.summary).toBe("Access and content restored");
+    expect(updatesOf("profiles")[0]).toMatchObject({
+      set: { suspended_at: null, moderation_state: "active" },
+      where: ["id", "author"],
+    });
   });
 
   it("still acts on other reports while post_id does not exist", async () => {

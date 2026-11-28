@@ -1,18 +1,42 @@
 /**
- * When Restore on a post report may unhide the post (owner decision 2026-11-28): only to undo this report's own Remove
- * content, never a hide that anyone else made after it. Pure, so the queue's server functions and the queue card share
- * one rule and the client bundle can import it.
+ * What Restore on a post report may undo (owner decision 2026-11-28): only this report's own action, never a hide,
+ * suspension or ban that anyone else made after it. Pure, so the queue's server functions and the queue card share one
+ * rule and the client bundle can import it.
  */
 
 /** The summary Remove content writes on a post report; Restore reads it back to know that this report hid the post. */
 export const POST_HIDDEN_SUMMARY = "Post hidden";
 
-/** Why Restore leaves a hidden post hidden, in the words the summary and the queue card both use. */
+/** The summaries Suspend and Ban write; Restore reads them back to know that this report suspended or banned. */
+export const ACCOUNT_SUSPENDED_SUMMARY = "Account suspended";
+export const ACCOUNT_BANNED_SUMMARY = "Account banned";
+export const ACCOUNT_ACTION_SUMMARIES = [
+  ACCOUNT_SUSPENDED_SUMMARY,
+  ACCOUNT_BANNED_SUMMARY,
+] as const;
+
+/**
+ * Why Restore leaves a hidden post hidden, in the words the summary and the queue card both use. Each is true whenever
+ * it is given: notThisReport reads only the report's notes, which its latest action (or status change with notes)
+ * wrote, so it says no more than that.
+ */
 export const RESTORE_KEEPS_HIDDEN = {
   otherReport: "another report about this post was acted on",
-  notThisReport: "this report did not hide it",
+  notThisReport: "this report's latest action did not hide it",
   hiddenSince: "it was hidden again, or this report was updated, after this report hid it",
 } as const;
+
+/** Why Restore on a post report leaves the author's suspension or ban in place. */
+export const RESTORE_KEEPS_ACCOUNT = {
+  otherReport: "another report about this account suspended or banned it",
+  notThisReport: "this report's latest action did not suspend or ban it",
+  changedSince:
+    "the suspension was changed, or this report was updated, after this report's action",
+} as const;
+
+/** Restore could not read what it needs, so it changed nothing; the moderator can try again. */
+export const RESTORE_READ_FAILED =
+  "Couldn't read what this report changed, so Restore changed nothing. Please try again.";
 
 const TIMESTAMP =
   /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})(?:\.(\d{1,6}))?(Z|[+-]\d{2}(?::?\d{2})?)$/i;
@@ -65,4 +89,61 @@ export function postRestoreBlocker(input: {
 /** What the queue card says before Restore runs: while the post is hidden, why Restore would leave it so; else null. */
 export function restoreKeepsHidden(input: Parameters<typeof postRestoreBlocker>[0]): string | null {
   return input.hiddenAt ? postRestoreBlocker(input) : null;
+}
+
+/** Whether a report's notes say it suspended or banned its account: what counts as another report's ban in force. */
+export function notesClaimAccountAction(notes: string | null): boolean {
+  return ACCOUNT_ACTION_SUMMARIES.some((summary) => (notes ?? "").startsWith(summary));
+}
+
+/**
+ * Why Restore on a post report must leave the author's suspension or ban in place, or null when it may lift it. The
+ * same three conditions as for the post: this report's own Suspend or Ban made it (its notes say so), suspended_at is
+ * still exactly this report's reviewed_at (both written from one `now`; a later suspension, a superadmin's lift or any
+ * later change to this report moves one of them), and no other resolved or actioned report about the author says it
+ * suspended or banned them. For a restricted account only.
+ */
+export function accountRestoreBlocker(input: {
+  resolutionNotes: string | null;
+  reviewedAt: string | null;
+  suspendedAt: string | null;
+  otherAccountReports: number;
+}): string | null {
+  if (input.otherAccountReports > 0) return RESTORE_KEEPS_ACCOUNT.otherReport;
+  if (!notesClaimAccountAction(input.resolutionNotes)) return RESTORE_KEEPS_ACCOUNT.notThisReport;
+  const at = timestampMicros(input.suspendedAt);
+  if (at === null || at !== timestampMicros(input.reviewedAt)) {
+    return RESTORE_KEEPS_ACCOUNT.changedSince;
+  }
+  return null;
+}
+
+/** An account in these states is restricted, as the database's own gates read it (with suspended_at set). */
+export function accountRestricted(suspendedAt: string | null, moderationState: string): boolean {
+  return suspendedAt !== null || moderationState === "suspended" || moderationState === "banned";
+}
+
+/** The author's account Restore keeps, and where a superadmin lifts it (/superadmin, Users & profiles). */
+export function keptAccountSentence(moderationState: string, why: string): string {
+  const state = moderationState === "banned" ? "banned" : "suspended";
+  return `The account stays ${state}: ${why}. A superadmin lifts the suspension on /superadmin, Users & profiles, Restore account.`;
+}
+
+/** The post Restore keeps hidden, and where a superadmin unhides it (/superadmin, Content, Network posts). */
+export function keptPostSentence(why: string): string {
+  return `The post stays hidden: ${why}. A superadmin unhides it on /superadmin, Content, Network posts.`;
+}
+
+/**
+ * Restore's summary on a post report (the toast, the report's notes, the audit entry): what it undid ("ban lifted",
+ * "post unhidden"), then each thing it kept. It never starts with an action's summary, so a later Restore of the same
+ * report undoes nothing more.
+ */
+export function restoreSummary(undone: string[], kept: string[]): string {
+  const head = undone.length
+    ? `${undone.join(", ")}.`
+    : kept.length
+      ? "nothing undone."
+      : "nothing to undo.";
+  return [head.charAt(0).toUpperCase() + head.slice(1), ...kept].join(" ");
 }

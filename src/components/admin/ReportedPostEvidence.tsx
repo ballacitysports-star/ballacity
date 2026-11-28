@@ -78,8 +78,8 @@ export function ReportedPostEvidence({
         </p>
         {post.restoreKeepsHidden ? (
           <p className="text-muted-foreground">
-            Restore lifts the author's suspension or ban and dismisses this report, but leaves the
-            post hidden: {post.restoreKeepsHidden}.
+            Restore dismisses this report but leaves the post hidden: {post.restoreKeepsHidden}. A
+            superadmin unhides it on /superadmin, Content, Network posts.
           </p>
         ) : null}
       </dd>

@@ -86,26 +86,44 @@ who deleted it.
 The existing actions apply as they do to a reported game or reel, with one difference for **Restore**:
 
 - **Remove content** hides the post and resolves the report.
-- **Restore** lifts the author's suspension or ban (as it does for every report), marks the report dismissed, and
-  never unhides a post that anyone else hid after this report's own Remove content (owner decision 2026-11-28). It
-  unhides the post only when all three hold:
+- **Restore** on a post report undoes only this report's own action, never what anyone else did (owner decision
+  2026-11-28), then marks the report dismissed. It reads everything it needs first; if any read fails it changes
+  nothing, leaves the report as it was, and says "Couldn't read what this report changed, so Restore changed nothing.
+  Please try again."
+
+  It unhides the post only when all three hold:
   - this report's own Remove content hid it: the report's notes start with "Post hidden";
   - the post's `hidden_at` is exactly the report's `reviewed_at`, to the microsecond. Remove content writes both from
     one timestamp, so a later hide (from the superadmin content queue, or by another moderator through another report)
     moves `hidden_at` away from it;
   - no other report about the same post has been resolved or actioned.
 
-  Anything that changes the report's `reviewed_at` after its Remove content also keeps the post hidden: a status
-  change from the queue (Investigating, Escalate, Resolve, Dismiss), a second action on the same report, or a
-  moderator's direct update of the report (a trigger stamps `reviewed_at` then). The rule fails safe: Restore cannot
-  tell such a report from one whose hide was replaced, so it leaves the post hidden. The unhide itself applies only
-  while `hidden_at` still holds the value Restore read, so a hide made in between is kept; a post that is not hidden is
-  not written at all.
+  It lifts the author's suspension or ban (clearing `suspended_at` and `suspended_reason`, and setting
+  `moderation_state` to 'active') only by the same rule: the notes start with "Account suspended" or "Account banned",
+  `profiles.suspended_at` is exactly the report's `reviewed_at`, and no other resolved or actioned report about the
+  author says it suspended or banned them. Otherwise the suspension, the ban and `moderation_state` stay exactly as they
+  are; this holds too for a post report whose post was deleted for good. A warning limits nothing, so Restore still
+  clears it, but only while the state is still 'warned'. (Restore on the other kinds of report is unchanged here.)
 
-  Otherwise the post stays hidden, the card says so before Restore runs, and the summary says why: "another report
-  about this post was acted on", "this report did not hide it", or "it was hidden again, or this report was updated,
-  after this report hid it". A superadmin unhides such a post from the content queue (`/superadmin`, Content, Network
-  posts).
+  Anything that changes the report's `reviewed_at` after its action also keeps the change in place: a status change
+  from the queue (Investigating, Escalate, Resolve, Dismiss), a second action on the same report, or a moderator's
+  direct update of the report (a trigger stamps `reviewed_at` then). The rule fails safe: Restore cannot tell such a
+  report from one whose change was replaced. Each write applies only while `hidden_at` or `suspended_at` still holds
+  the value Restore read, so a change made in between is kept; a post that is not hidden is not written at all.
+
+  Restore's summary (the toast, the report's notes, the audit entry) says what it undid ("Ban lifted.", "Post
+  unhidden.", "Warning cleared.", "Nothing undone." or "Nothing to undo."), then each thing it kept and why:
+  - the post: "another report about this post was acted on", "this report's latest action did not hide it", or "it
+    was hidden again, or this report was updated, after this report hid it";
+  - the account: "another report about this account suspended or banned it", "this report's latest action did not
+    suspend or ban it", or "the suspension was changed, or this report was updated, after this report's action".
+
+  The "latest action" wording is deliberate: the rule reads only the report's notes, which its latest action wrote, so
+  after Remove content then Warn, or after a refused Restore, it does not claim the report never hid the post. A
+  summary never starts with an action's summary, so a later Restore of the same report undoes nothing more. The card
+  says before Restore runs when it would leave the post hidden. A superadmin unhides such a post from the content queue
+  (`/superadmin`, Content, Network posts), and lifts a suspension on `/superadmin`, Users & profiles, Restore account
+  (`superadminSuspendUser`, which clears `suspended_at` and `suspended_reason` only).
 
 - Warn, Suspend, Ban, Resolve and Dismiss act on the author and the report as before.
 
