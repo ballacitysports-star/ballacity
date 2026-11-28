@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
+  ATTACHMENT_METADATA_MESSAGE,
   ATTACHMENT_TOO_LARGE_MESSAGE,
   ATTACHMENT_TYPE_MESSAGE,
   MAX_ATTACHMENT_BYTES,
@@ -19,9 +20,10 @@ const BUCKET = "message-attachments";
  * database only when this record exists for that path, that sender and that
  * conversation, so the check cannot be skipped by calling the API directly.
  *
- * A refused file is deleted. A picture also goes through the safety scan that
- * profile photos get; an unsafe one is deleted and child-safety escalation runs
- * when the scan says so.
+ * A refused file is deleted. A picture has its location and other personal
+ * metadata removed from the stored file first (G3), then goes through the
+ * safety scan that profile photos get; an unsafe one is deleted and
+ * child-safety escalation runs when the scan says so.
  */
 export const finalizeMessageAttachment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -52,12 +54,31 @@ export const finalizeMessageAttachment = createServerFn({ method: "POST" })
       await remove();
       throw new Error(ATTACHMENT_TOO_LARGE_MESSAGE);
     }
-    const buffer = new Uint8Array(await blob.arrayBuffer());
+    let buffer: Uint8Array = new Uint8Array(await blob.arrayBuffer());
     const problem = attachmentProblem(buffer);
     const checked = problem ? null : classifyAttachment(buffer);
     if (problem || !checked) {
       await remove();
       throw new Error(problem ?? ATTACHMENT_TYPE_MESSAGE);
+    }
+
+    if (checked.kind === "image") {
+      // G3: the browser re-encodes only large photos, so a small one arrives with its GPS and camera tags. They come
+      // off the stored file before the scan and the check row; a picture that cannot be cleaned is deleted, not sent.
+      // Videos and PDFs are stored as sent (their metadata is not handled here).
+      const { stripStoredImage } = await import("@/lib/image-metadata.server");
+      const stripped = await stripStoredImage(supabaseAdmin, {
+        bucket: BUCKET,
+        path: data.path,
+        bytes: buffer,
+        mime: checked.mime,
+        cacheControl: "3600",
+      });
+      if (!stripped.ok) {
+        await remove();
+        throw new Error(ATTACHMENT_METADATA_MESSAGE);
+      }
+      buffer = stripped.bytes;
     }
 
     if (checked.kind === "image") {

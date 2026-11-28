@@ -48,6 +48,7 @@ import {
 } from "@/lib/payments";
 import { validateImageMeta } from "@/lib/image-validation";
 import { paymentSubmissionErrorMessage, userErrorMessage } from "@/lib/user-error";
+import { imageUploadErrorMessage } from "@/lib/image-upload-errors";
 import {
   PAYMENT_DISCLAIMER,
   PAYMENT_STATE_META,
@@ -1953,11 +1954,15 @@ function PaymentInstructionsAndProof({
       setUploadedPath(null);
       setUploadState("error");
       // uploadProofScreenshot refuses a file that isn't a JPG, PNG or WEBP under 8 MB with its own sentence (pickFile
-      // lets videos and larger files through); say that. Anything else is a storage or network failure (WP 4.0).
+      // lets videos and larger files through); say that. Its G3 refusal (location data could not be removed) is
+      // shown as it is too. Anything else is a storage or network failure (WP 4.0).
       const invalid = validateImageMeta({ mime: f.type, bytes: f.size });
       const msg = invalid
         ? `${invalid}.`
-        : userErrorMessage(err, "Couldn't upload your proof. Check your connection and try again.");
+        : imageUploadErrorMessage(
+            err,
+            "Couldn't upload your proof. Check your connection and try again.",
+          );
       setUploadError(msg);
       toast.error(msg);
     }
