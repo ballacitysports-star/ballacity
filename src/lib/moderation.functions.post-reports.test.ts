@@ -79,10 +79,9 @@ import {
   applyModerationAction,
   isMissingPostIdColumn,
   listReports,
-  postBodyMd5,
-  postEditedSinceReport,
   postRestoreBlocker,
 } from "@/lib/moderation.functions";
+import { postBodyMd5, postEditedSinceReport } from "@/lib/post-fingerprint.server";
 
 const md5 = (s: string) => createHash("md5").update(s, "utf8").digest("hex");
 

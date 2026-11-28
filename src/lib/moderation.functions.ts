@@ -1,9 +1,9 @@
-import { createHash } from "crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import type { AuditAction } from "@/lib/audit-actions";
 import { assertModerator } from "@/lib/moderation.server";
+import { postEditedSinceReport } from "@/lib/post-fingerprint.server";
 import { reportStatusesFor } from "@/lib/report-status";
 
 /** Canonical audit action for each moderation outcome. */
@@ -67,22 +67,6 @@ export function isMissingPostIdColumn(
     (error.code === "42703" || error.code === "PGRST204") &&
     /\bpost_(id|body_md5)\b/.test(error.message ?? "")
   );
-}
-
-/** md5 of a post's text, as Postgres md5(text) computes it (report_post keeps it as user_reports.post_body_md5). */
-export function postBodyMd5(body: string): string {
-  return createHash("md5").update(body, "utf8").digest("hex");
-}
-
-/**
- * Whether a reported post's text changed after the report: its md5 now against the one report_post kept. null when the
- * report kept none (a row written before 20261205100000 or by server code), so nobody can tell.
- */
-export function postEditedSinceReport(
-  body: string,
-  reportedMd5: string | null | undefined,
-): boolean | null {
-  return reportedMd5 ? postBodyMd5(body) !== reportedMd5 : null;
 }
 
 /** The summary Remove content writes on a post report; Restore reads it back to know that this report hid the post. */
