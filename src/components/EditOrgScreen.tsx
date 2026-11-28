@@ -52,6 +52,7 @@ import {
 import { autocompletePlaces, getPlaceDetails } from "@/lib/places.functions";
 import { useUserLocation } from "@/lib/geo";
 import { toast } from "sonner";
+import { staffAvatarDataUrl } from "@/lib/image-metadata-file";
 import { useAutosave } from "@/hooks/use-autosave";
 import { SaveStatus } from "@/components/SaveStatus";
 import { CANCEL_CUTOFF_PRESETS, normalizeCutoff } from "@/lib/cancel-window";
@@ -594,19 +595,15 @@ export function EditOrgScreen({ org }: { org: Org }) {
     setStaffName("");
     setStaffRole("");
   }
-  function updateStaffAvatar(i: number, file: File) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result === "string") {
-        setStaff((s) => {
-          const next = [...s];
-          next[i] = { ...next[i], avatar: result };
-          return next;
-        });
-      }
-    };
-    reader.readAsDataURL(file);
+  async function updateStaffAvatar(i: number, file: File) {
+    // G3: stored inline in the team row, so the location and camera tags come off here (and again on save).
+    const picked = await staffAvatarDataUrl(file);
+    if ("error" in picked) return void toast.error(picked.error);
+    setStaff((s) => {
+      const next = [...s];
+      next[i] = { ...next[i], avatar: picked.dataUrl };
+      return next;
+    });
   }
   function resetStaffAvatar(i: number) {
     setStaff((s) => {
@@ -1476,7 +1473,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
                             className="hidden"
                             onChange={(e) => {
                               const file = e.target.files?.[0];
-                              if (file) updateStaffAvatar(i, file);
+                              if (file) void updateStaffAvatar(i, file);
                             }}
                           />
                           {hasCustomAvatar ? (
