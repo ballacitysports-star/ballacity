@@ -15,8 +15,9 @@ const WINDOWS = [
 /**
  * P0-8: errors reported by the app (browser and server), grouped by fingerprint. Reports hold
  * no personal data; they are kept 30 days. "Last hour" with "Server only" answers "did the
- * publish break anything on the server": pages that failed to render (ssr) and server functions
- * that failed (server_fn).
+ * publish break anything on the server": pages that failed to render (ssr), scheduled workers that
+ * answered 500 (ssr too, P2-7a: the message starts with the job's name) and server functions that
+ * failed (server_fn).
  */
 export function ErrorsTab() {
   const list = useServerFn(superadminListErrors);
@@ -55,8 +56,8 @@ export function ErrorsTab() {
       </div>
       {serverOnly ? (
         <p className="text-xs text-muted-foreground">
-          Server only: pages that failed to render (ssr) and server functions that failed
-          (server_fn).
+          Server only: pages that failed to render (ssr), scheduled workers that failed (ssr, the
+          message starts with the job) and server functions that failed (server_fn).
         </p>
       ) : null}
       {q.isLoading ? (

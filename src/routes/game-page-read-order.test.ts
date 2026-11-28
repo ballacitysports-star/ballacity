@@ -10,6 +10,15 @@ import { describe, expect, it } from "vitest";
  */
 const page = readFileSync("src/routes/games.$gameId.index.tsx", "utf8");
 
+/** The body of applyOptimisticReview, from its arrow to the closing brace at its indent. */
+function optimisticReviewBody(): string {
+  const m = page.match(
+    /const applyOptimisticReview = \(reqId: string, status: "approved" \| "rejected"\): \(\(\) => void\) => \{\n([\s\S]*?)\n {2}\};/,
+  );
+  expect(m).not.toBeNull();
+  return m![1];
+}
+
 describe("game page read order", () => {
   it("lets only the newest host request read replace the list", () => {
     expect(page).toMatch(
@@ -22,6 +31,40 @@ describe("game page read order", () => {
       /if \(!leavingRef\.current && claimNewestRead\(settingsReads, settingsReadNo\)\) \{\s*setSettings\(early\);/,
     );
     expect(page).toContain("if (claimNewestRead(settingsReads, settingsReadNo)) setSettings(s);");
+  });
+
+  it("lets saved settings claim a number so an older settings read cannot undo the save", () => {
+    expect(page).toMatch(
+      /onSettingsSaved=\{\(s\) => \{[^}]*?claimLocalWrite\(settingsReads\);\s*setSettings\(s\);\s*\}\}/,
+    );
+  });
+
+  it("claims a number for the optimistic review before it writes the list", () => {
+    const body = optimisticReviewBody();
+    expect(body).toMatch(/^\s*claimLocalWrite\(hostReqReads\);[\s\S]*setHostRequests\(\(prev\) =>/);
+    // Claimed in the body, not inside the updater, which React may defer or run twice.
+    expect(body.indexOf("claimLocalWrite(hostReqReads)")).toBeLessThan(
+      body.indexOf("setHostRequests("),
+    );
+  });
+
+  it("undoes only the tapped row and leaves the tap's claim in force", () => {
+    const body = optimisticReviewBody();
+    expect(body).toMatch(
+      /return \(\) => \{\s*setHostRequests\(\(prev\) => undoReview\(prev, before, reviewedAt\)\);/,
+    );
+    expect(body).not.toMatch(/setHostRequests\(snapshot\)/);
+    // One claim, by the tap: the undo takes no number of its own.
+    expect(body.match(/claimLocalWrite\(/g)).toHaveLength(1);
+  });
+
+  it("reads the list again after the undo, to recover what a read dropped by the tap carried", () => {
+    const body = optimisticReviewBody();
+    // After the row is restored, inside the undo, and as a normal numbered read, not a local write.
+    expect(body).toMatch(
+      /undoReview\(prev, before, reviewedAt\)\);\s*void refreshHostRequests\(\);\s*\};/,
+    );
+    expect(body.match(/refreshHostRequests\(/g)).toHaveLength(1);
   });
 
   it("orders the removal record on its own", () => {

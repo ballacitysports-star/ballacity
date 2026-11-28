@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
 import { answerSessionChecks } from "./helpers/signed-in";
+import { PAY_FIXTURE_HOST_ID, servePayEntryReads } from "./helpers/pay-fixtures";
 
 /**
  * E2E: the pay page must flip from the approval gate to the payment picker
@@ -26,7 +27,7 @@ test.skip(
 );
 
 const GAME_ID = "g2";
-const FAKE_HOST_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+const FAKE_HOST_ID = PAY_FIXTURE_HOST_ID;
 const METHOD_ID = "mock-method-venmo";
 const ENTRY_FEE = 15;
 
@@ -150,6 +151,10 @@ test("realtime approval flips pay page from gate to picker (no focus / reload)",
       });
     },
   );
+
+  // Everything else the approval gate waits on, answered here rather than by the shared staging project (see
+  // servePayEntryReads). Realtime is left on: the spec needs the pay page's join-request channel.
+  await servePayEntryReads(page, GAME_ID);
 
   await restoreSession(page);
   await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });

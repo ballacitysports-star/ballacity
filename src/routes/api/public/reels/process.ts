@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { authorizeWorker, unauthorizedResponse } from "@/lib/worker-auth.server";
+import { REELS_WORKER, reportingWorkerFailures } from "@/lib/worker-failure-report.server";
 import {
   BATCH_SIZE,
   MAX_ATTEMPTS,
@@ -12,7 +13,9 @@ import {
 export const Route = createFileRoute("/api/public/reels/process")({
   server: {
     handlers: {
-      POST: async ({ request }) => {
+      // A 500 (no AI key, the queue read failed, or a throw) is also filed in the superadmin error
+      // view as "process-highlight-reels: <error>" (P2-7a, src/lib/worker-failure-report.server.ts).
+      POST: reportingWorkerFailures(REELS_WORKER, async ({ request }) => {
         // Restrict this expensive endpoint to callers that present the shared
         // worker secret. Prevents anonymous internet visitors from burning
         // Lovable AI credits by hammering the URL.
@@ -74,7 +77,7 @@ export const Route = createFileRoute("/api/public/reels/process")({
         return new Response(JSON.stringify({ processed: results.length, skipped, results }), {
           headers: { "Content-Type": "application/json" },
         });
-      },
+      }),
     },
   },
 });

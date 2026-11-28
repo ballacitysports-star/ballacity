@@ -657,6 +657,276 @@ async function postReportRace() {
   ];
 }
 
+// 20261204100000: a removed player sends their declined request again (rejected -> pending, as the player, so the
+// ask-limit trigger and enforce_host_block_resend run) while game_respond_invite accepts the host's later invitation
+// for the same game and player. The resend holds the request and then the removal row; the accept holds the invitation,
+// the game, the request and then the removal row (the lift, when it approves). Both take the request before the removal
+// row and the resend takes neither the invitation nor the game, so the migration argues they queue at the request and
+// never deadlock. Each round has its own game and player, so the rounds run at once without queueing on one game row.
+// The rounds are steered into each order (the resend first, the accept first, the accept holding its invitation and
+// game while the resend takes the request) by sessions that wait on each other through application_name and pg_locks,
+// not fixed sleeps, plus rounds started together with no steering. Half the games have room, so the accept approves
+// and the lift deletes the removal record; half are full, so the accept answers full after locking the same rows and
+// the record must stay, carrying only the resend's ask.
+const ASK_RACE_ROUNDS = ["resend first", "accept first", "accept mid-call", "together"].flatMap(
+  (order) => ["room", "full"].flatMap((room) => [0, 1, 2].map(() => ({ order, room }))),
+);
+const ASK_RACE_HANDLES = [
+  "raceaskhost",
+  "raceaskfill",
+  ...ASK_RACE_ROUNDS.map((_, i) => `raceask${i}`),
+];
+const ASK_RACE_CLEANUP = `
+  DELETE FROM public.hosted_games WHERE id LIKE 'race-ask-%';
+  DELETE FROM public.notifications WHERE user_id IN (${ASK_RACE_HANDLES.map((h) => `t.id('${h}')`).join(", ")});
+  DELETE FROM auth.users WHERE id IN (${ASK_RACE_HANDLES.map((h) => `t.id('${h}')`).join(", ")});`;
+
+async function removedAskVsAcceptRace() {
+  psql(dbName, [], ASK_RACE_CLEANUP);
+  const games = ASK_RACE_ROUNDS.map((x, i) => ({
+    ...x,
+    game: `race-ask-${i}`,
+    who: `raceask${i}`,
+    tag: `raceask-${i}`,
+  }));
+  // Each player is on the roster with an approved request and is removed by the host through host_remove_player, which
+  // writes the removal record and declines the request. The decline is then moved an hour back, past the request's own
+  // 15-minute resend cooldown, and the host's new invitation is written half an hour ago: later than the decline, so
+  // the accept does not read it as a take-back. A full game's one place is held by the filler.
+  r = psql(
+    dbName,
+    [],
+    `SELECT ${ASK_RACE_HANDLES.map((h) => `t.person('${h}', 30)`).join(", ")};
+     INSERT INTO public.hosted_games (id, host_id, sport, title, date, max_players) VALUES
+       ${games
+         .map(
+           (g) =>
+             `('${g.game}', t.id('raceaskhost'), 'basketball', 'Ask race', now() + interval '2 days', ${g.room === "full" ? 1 : 10})`,
+         )
+         .join(",\n       ")};
+     INSERT INTO public.game_payment_settings (game_id, host_id, entry_fee, requires_approval)
+       SELECT id, t.id('raceaskhost'), 0, true FROM public.hosted_games WHERE id LIKE 'race-ask-%';
+     SET session_replication_role = replica;
+     INSERT INTO public.join_requests (game_id, host_id, player_id, status, idempotency_key, reviewed_at) VALUES
+       ${games.map((g) => `('${g.game}', t.id('raceaskhost'), t.id('${g.who}'), 'approved', 'race', now() - interval '2 hours')`).join(",\n       ")};
+     INSERT INTO public.game_participants (game_id, user_id) VALUES
+       ${games.map((g) => `('${g.game}', t.id('${g.who}'))`).join(", ")};
+     INSERT INTO public.game_participants (game_id, user_id) VALUES
+       ${games
+         .filter((g) => g.room === "full")
+         .map((g) => `('${g.game}', t.id('raceaskfill'))`)
+         .join(", ")};
+     UPDATE public.hosted_games g SET joined = (SELECT count(*) FROM public.game_participants p WHERE p.game_id = g.id)
+      WHERE g.id LIKE 'race-ask-%';
+     SET session_replication_role = origin;
+     DO $rm$
+     BEGIN
+       ${games
+         .map(
+           (g) =>
+             `PERFORM t.as_user(t.id('raceaskhost')); PERFORM public.host_remove_player('${g.game}', t.id('${g.who}')); PERFORM t.reset();`,
+         )
+         .join("\n       ")}
+     END $rm$;
+     SET session_replication_role = replica;
+     UPDATE public.join_requests SET last_rejected_at = now() - interval '1 hour', reviewed_at = now() - interval '1 hour'
+      WHERE game_id LIKE 'race-ask-%';
+     UPDATE public.game_removals SET removed_at = now() - interval '1 hour' WHERE game_id LIKE 'race-ask-%';
+     SET session_replication_role = origin;
+     INSERT INTO public.game_invites (game_id, host_id, invitee_id, created_at) VALUES
+       ${games.map((g) => `('${g.game}', t.id('raceaskhost'), t.id('${g.who}'), now() - interval '30 minutes')`).join(",\n       ")};`,
+  );
+  if (r.status !== 0) fail("The removed player's ask race could not set up its games.", r.stderr);
+  // A round races only from this start: removed, declined by the removal, no ask yet, the invitation waiting.
+  const ready = psql(dbName, [
+    "-At",
+    "-c",
+    `SELECT count(*) FROM public.hosted_games g
+       JOIN public.join_requests jr ON jr.game_id = g.id
+       JOIN public.game_removals rm ON rm.game_id = g.id AND rm.user_id = jr.player_id
+       JOIN public.game_invites i ON i.game_id = g.id AND i.invitee_id = jr.player_id
+      WHERE g.id LIKE 'race-ask-%' AND jr.status = 'rejected' AND jr.reviewer_notes = 'Removed by host'
+        AND jr.last_rejected_at < now() - interval '15 minutes' AND coalesce(jr.attempt_count, 1) = 1
+        AND rm.asks = 0 AND rm.last_ask_at IS NULL AND i.status = 'pending' AND i.created_at > jr.last_rejected_at
+        AND NOT EXISTS (SELECT 1 FROM public.game_participants p WHERE p.game_id = g.id AND p.user_id = jr.player_id)`,
+  ]).stdout.trim();
+  if (ready !== String(games.length))
+    fail(
+      `The removed player's ask race set up ${ready} of ${games.length} rounds in their start state.`,
+    );
+
+  // Poll for 30s at most, then fail the session (which fails the round as a non-deadlock error).
+  const until = (cond, what) => `DO $wait$
+     BEGIN
+       FOR _try IN 1..300 LOOP
+         IF ${cond} THEN RETURN; END IF;
+         PERFORM pg_sleep(0.1);
+         -- pg_stat_activity is read once per transaction unless this drops the copy, and the loop is one transaction.
+         PERFORM pg_stat_clear_snapshot();
+       END LOOP;
+       RAISE EXCEPTION 'the race never reached: ${what}';
+     END $wait$;`;
+  const seen = (name) =>
+    until(`EXISTS (SELECT 1 FROM pg_stat_activity WHERE application_name = '${name}')`, name);
+  const blocking = until(
+    "EXISTS (SELECT 1 FROM pg_locks l WHERE NOT l.granted AND pg_backend_pid() = ANY (pg_blocking_pids(l.pid)))",
+    "the other session waiting on this one",
+  );
+  // Each step names itself in application_name, which the partner session watches. The resend runs as the player
+  // through the API role and prints the rows it changed and the record's asks in its own transaction.
+  const resend = (g, steer) =>
+    `${steer === "accept first" ? seen(`${g.tag}-answered`) : ""}
+     ${steer === "accept mid-call" ? seen(`${g.tag}-locked`) : ""}
+     BEGIN; SELECT t.as_user(t.id('${g.who}'));
+     WITH u AS (UPDATE public.join_requests SET status = 'pending'
+                 WHERE game_id = '${g.game}' AND player_id = t.id('${g.who}') AND status = 'rejected' RETURNING 1)
+     SELECT 'RESENT:' || count(*) FROM u;
+     SELECT 'ASKS:' || coalesce((SELECT asks::text FROM public.game_removals
+                                  WHERE game_id = '${g.game}' AND user_id = t.id('${g.who}')), 'none');
+     SELECT t.reset();
+     ${steer === "resend first" || steer === "accept mid-call" ? `SET application_name = '${g.tag}-resent'; ${blocking}` : ""}
+     ${steer === "accept mid-call" ? "SELECT pg_sleep(1.5);" : ""}
+     COMMIT;`;
+  // accept mid-call: the accept holds its invitation and game first, as an accept that has just locked them would, and
+  // calls only once the resend holds the request, then waits for it. The resend keeps the request 1.5s past that, so
+  // the deadlock check (deadlock_timeout 1s, as in races 3 and 3b) runs while the accept waits.
+  const accept = (g, steer) =>
+    `${steer === "resend first" ? seen(`${g.tag}-resent`) : ""}
+     BEGIN;
+     ${
+       steer === "accept mid-call"
+         ? `SELECT 1 FROM public.game_invites WHERE game_id = '${g.game}' AND invitee_id = t.id('${g.who}') FOR UPDATE;
+     SELECT 1 FROM public.hosted_games WHERE id = '${g.game}' FOR NO KEY UPDATE;
+     SET application_name = '${g.tag}-locked'; ${seen(`${g.tag}-resent`)}`
+         : ""
+     }
+     SELECT t.as_user(t.id('${g.who}'));
+     SELECT 'ANSWER:' || (public.game_respond_invite(
+       (SELECT id FROM public.game_invites WHERE game_id = '${g.game}' AND invitee_id = t.id('${g.who}')), true) ->> 'status');
+     SELECT t.reset();
+     ${steer === "accept first" ? `SET application_name = '${g.tag}-answered'; ${blocking}` : ""}
+     COMMIT;`;
+  // The migration argues the two never deadlock, so any 40P01 fails the first line below. An accept ended by one is
+  // still tried once more, unsteered, as the app's accept retries a 40P01, only so the other lines can say what the
+  // retry left behind. The resend is not retried: createJoinRequest has no 40P01 retry, so the player would see the
+  // error. Any other failure is a failure.
+  const run = async (script, retry) => {
+    const first = await session(script);
+    const deadlocked = first.code !== 0 && /deadlock detected/.test(first.out);
+    if (!deadlocked) return { ...first, deadlocks: 0 };
+    if (!retry) return { ...first, deadlocks: 1 };
+    const again = await session(retry);
+    return { ...again, deadlocks: 1, retried: true };
+  };
+  const rounds = await Promise.all(
+    games.map(async (g) => {
+      const [a, s] = await Promise.all([
+        run(accept(g, g.order), accept(g, "together")),
+        run(resend(g, g.order), null),
+      ]);
+      return { ...g, a, s };
+    }),
+  );
+  // request status | attempt count | removal asks (or none) | last ask stamped | player's roster rows | invitation status
+  // | invitation linked to the request | host's accepted notices for the game
+  const states = psql(dbName, [
+    "-At",
+    "-F",
+    "\t",
+    "-c",
+    `SELECT g.id, jr.status || '|' || coalesce(jr.attempt_count, 1) || '|' || coalesce(rm.asks::text, 'none') || '|' ||
+              (rm.last_ask_at IS NOT NULL)::text || '|' ||
+              (SELECT count(*) FROM public.game_participants p WHERE p.game_id = g.id AND p.user_id = jr.player_id) || '|' ||
+              i.status || '|' || (i.join_request_id IS NOT DISTINCT FROM jr.id)::text || '|' ||
+              (SELECT count(*) FROM public.notifications n
+                WHERE n.user_id = t.id('raceaskhost') AND n.type = 'game_invite_accepted' AND n.link = '/games/' || g.id)
+       FROM public.hosted_games g
+       JOIN public.join_requests jr ON jr.game_id = g.id AND jr.player_id <> t.id('raceaskfill')
+       JOIN public.game_invites i ON i.game_id = g.id AND i.invitee_id = jr.player_id
+       LEFT JOIN public.game_removals rm ON rm.game_id = g.id AND rm.user_id = jr.player_id
+      WHERE g.id LIKE 'race-ask-%'`,
+  ]);
+  psql(dbName, [], ASK_RACE_CLEANUP);
+  const byGame = new Map(
+    states.stdout
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => line.split("\t")),
+  );
+  for (const x of rounds) {
+    const [status, attempts, asks, stamped, roster, invite, linked, notices] = (
+      byGame.get(x.game) ?? ""
+    ).split("|");
+    Object.assign(x, {
+      answer: (x.a.out.match(/ANSWER:(\w+)/) ?? [])[1],
+      resent: Number((x.s.out.match(/RESENT:(\d+)/) ?? [])[1] ?? NaN),
+      asksSeen: (x.s.out.match(/ASKS:(\w+)/) ?? [])[1],
+      end: { status, attempts: Number(attempts), asks, stamped, roster, invite, linked, notices },
+    });
+  }
+  const deadlocks = rounds.reduce((n, x) => n + x.a.deadlocks + x.s.deadlocks, 0);
+  const approved = (x) => x.end.status === "approved";
+  return [
+    [
+      `a removed player's resend against the accept of the host's later invitation, ${rounds.length} rounds at once: ` +
+        `no deadlock and no session error (${deadlocks} ended by a deadlock)`,
+      states.status === 0 &&
+        byGame.size === rounds.length &&
+        deadlocks === 0 &&
+        rounds.every(
+          (x) => x.a.code === 0 && x.s.code === 0 && !/deadlock/i.test(x.a.out + x.s.out),
+        ),
+    ],
+    [
+      "and at most one approval: the accept approves on a game with room (one notice), is told full otherwise, the resend never approves",
+      rounds.every(
+        (x) =>
+          x.answer === (x.room === "room" ? "accepted" : "full") &&
+          approved(x) === (x.answer === "accepted") &&
+          x.end.notices === (x.answer === "accepted" ? "1" : "0"),
+      ),
+    ],
+    [
+      "and the removal record is gone exactly when the accept approved",
+      rounds.every((x) => (x.end.asks === "none") === approved(x)),
+    ],
+    [
+      "and asks count only the player's own resend that changed the request",
+      rounds.every(
+        (x) =>
+          (x.resent === 1 || x.resent === 0) &&
+          x.end.attempts === 1 + x.resent &&
+          // A resend that changed the request is counted once in its own transaction; one that found it approved
+          // finds the record already lifted.
+          x.asksSeen === (x.resent === 1 ? "1" : "none") &&
+          (approved(x) ||
+            (x.end.asks === String(x.resent) && x.end.stamped === String(x.resent === 1))),
+      ),
+    ],
+    [
+      "and the roster and invitation agree with the request: approved, seated and accepted, or pending and invited",
+      rounds.every((x) =>
+        approved(x)
+          ? x.end.roster === "1" && x.end.invite === "accepted" && x.end.linked === "true"
+          : x.end.roster === "0" &&
+            x.end.invite === "pending" &&
+            x.end.status === (x.resent === 1 ? "pending" : "rejected"),
+      ),
+    ],
+    [
+      "and the rounds raced each order: the resend first or mid-call is counted, the accept first leaves it nothing to send",
+      rounds.every((x) =>
+        x.order === "together" || x.a.retried || x.s.retried
+          ? true
+          : x.resent === (x.order === "accept first" && x.room === "room" ? 0 : 1),
+      ) &&
+        rounds.some((x) => x.room === "room" && x.resent === 0) &&
+        rounds.some((x) => x.room === "room" && x.resent === 1),
+    ],
+  ];
+}
+
 // P2-1 stage 4a: one family signs up through the old path (rsvp_tryout) and another through
 // events (register_for_event) for the last seat of the same copied tryout. Both lock the post
 // first, so the second waits for the first and is told it is full: one seat is taken, never two,
@@ -804,6 +1074,7 @@ try {
         ...(await postReportRace()),
         ...(await hostRemovalRaces()),
         ...(await guardianCancelRace()),
+        ...(await removedAskVsAcceptRace()),
         ...(await oldVsNewSignupRace(true)),
         ...(await oldVsNewSignupRace(false)),
       ]) {

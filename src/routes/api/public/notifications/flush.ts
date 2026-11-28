@@ -1,5 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { authorizeWorker } from "@/lib/worker-auth.server";
+import {
+  NOTIFICATION_FLUSH_WORKER,
+  reportingWorkerFailures,
+} from "@/lib/worker-failure-report.server";
 
 /**
  * Flushes push notifications that were held back by the minor notification
@@ -8,7 +12,9 @@ import { authorizeWorker } from "@/lib/worker-auth.server";
  * Called by a scheduler (pg_cron or any external scheduler) with the shared
  * worker secret. The work is in `notification-flush.server`, which claims each
  * row, checks the guardian's settings again, and retries with backoff. The
- * response is a count summary, including how many rows are overdue.
+ * response is a count summary, including how many rows are overdue. A 500 is also filed in the
+ * superadmin error view as "flush-held-notifications: <error>" (P2-7a,
+ * src/lib/worker-failure-report.server.ts).
  */
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -20,7 +26,7 @@ function json(body: unknown, status = 200) {
 export const Route = createFileRoute("/api/public/notifications/flush")({
   server: {
     handlers: {
-      POST: async ({ request }) => {
+      POST: reportingWorkerFailures(NOTIFICATION_FLUSH_WORKER, async ({ request }) => {
         if ((await authorizeWorker(request)) !== "ok") return json({ error: "Unauthorized" }, 401);
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -63,7 +69,7 @@ export const Route = createFileRoute("/api/public/notifications/flush")({
         } catch (e) {
           return json({ error: e instanceof Error ? e.message : "flush failed" }, 500);
         }
-      },
+      }),
     },
   },
 });

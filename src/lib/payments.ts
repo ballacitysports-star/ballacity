@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getCurrentUserId } from "@/lib/current-user-id";
 import { validateImageMeta } from "@/lib/image-validation";
+import { requireStrippedImageFile } from "@/lib/image-metadata-file";
 import { cancelPendingGameInvitesFor } from "@/lib/game-invites";
 import { isMissingFunctionError } from "@/lib/managed-profile-names";
 import { hostAnswersRequest, isGuardianOnlyRequest } from "@/lib/guarded-open-join";
@@ -444,7 +445,10 @@ export async function uploadProofScreenshot(file: File): Promise<string> {
   if (invalid) throw new Error(invalid);
   const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
   const path = `${userId}/${crypto.randomUUID()}.${ext}`;
-  const { error } = await supabase.storage.from("payment-proofs").upload(path, file, {
+  // G3: proofs go straight to storage with no server step, so a phone photo's location and camera tags come off
+  // here. A file that cannot be cleaned is not sent.
+  const clean = await requireStrippedImageFile(file);
+  const { error } = await supabase.storage.from("payment-proofs").upload(path, clean, {
     cacheControl: "3600",
     upsert: false,
     contentType: file.type,

@@ -1,5 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { isAllowedImageMime } from "@/lib/image-validation";
+import { METADATA_IMAGE_REFUSAL } from "@/lib/image-upload-errors";
+import { stripImageFile } from "@/lib/image-metadata-file";
 
 const ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"];
 
@@ -51,6 +53,11 @@ export async function uploadTeamCover(
   }
   const userId = userRes.user.id;
 
+  // G3: this upload goes straight to a public bucket with no server step, so the location and camera tags come off
+  // here or not at all. A file that cannot be cleaned is not sent.
+  const clean = await stripImageFile(file);
+  if (!clean) throw new TeamCoverUploadError(METADATA_IMAGE_REFUSAL);
+
   const ext = extFromFile(file);
   const path = `${userId}/${crypto.randomUUID()}.${ext}`;
 
@@ -64,11 +71,11 @@ export async function uploadTeamCover(
   await new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", signed.signedUrl, true);
-    if (file.type) xhr.setRequestHeader("Content-Type", file.type);
+    xhr.setRequestHeader("Content-Type", clean.type);
     xhr.setRequestHeader("x-upsert", "true");
     xhr.upload.onprogress = (e) => {
       if (!onProgress) return;
-      const total = e.lengthComputable ? e.total : file.size;
+      const total = e.lengthComputable ? e.total : clean.size;
       const loaded = e.loaded;
       onProgress({
         loaded,
@@ -78,7 +85,7 @@ export async function uploadTeamCover(
     };
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
-        onProgress?.({ loaded: file.size, total: file.size, percent: 100 });
+        onProgress?.({ loaded: clean.size, total: clean.size, percent: 100 });
         resolve();
       } else {
         reject(new TeamCoverUploadError(`Upload failed (${xhr.status}).`));
@@ -86,7 +93,7 @@ export async function uploadTeamCover(
     };
     xhr.onerror = () => reject(new TeamCoverUploadError("Network error during upload."));
     xhr.onabort = () => reject(new TeamCoverUploadError("Upload was cancelled."));
-    xhr.send(file);
+    xhr.send(clean);
   });
 
   const { data: publicUrl } = supabase.storage.from(BUCKET).getPublicUrl(path);
