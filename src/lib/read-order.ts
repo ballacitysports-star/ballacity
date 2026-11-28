@@ -7,6 +7,10 @@
  * Usage: take `const readNo = ++order.sent` just before sending the read, and apply its answer
  * only when `claimNewestRead(order, readNo)` returns true. A failed read claims nothing, so it
  * never blocks the answer of a read sent before it.
+ *
+ * A local write of the same rows (an optimistic update, or rows a save just returned) is newer
+ * than every read already out, so it takes its own number with `claimLocalWrite` before it sets
+ * the rows. Reads sent before it then answer too late to replace it; reads sent after it still land.
  */
 export type ReadOrder = { sent: number; newestApplied: number };
 
@@ -22,4 +26,16 @@ export function claimNewestRead(order: ReadOrder, readNo: number): boolean {
   if (readNo < order.newestApplied) return false;
   order.newestApplied = readNo;
   return true;
+}
+
+/**
+ * Claim a fresh number for a local write of the rows and return it. The claim always succeeds,
+ * since no read has a higher number yet, and from then on every read sent before the write is
+ * dropped. The claim is never given back: `newestApplied` only grows, so undoing the write later
+ * does not let those older reads land again.
+ */
+export function claimLocalWrite(order: ReadOrder): number {
+  const writeNo = ++order.sent;
+  claimNewestRead(order, writeNo);
+  return writeNo;
 }

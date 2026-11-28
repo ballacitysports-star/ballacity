@@ -48,6 +48,9 @@ describe("ErrorsTab views (P0-8)", () => {
     expect(pressed("Last hour")).toBe(true);
     expect(pressed("Server only")).toBe(true);
     expect(screen.getByText(/pages that failed to render \(ssr\)/)).toBeTruthy();
+    expect(
+      screen.getByText(/scheduled workers that failed \(ssr, the message starts with the job\)/),
+    ).toBeTruthy();
     expect(await screen.findByText("No server errors reported in this period.")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Server only" }));

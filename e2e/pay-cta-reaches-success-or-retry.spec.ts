@@ -1,6 +1,11 @@
 import { test, expect, type Page } from "@playwright/test";
 import { restoreSession } from "./helpers/signed-in";
-import { PAY_FIXTURE_HOST_ID, payFixtureGameRow, serveFixtureGame } from "./helpers/pay-fixtures";
+import {
+  PAY_FIXTURE_HOST_ID,
+  answerPayEntryChecks,
+  payFixtureGameRow,
+  serveFixtureGame,
+} from "./helpers/pay-fixtures";
 import { stubRiskAcknowledged } from "./helpers/risk-ack";
 
 /**
@@ -47,6 +52,8 @@ async function mockEmptyLists(page: Page) {
   await page.route((url) => tableUrl(url, "host_payment_methods"), empty);
   await page.route((url) => tableUrl(url, "payment_methods"), empty);
   await page.route((url) => tableUrl(url, "game_participants"), empty);
+  // The guardian checks and the removal read (see answerPayEntryChecks).
+  await answerPayEntryChecks(page);
   // The pay screen reads the host's methods through this RPC, not the table
   // above. Unanswered, it asked the real database for the real g2 host's
   // methods: what the "ready" screen showed, and how fast, depended on that.

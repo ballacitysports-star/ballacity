@@ -52,10 +52,12 @@ and pg_net's.
 
 - **A worker job's "succeeded" means the call was sent.** `flush-held-notifications`, `send-game-reminders` and the
   other jobs that call `private_sec.worker_post` queue an HTTP request through pg_net and finish. If the endpoint then
-  answers 500, the job still shows `succeeded`. The pg_net counts are the only sign of that, and they cannot be tied to
-  a job: pg_net records no job id. pg_net also keeps responses for 6 hours by default (`pg_net.ttl`), so "last 24 hours"
-  usually covers less; the card shows the oldest response it counted. To see which endpoint fails, read the worker's
-  own logs.
+  answers 500, the job still shows `succeeded`. On this card the pg_net counts are the only sign of that, and they
+  cannot be tied to a job: pg_net records no job id. pg_net also keeps responses for 6 hours by default
+  (`pg_net.ttl`), so "last 24 hours" usually covers less; the card shows the oldest response it counted. For a 5xx
+  answer, the **error view** names the endpoint and what failed ("Worker failures in the error view", below). A 4xx (a
+  wrong worker secret answers 401 to every call) and no response are not filed there; for those, read the worker's own
+  logs.
 - **Jobs the function's owner can see.** On Supabase, `cron.job` and `cron.job_run_details` have row level security
   (`username = current_user`). The function runs as its owner, the role that applies migrations, which is the role that
   scheduled every job in `supabase/migrations`. A job scheduled by hand as another role would not be listed.
@@ -67,6 +69,45 @@ and pg_net's.
   `server restarted` while still starting has neither time: it counts in "failed in 7 days" when the newest time among
   the runs recorded before it is within the 7 days, and it gives no "last run" time.
 - At most 200 jobs are listed.
+
+## Worker failures in the error view
+
+Each worker endpoint files its own 5xx answers in `app_error_events`, so they show in the superadmin error view (the
+Errors tab; "Server only" keeps them) next to pages and server functions that failed. That covers
+`/api/public/reminders/run`, `/api/public/notifications/flush`, `/api/public/payments/release-holds` and
+`/api/public/reels/process` (`src/lib/worker-failure-report.server.ts`, which wraps each route's handler).
+
+- **What is filed.** A row for an answer of 500 or above, whether the sweep failed and the route answered 500 or the
+  handler threw (it then answers `{ "error": "worker_failed" }` with status 500, and the request middleware does not
+  file it again). The message is `<job>: <error>`: `<job>` is `send-game-reminders`, `flush-held-notifications`,
+  `release-expired-payment-holds` or `process-highlight-reels`, and `<error>` is the `error` field of the answer (for
+  reels, the code it answers, such as `queue_read_failed`), what the handler threw, or `http_<status>` when the answer
+  has no error field. The route is the endpoint's path. The kind is `ssr`, the kind the server already uses for a
+  request that failed. No pg_cron job calls `/api/public/payments/release-holds` (the `release-expired-payment-holds`
+  job runs the same sweep in SQL); a row under that route comes from an external scheduler.
+- **What is not filed.** Answers below 500: a run that worked, and a 401 for a missing or wrong worker secret. An abort,
+  as everywhere else. Per-item failures that the endpoint counts in a 200 answer (a push that failed, a reel that
+  failed) are not rows either; they stay in `notification_delivery_log` and on the reel.
+- **What a row holds.** The error view's usual scrubbing applies: emails, tokens, ids, long numbers and the values
+  Postgres repeats in its errors are removed, and the message is cut to 500 characters. Nothing else of the answer
+  (its counts or results) and nothing of the request (body, headers, the worker secret, the query string) goes in, and
+  the row counts as signed out.
+- **The same failure at most once every 30 minutes.** "The same" is the same group in the error view: the scrubbed
+  message (numbers and ids masked) and the route. Before it files a row, the endpoint looks in `app_error_events` for
+  such a row from the last 30 minutes, so this holds across server instances. A failure that keeps happening (the reels
+  endpoint runs every minute, the reminders and flush endpoints every 5 minutes) adds about 48 rows a day instead of up
+  to 1,440, its group's count is about the number of half hours it went on failing (not the number of runs), and its
+  last time is at most about 30 minutes old while it lasts. The error view reads only the newest 2,000 rows of the
+  window it shows (it then says "showing the latest 2,000"), so this is what keeps a stuck worker from pushing the other
+  errors out: all four endpoints failing for 7 days come to about 1,350 rows. Over 30 days one failure that never stops
+  comes to about 1,440, so in the 30-day view two of them can still fill the 2,000. A row that was not saved does not
+  count, so the next failure tries again; when the check itself fails, the row is filed anyway.
+- **Limits.** Reporting is best effort. A failed run's answer waits at most 1.5 seconds for the row to be saved, and
+  never past 4 seconds after the call arrived: pg_net stops waiting after 5, and an answer it no longer waits for counts
+  as "no response", not as a 5xx. A run that has already taken 4 seconds answers at once, and its row may then not be
+  saved. A failure to save changes nothing in the answer. Rows count against the same per-minute budget as the server's
+  other reports (60 a minute on each server instance). A sweep that pg_net stops waiting for (after 5 seconds) can be
+  cancelled before it answers, and then nothing is filed; the pg_net "no response" count still shows it.
 
 ## Run history retention
 

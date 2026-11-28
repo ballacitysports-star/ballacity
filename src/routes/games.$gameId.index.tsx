@@ -47,7 +47,8 @@ import { needsRiskAcknowledgment, RISK_ACKNOWLEDGMENT } from "@/lib/safety";
 import { recordSafetyAck, useSafetyAck } from "@/lib/safety-acks";
 import { planRiskAckTap, riskAckReadFrom, settleRiskAckTap } from "@/lib/risk-ack-tap";
 import { createLocalWriteGuard } from "@/lib/local-write-guard";
-import { claimNewestRead, newReadOrder } from "@/lib/read-order";
+import { claimLocalWrite, claimNewestRead, newReadOrder } from "@/lib/read-order";
+import { markReviewed, undoReview } from "@/lib/optimistic-review";
 import {
   GAME_FULL_MESSAGE,
   INVITE_EXPIRED_MESSAGE,
@@ -702,15 +703,31 @@ function GameDetail() {
   // undo function the caller runs on server error so the UI reverts to the
   // pre-tap state. Realtime `join_requests:host:*` events reconcile with
   // authoritative rows on success; we don't need a manual refetch.
+  //
+  // The tap is a local write of the list, so it claims a read number of its own: a read sent
+  // before the tap holds the old status and would otherwise answer after it and flip the row back.
+  // The claim is taken here and not in the updater, which React may run later or twice.
+  // The undo takes no number. The tap's claim stays in force, so reads sent before the tap stay
+  // dropped after the undo too, while reads sent after the tap still land. Such a read can predate
+  // the review's commit and briefly show the old status; the review's own realtime event reads again. The undo puts back only this row, and only while no read has replaced it since
+  // (see optimistic-review.ts).
+  // The undo then reads the list again. A read that was out at the tap was dropped, and a failed
+  // review writes nothing, so no realtime event would bring back what that read carried (a new
+  // request, say). The new read takes a fresh number, so it lands, and it holds the server's rows,
+  // so it cannot undo the restored row wrongly.
   const applyOptimisticReview = (reqId: string, status: "approved" | "rejected"): (() => void) => {
-    let snapshot: JoinRequest[] = [];
+    claimLocalWrite(hostReqReads);
+    const reviewedAt = new Date().toISOString();
+    let before: JoinRequest | undefined;
     setHostRequests((prev) => {
-      snapshot = prev;
-      return prev.map((r) =>
-        r.id === reqId ? { ...r, status, reviewed_at: new Date().toISOString() } : r,
-      );
+      const marked = markReviewed(prev, reqId, status, reviewedAt);
+      before = marked.before;
+      return marked.rows;
     });
-    return () => setHostRequests(snapshot);
+    return () => {
+      setHostRequests((prev) => undoReview(prev, before, reviewedAt));
+      void refreshHostRequests();
+    };
   };
 
   // Host "Remove player" flow. `removeTarget` drives the confirmation
@@ -3373,7 +3390,12 @@ function GameDetail() {
           hostId={settings?.host_id ?? game.hostUserId ?? user?.id ?? ""}
           settings={settings}
           onClose={() => setEditOpen(false)}
-          onSettingsSaved={(s) => setSettings(s)}
+          onSettingsSaved={(s) => {
+            // The saved settings are newer than any settings read already out, so the save claims
+            // a read number of its own and a read sent before it cannot answer after and undo it.
+            claimLocalWrite(settingsReads);
+            setSettings(s);
+          }}
         />
       )}
 

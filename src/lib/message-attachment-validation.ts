@@ -42,6 +42,9 @@ export const ATTACHMENT_TYPE_MESSAGE =
   "That file type is not allowed. Send a photo (JPG, PNG, WEBP), a video (MP4, MOV, WEBM) or a PDF.";
 export const ANIMATED_ATTACHMENT_MESSAGE =
   "Animated pictures can't be sent. Send a still photo instead.";
+/** finalizeMessageAttachment (G3): the picture could not be parsed to remove its location data. */
+export const ATTACHMENT_METADATA_MESSAGE =
+  "This photo's location details could not be removed, so it was not sent. Try another photo.";
 /** finalizeMessageAttachment: the safety scan refused the picture. */
 export const UNSAFE_ATTACHMENT_MESSAGE = "That picture can't be sent.";
 /** Every refusal above: they tell the sender what to do, so a failed send shows them as they are (WP 4.0). */
@@ -49,6 +52,7 @@ export const ATTACHMENT_REFUSAL_MESSAGES: readonly string[] = [
   ATTACHMENT_TOO_LARGE_MESSAGE,
   ATTACHMENT_TYPE_MESSAGE,
   ANIMATED_ATTACHMENT_MESSAGE,
+  ATTACHMENT_METADATA_MESSAGE,
   UNSAFE_ATTACHMENT_MESSAGE,
 ];
 

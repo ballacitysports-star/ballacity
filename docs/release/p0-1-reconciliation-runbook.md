@@ -156,8 +156,12 @@ a production change with its own approval, which is what sections A to C do.
 - File 6: `docs/rollbacks/20261103130000_profile_insert_guard.down.sql` (guarded by
   `app.confirm_reopen_profile_insert=yes`).
 - File 7: `docs/rollbacks/20261103140000_payment_settings_host_guard.down.sql` (guarded by
-  `app.confirm_reopen_payment_settings=yes`). It re-opens the hole the hotfix closed only partly, so it is for a
-  regression that blocks hosts, not for comfort. The hotfix `20261102100000` stays in place after this rollback.
+  `app.confirm_reopen_payment_settings=yes`, and since 2026-11-27 by a definition guard that refuses while
+  `public.game_removals` exists or any of its seven pinned bodies differs). It re-opens the hole the hotfix closed only
+  partly, so it is for a regression that blocks hosts, not for comfort. The hotfix `20261102100000` was meant to stay in
+  place, but a 2026-11-27 rehearsal showed the file also drops `private_sec.game_payee` and
+  `private_sec.can_manage_game_payment_settings`, which the hotfix created, and leaves different policies on
+  `game_payment_settings`. Review the file before any use.
 - Ledger rows (step D): `DELETE FROM supabase_migrations.schema_migrations WHERE version = '<v>'` for the rows inserted,
   each in its own transaction, with the same approval as the insert.
 - Ruleset: set it to Evaluate or disable it in GitHub settings.

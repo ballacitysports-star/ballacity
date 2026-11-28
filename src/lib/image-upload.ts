@@ -3,7 +3,7 @@ import { buildMediaRef } from "@/lib/media-refs";
 import { warmImageVariants } from "@/lib/image-variants";
 import { finalizeImageUpload } from "@/lib/image-uploads.functions";
 import { refreshBlockedImages } from "@/lib/blocked-images";
-import { IMAGE_FLAGGED_MESSAGE } from "@/lib/image-upload-errors";
+import { IMAGE_FLAGGED_MESSAGE, METADATA_IMAGE_REFUSAL } from "@/lib/image-upload-errors";
 import {
   MAX_IMAGE_BYTES,
   isAllowedImageMime,
@@ -28,7 +28,7 @@ const PRIVATE_BUCKETS: Record<PrivateImageBucket, true> = {
   "game-covers": true,
 };
 
-function decodeDataUrl(dataUrl: string): { blob: Blob; mime: string; ext: string } {
+async function decodeDataUrl(dataUrl: string): Promise<{ blob: Blob; mime: string; ext: string }> {
   const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,(.+)$/);
   if (!match) throw new Error("Not a valid image data URL");
   const mime = match[1];
@@ -44,7 +44,14 @@ function decodeDataUrl(dataUrl: string): { blob: Blob; mime: string; ext: string
   });
   if (failure) throw new Error(failure);
 
-  const blob = new Blob([bytes], { type: mime });
+  // G3: the gallery sends the file as picked, GPS and all. finalizeImageUpload strips the stored copy too, but this is
+  // a public bucket, so the tags come off before the bytes leave the device as well. Nothing is sent when that fails.
+  // Loaded on first use, so the stripper stays out of the bundle every page loads first.
+  const { tryStripImageMetadata } = await import("@/lib/image-metadata");
+  const stripped = tryStripImageMetadata(bytes);
+  if (!stripped.ok) throw new Error(METADATA_IMAGE_REFUSAL);
+
+  const blob = new Blob([stripped.bytes as BlobPart], { type: mime });
   return { blob, mime, ext };
 }
 
@@ -61,7 +68,7 @@ export async function uploadDataUrlToBucket(
   ownerId: string,
   dataUrl: string,
 ): Promise<string> {
-  const { blob, mime, ext } = decodeDataUrl(dataUrl);
+  const { blob, mime, ext } = await decodeDataUrl(dataUrl);
   const path = `${ownerId}/${crypto.randomUUID()}.${ext}`;
 
   const { error } = await supabase.storage.from(bucket).upload(path, blob, {

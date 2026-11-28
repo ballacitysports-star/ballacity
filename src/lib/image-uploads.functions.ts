@@ -2,8 +2,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isAnimatedImage } from "@/lib/image-animation";
-import { ANIMATED_IMAGE_REFUSAL, UNREADABLE_IMAGE_REFUSAL } from "@/lib/image-upload-errors";
-import { IMAGE_BUCKET_KEYS } from "@/lib/image-moderation";
+import {
+  ANIMATED_IMAGE_REFUSAL,
+  METADATA_IMAGE_REFUSAL,
+  UNREADABLE_IMAGE_REFUSAL,
+} from "@/lib/image-upload-errors";
+import { IMAGE_BUCKET_KEYS, isPublicImageBucket } from "@/lib/image-moderation";
 import {
   MAX_IMAGE_BYTES,
   readImageDimensions,
@@ -13,7 +17,8 @@ import {
 
 /**
  * Server-side gate for every uploaded image: re-validates type / size /
- * dimensions from the stored bytes (never trusting the client), then runs an
+ * dimensions from the stored bytes (never trusting the client), removes
+ * location and other personal metadata from the stored file (G3), then runs an
  * automated safety scan. Unsafe uploads are quarantined so nothing in the app
  * renders them until a superadmin approves.
  */
@@ -37,8 +42,8 @@ export const finalizeImageUpload = createServerFn({ method: "POST" })
     const { data: blob, error: dlErr } = await supabaseAdmin.storage.from(bucket).download(path);
     if (dlErr || !blob) throw new Error("Uploaded file could not be read");
 
-    const buffer = new Uint8Array(await blob.arrayBuffer());
-    const bytes = buffer.byteLength;
+    let buffer: Uint8Array = new Uint8Array(await blob.arrayBuffer());
+    let bytes = buffer.byteLength;
     const sniffed = sniffImageMime(buffer);
     const dimensions = readImageDimensions(buffer);
 
@@ -68,6 +73,42 @@ export const finalizeImageUpload = createServerFn({ method: "POST" })
       );
       throw new Error(failure);
     }
+
+    // G3: GPS, camera, time and other personal tags come off the stored file before the scan reads it and before
+    // the caller gets a URL, so every viewer and every resized variant sees only the clean copy. A file that cannot
+    // be parsed or written back is removed and refused, never kept as it was sent.
+    const { stripStoredImage, metadataSummary } = await import("@/lib/image-metadata.server");
+    const stripped = await stripStoredImage(supabaseAdmin, {
+      bucket,
+      path,
+      bytes: buffer,
+      // validateImageMeta passed above, so the sniffed type is one of the allowed image types.
+      mime: sniffed as string,
+      // Public paths are random and never reused, the same lifetime uploadDataUrlToBucket asks for.
+      cacheControl: isPublicImageBucket(bucket) ? "31536000" : "3600",
+    });
+    if (!stripped.ok) {
+      await supabaseAdmin.storage.from(bucket).remove([path]);
+      await supabaseAdmin.from("image_moderation").upsert(
+        {
+          bucket,
+          path,
+          owner_id: context.userId,
+          status: "removed",
+          reason: METADATA_IMAGE_REFUSAL,
+          mime: sniffed,
+          bytes,
+          width: dimensions?.width ?? null,
+          height: dimensions?.height ?? null,
+          scan: { stage: "metadata", failure: stripped.stage } as never,
+        },
+        { onConflict: "bucket,path" },
+      );
+      throw new Error(METADATA_IMAGE_REFUSAL);
+    }
+    buffer = stripped.bytes;
+    bytes = buffer.byteLength;
+    const metadata = metadataSummary(stripped);
 
     // Small enough to inline: keeps private-bucket scans off signed URLs.
     const inlineable = bytes <= 4 * 1024 * 1024 && bytes <= MAX_IMAGE_BYTES;
@@ -111,7 +152,7 @@ export const finalizeImageUpload = createServerFn({ method: "POST" })
         width: dimensions?.width ?? null,
         height: dimensions?.height ?? null,
         quarantined_at: quarantined ? new Date().toISOString() : null,
-        scan: verdict as never,
+        scan: { ...verdict, metadata } as never,
       },
       { onConflict: "bucket,path" },
     );
