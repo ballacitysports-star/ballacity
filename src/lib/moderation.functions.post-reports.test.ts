@@ -3,8 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 /**
  * Post reports in the moderation queue (20261205100000): a moderator sees the reported post as it is now, whether its
  * text changed after the report, and its context. Remove content hides it; Restore unhides it only when this report's own
- * Remove content hid it and no other report about it was acted on. user_reports.post_id is read only where it exists,
- * so the queue keeps working before the migration is applied and after its rollback.
+ * Remove content hid it, the post's hidden_at is still that hide's timestamp (the report's reviewed_at), and no other
+ * report about it was acted on (owner decision 2026-11-28). user_reports.post_id is read only where it exists, so the
+ * queue keeps working before the migration is applied and after its rollback.
  */
 
 // A server function is its handler for these tests: validate the input, then run it.
@@ -79,9 +80,14 @@ import {
   applyModerationAction,
   isMissingPostIdColumn,
   listReports,
-  postRestoreBlocker,
 } from "@/lib/moderation.functions";
 import { postBodyMd5, postEditedSinceReport } from "@/lib/post-fingerprint.server";
+import {
+  RESTORE_KEEPS_HIDDEN,
+  postRestoreBlocker,
+  restoreKeepsHidden,
+  timestampMicros,
+} from "@/lib/post-restore";
 
 const md5 = (s: string) => createHash("md5").update(s, "utf8").digest("hex");
 
@@ -89,6 +95,11 @@ const MISSING_POST_ID = {
   code: "42703",
   message: "column user_reports.post_id does not exist",
 };
+
+/** This report's Remove content: hidden_at and reviewed_at as PostgREST returns them, from one `now`. */
+const T_MINE = "2026-11-27T11:00:00.123+00:00";
+/** A later moment: a superadmin's or another moderator's hide, or a later change to this report. */
+const T_LATER = "2026-11-27T12:30:00.456+00:00";
 
 const report = (over: Record<string, unknown> = {}) => ({
   id: "11111111-1111-4111-8111-111111111111",
@@ -254,6 +265,40 @@ describe("listReports with post reports", () => {
     );
   });
 
+  it("tells a moderator before Restore when the post was hidden again after this report hid it", async () => {
+    const mine = report({
+      status: "resolved",
+      resolution_notes: "Post hidden — abuse",
+      reviewed_at: T_MINE,
+    });
+    const post = (hidden_at: string | null) => ({
+      id: "post-1",
+      body: "Tryouts Sunday",
+      posted_as: "person",
+      team_id: null,
+      org_id: null,
+      audience: "public",
+      hidden_at,
+      deleted_at: null,
+      moderation_status: "approved",
+    });
+    h.answers.user_reports = [
+      { data: [mine], error: null },
+      { data: [{ id: mine.id, post_id: "post-1" }], error: null },
+    ];
+    h.answers.posts = [{ data: [post(T_LATER)], error: null }];
+    const later = await listReports({ data: { status: "all", subjectType: "post" } });
+    expect(later.reports[0].post?.restoreKeepsHidden).toBe(RESTORE_KEEPS_HIDDEN.hiddenSince);
+
+    h.answers.user_reports = [
+      { data: [mine], error: null },
+      { data: [{ id: mine.id, post_id: "post-1" }], error: null },
+    ];
+    h.answers.posts = [{ data: [post(T_MINE)], error: null }];
+    const own = await listReports({ data: { status: "all", subjectType: "post" } });
+    expect(own.reports[0].post).toMatchObject({ hidden: true, restoreKeepsHidden: null });
+  });
+
   it("keeps a report whose post was deleted for good, without the post", async () => {
     h.answers.user_reports = [{ data: [report({ post_id: null })], error: null }];
     const out = await listReports({ data: { status: "new", subjectType: "all" } });
@@ -290,19 +335,66 @@ describe("listReports with post reports", () => {
 });
 
 describe("postRestoreBlocker and the text fingerprint", () => {
-  it("lets Restore unhide only what this report's own Remove content hid, while no other report was acted on", () => {
-    expect(
-      postRestoreBlocker({ resolutionNotes: "Post hidden — abuse", otherClosedReports: 0 }),
-    ).toBeNull();
-    expect(postRestoreBlocker({ resolutionNotes: "Post hidden", otherClosedReports: 1 })).toBe(
-      "another report about this post was acted on",
+  const own = {
+    resolutionNotes: "Post hidden — abuse",
+    reviewedAt: T_MINE,
+    hiddenAt: T_MINE,
+    otherClosedReports: 0,
+  };
+
+  it("lets Restore unhide only this report's own hide, while no other report was acted on", () => {
+    expect(postRestoreBlocker(own)).toBeNull();
+    expect(postRestoreBlocker({ ...own, resolutionNotes: "Post hidden" })).toBeNull();
+    expect(postRestoreBlocker({ ...own, otherClosedReports: 1 })).toBe(
+      RESTORE_KEEPS_HIDDEN.otherReport,
     );
-    expect(postRestoreBlocker({ resolutionNotes: "Warning issued", otherClosedReports: 0 })).toBe(
-      "this report did not hide it",
+    expect(postRestoreBlocker({ ...own, resolutionNotes: "Warning issued" })).toBe(
+      RESTORE_KEEPS_HIDDEN.notThisReport,
     );
-    expect(postRestoreBlocker({ resolutionNotes: null, otherClosedReports: 0 })).toBe(
-      "this report did not hide it",
+    expect(postRestoreBlocker({ ...own, resolutionNotes: null })).toBe(
+      RESTORE_KEEPS_HIDDEN.notThisReport,
     );
+  });
+
+  it("keeps a post hidden whose hidden_at is not exactly this report's reviewed_at", () => {
+    // a later hide (superadmin, another moderator)
+    expect(postRestoreBlocker({ ...own, hiddenAt: T_LATER })).toBe(
+      RESTORE_KEEPS_HIDDEN.hiddenSince,
+    );
+    // this report changed after its Remove content (a status change, a second action): fail safe
+    expect(postRestoreBlocker({ ...own, reviewedAt: T_LATER })).toBe(
+      RESTORE_KEEPS_HIDDEN.hiddenSince,
+    );
+    // a microsecond apart is not the same `now`
+    expect(postRestoreBlocker({ ...own, hiddenAt: "2026-11-27T11:00:00.123001+00:00" })).toBe(
+      RESTORE_KEEPS_HIDDEN.hiddenSince,
+    );
+    expect(postRestoreBlocker({ ...own, reviewedAt: null })).toBe(RESTORE_KEEPS_HIDDEN.hiddenSince);
+    expect(postRestoreBlocker({ ...own, hiddenAt: "not a time", reviewedAt: "not a time" })).toBe(
+      RESTORE_KEEPS_HIDDEN.hiddenSince,
+    );
+    // the same instant however PostgREST or toISOString spells it
+    expect(postRestoreBlocker({ ...own, reviewedAt: "2026-11-27T11:00:00.123Z" })).toBeNull();
+  });
+
+  it("says nothing before Restore about a post that is not hidden", () => {
+    expect(restoreKeepsHidden({ ...own, hiddenAt: null, resolutionNotes: null })).toBeNull();
+    expect(restoreKeepsHidden({ ...own, hiddenAt: T_LATER })).toBe(
+      RESTORE_KEEPS_HIDDEN.hiddenSince,
+    );
+  });
+
+  it("reads a timestamptz to the microsecond, whatever its spelling", () => {
+    const at = Date.parse("2026-11-27T11:00:00Z") * 1000;
+    expect(timestampMicros("2026-11-27T11:00:00Z")).toBe(at);
+    expect(timestampMicros("2026-11-27T11:00:00.123Z")).toBe(at + 123000);
+    expect(timestampMicros("2026-11-27T11:00:00.123+00:00")).toBe(at + 123000);
+    expect(timestampMicros("2026-11-27 11:00:00.123+00")).toBe(at + 123000);
+    expect(timestampMicros("2026-11-27T11:00:00.123456+00:00")).toBe(at + 123456);
+    expect(timestampMicros("2026-11-27T12:30:00.123+01:30")).toBe(at + 123000);
+    expect(timestampMicros("2026-11-27T11:00:00")).toBeNull();
+    expect(timestampMicros("yesterday")).toBeNull();
+    expect(timestampMicros(null)).toBeNull();
   });
 
   it("hashes a post's text as Postgres md5(text) does, and tells an edit apart", () => {
@@ -361,18 +453,51 @@ describe("applyModerationAction on a post report", () => {
     });
   });
 
-  const HIDDEN = { data: [{ id: "post-1", hidden_at: "2026-11-27T11:00:00Z" }], error: null };
+  const hiddenAt = (at: string | null) => ({
+    data: [{ id: "post-1", hidden_at: at }],
+    error: null,
+  });
+  /** This report, after its own Remove content: its notes, and reviewed_at = the hide's `now`. */
+  const mine = (over: Record<string, unknown> = {}) =>
+    report({
+      status: "resolved",
+      resolution_notes: "Post hidden — abuse",
+      reviewed_at: T_MINE,
+      ...over,
+    });
+  const OTHER_ID = "22222222-2222-4222-8222-222222222222";
+  /** Every write to posts, with all its filters. */
+  const postWrites = () =>
+    h.calls.filter((c) => c.table === "posts" && c.ops.some((o) => o[0] === "update"));
+  const staysHidden = (why: string) => `Access restored; the post stays hidden (${why})`;
+
+  it("Remove content writes one timestamp to the post's hidden_at and the report's reviewed_at", async () => {
+    h.answers.user_reports = [{ data: [report()], error: null }];
+    await act("remove_content");
+    const hide = updatesOf("posts")[0].set as { hidden_at: string };
+    const review = updatesOf("user_reports")[0].set as { reviewed_at: string };
+    expect(review.reviewed_at).toBe(hide.hidden_at);
+  });
 
   it("Restore unhides the post when this report's own Remove content hid it", async () => {
-    const mine = report({ status: "resolved", resolution_notes: "Post hidden — abuse" });
+    const r = mine();
     h.answers.user_reports = [
-      { data: [mine], error: null },
-      { data: [{ id: mine.id }], error: null },
+      { data: [r], error: null },
+      { data: [{ id: r.id }], error: null },
     ];
-    h.answers.posts = [HIDDEN];
+    h.answers.posts = [hiddenAt(T_MINE)];
     const out = await act("restore");
     expect(out.summary).toBe("Access and content restored");
-    expect(updatesOf("posts")).toEqual([{ set: { hidden_at: null }, where: ["id", "post-1"] }]);
+    expect(selectsOf("user_reports")[0]).toMatch(/\breviewed_at\b/);
+    // only while hidden_at still holds this report's hide
+    expect(postWrites().map((c) => c.ops)).toEqual([
+      [
+        ["update", { hidden_at: null }],
+        ["eq", "id", "post-1"],
+        ["eq", "hidden_at", T_MINE],
+        ["select", "id"],
+      ],
+    ]);
     expect(updatesOf("user_reports").at(-1)?.set).toMatchObject({ status: "dismissed" });
     expect(updatesOf("profiles")[0]).toMatchObject({
       set: { suspended_at: null, moderation_state: "active" },
@@ -380,18 +505,43 @@ describe("applyModerationAction on a post report", () => {
     });
   });
 
-  it("Restore on a weak second report leaves a post another report took down hidden", async () => {
-    const weak = report({ id: "22222222-2222-4222-8222-222222222222" });
+  it("Restore leaves a post hidden that a superadmin hid after this report's Remove content", async () => {
+    const r = mine();
     h.answers.user_reports = [
-      { data: [weak], error: null },
-      { data: [{ id: "11111111-1111-4111-8111-111111111111" }], error: null },
+      { data: [r], error: null },
+      { data: [{ id: r.id }], error: null },
     ];
-    h.answers.posts = [HIDDEN];
+    h.answers.posts = [hiddenAt(T_LATER)];
     const out = await act("restore");
-    expect(updatesOf("posts")).toEqual([]);
-    expect(out.summary).toBe(
-      "Access restored; the post stays hidden (another report about this post was acted on)",
-    );
+    expect(postWrites()).toEqual([]);
+    expect(out.summary).toBe(staysHidden(RESTORE_KEEPS_HIDDEN.hiddenSince));
+    expect(h.audit.mock.calls[0][2]).toMatchObject({
+      after: { summary: staysHidden(RESTORE_KEEPS_HIDDEN.hiddenSince) },
+    });
+  });
+
+  it("Restore leaves a post hidden that another moderator hid later through another report", async () => {
+    const r = mine();
+    h.answers.user_reports = [
+      { data: [r], error: null },
+      { data: [{ id: r.id }, { id: OTHER_ID }], error: null },
+    ];
+    h.answers.posts = [hiddenAt(T_LATER)];
+    const out = await act("restore");
+    expect(postWrites()).toEqual([]);
+    expect(out.summary).toBe(staysHidden(RESTORE_KEEPS_HIDDEN.otherReport));
+  });
+
+  it("Restore leaves the post hidden while another report about it is resolved, even with this report's own hide", async () => {
+    const r = mine();
+    h.answers.user_reports = [
+      { data: [r], error: null },
+      { data: [{ id: r.id }, { id: OTHER_ID }], error: null },
+    ];
+    h.answers.posts = [hiddenAt(T_MINE)];
+    const out = await act("restore");
+    expect(postWrites()).toEqual([]);
+    expect(out.summary).toBe(staysHidden(RESTORE_KEEPS_HIDDEN.otherReport));
     const acted = h.calls.filter((c) => c.table === "user_reports")[1];
     expect(acted.ops).toEqual([
       ["select", "id"],
@@ -400,27 +550,81 @@ describe("applyModerationAction on a post report", () => {
     ]);
   });
 
-  it("Restore leaves a post hidden that this report did not hide (a superadmin hide, say)", async () => {
+  it("Restore on a weak second report leaves a post another report took down hidden", async () => {
+    const weak = report({ id: OTHER_ID });
     h.answers.user_reports = [
-      { data: [report()], error: null },
-      { data: [], error: null },
+      { data: [weak], error: null },
+      { data: [{ id: "11111111-1111-4111-8111-111111111111" }], error: null },
     ];
-    h.answers.posts = [HIDDEN];
+    h.answers.posts = [hiddenAt(T_MINE)];
     const out = await act("restore");
-    expect(updatesOf("posts")).toEqual([]);
-    expect(out.summary).toBe(
-      "Access restored; the post stays hidden (this report did not hide it)",
-    );
+    expect(postWrites()).toEqual([]);
+    expect(out.summary).toBe(staysHidden(RESTORE_KEEPS_HIDDEN.otherReport));
   });
 
-  it("Restore leaves a post that is not hidden alone, and still restores access", async () => {
+  it("Restore leaves a post hidden that this report's notes do not say it hid, even at the same instant", async () => {
+    for (const notes of [null, "Warning issued — abuse", "Access and content restored"]) {
+      h.calls = [];
+      const r = mine({ resolution_notes: notes });
+      h.answers.user_reports = [
+        { data: [r], error: null },
+        { data: [{ id: r.id }], error: null },
+      ];
+      h.answers.posts = [hiddenAt(T_MINE)];
+      const out = await act("restore");
+      expect(postWrites()).toEqual([]);
+      expect(out.summary).toBe(staysHidden(RESTORE_KEEPS_HIDDEN.notThisReport));
+    }
+  });
+
+  it("Restore leaves the post hidden once this report's reviewed_at changed after its Remove content", async () => {
+    // a status change or a second action on the report re-stamps reviewed_at: the rule fails safe
+    const r = mine({ status: "escalated", reviewed_at: T_LATER });
     h.answers.user_reports = [
-      { data: [report()], error: null },
+      { data: [r], error: null },
       { data: [], error: null },
     ];
-    h.answers.posts = [{ data: [{ id: "post-1", hidden_at: null }], error: null }];
+    h.answers.posts = [hiddenAt(T_MINE)];
+    const out = await act("restore");
+    expect(postWrites()).toEqual([]);
+    expect(out.summary).toBe(staysHidden(RESTORE_KEEPS_HIDDEN.hiddenSince));
+  });
+
+  it("Restore keeps a hide made between its read and its write", async () => {
+    const r = mine();
+    h.answers.user_reports = [
+      { data: [r], error: null },
+      { data: [{ id: r.id }], error: null },
+    ];
+    // the read sees this report's hide; the guarded unhide then matches no row
+    h.answers.posts = [hiddenAt(T_MINE), { data: [], error: null }];
+    const out = await act("restore");
+    expect(postWrites()).toHaveLength(1);
+    expect(out.summary).toBe(staysHidden(RESTORE_KEEPS_HIDDEN.hiddenSince));
+  });
+
+  it("Restore says so when unhiding the post failed", async () => {
+    const r = mine();
+    h.answers.user_reports = [
+      { data: [r], error: null },
+      { data: [{ id: r.id }], error: null },
+    ];
+    h.answers.posts = [hiddenAt(T_MINE), { data: null, error: { message: "boom" } }];
+    const out = await act("restore");
+    expect(out.summary).toBe(staysHidden("unhiding it failed"));
+    expect(updatesOf("user_reports").at(-1)?.set).toMatchObject({ status: "dismissed" });
+  });
+
+  it("Restore writes nothing to a post that is already visible, and still restores access", async () => {
+    const r = mine();
+    h.answers.user_reports = [
+      { data: [r], error: null },
+      { data: [{ id: r.id }], error: null },
+    ];
+    h.answers.posts = [hiddenAt(null)];
     const out = await act("restore");
     expect(out.summary).toBe("Access and content restored");
+    expect(postWrites()).toEqual([]);
     expect(updatesOf("profiles")[0].where).toEqual(["id", "author"]);
   });
 

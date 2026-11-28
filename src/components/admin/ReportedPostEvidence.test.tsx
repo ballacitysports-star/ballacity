@@ -21,6 +21,7 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 
 import { ReportedPostEvidence, reportedPostState } from "./ReportedPostEvidence";
+import { RESTORE_KEEPS_HIDDEN, restoreKeepsHidden } from "@/lib/post-restore";
 
 const post = (over: Partial<ModerationPost> = {}): ModerationPost => ({
   id: "post-1",
@@ -110,5 +111,63 @@ describe("ReportedPostEvidence (moderation queue, post reports)", () => {
         /Restore lifts the author's suspension or ban and dismisses this report, but leaves the post hidden: another report about this post was acted on\./,
       ),
     ).toBeTruthy();
+  });
+
+  describe("what it says before Restore, from the same rule Restore runs (post-restore.ts)", () => {
+    /** This report's Remove content: hidden_at and reviewed_at from one `now`, as PostgREST returns them. */
+    const T_MINE = "2026-11-27T11:00:00.123+00:00";
+    const T_LATER = "2026-11-27T12:30:00.456+00:00";
+    const own: Parameters<typeof restoreKeepsHidden>[0] = {
+      resolutionNotes: "Post hidden — abuse",
+      reviewedAt: T_MINE,
+      hiddenAt: T_MINE,
+      otherClosedReports: 0,
+    };
+    const card = (over: Partial<typeof own>) => {
+      const input = { ...own, ...over };
+      show(
+        "post-1",
+        post({ hidden: !!input.hiddenAt, restoreKeepsHidden: restoreKeepsHidden(input) }),
+      );
+    };
+    const warning = (why: string) =>
+      `Restore lifts the author's suspension or ban and dismisses this report, but leaves the post hidden: ${why}.`;
+
+    it("warns of nothing when this report's own hide is the one Restore would undo", () => {
+      card({});
+      expect(screen.getByText(/Shared with: Followers · hidden/)).toBeTruthy();
+      expect(screen.queryByText(/leaves the post hidden/)).toBeNull();
+    });
+
+    it("warns that a later superadmin hide stays", () => {
+      card({ hiddenAt: T_LATER });
+      expect(screen.getByText(warning(RESTORE_KEEPS_HIDDEN.hiddenSince))).toBeTruthy();
+    });
+
+    it("warns that another moderator's later hide through another report stays", () => {
+      card({ hiddenAt: T_LATER, otherClosedReports: 1 });
+      expect(screen.getByText(warning(RESTORE_KEEPS_HIDDEN.otherReport))).toBeTruthy();
+    });
+
+    it("warns that the post stays hidden while another report about it is resolved", () => {
+      card({ otherClosedReports: 1 });
+      expect(screen.getByText(warning(RESTORE_KEEPS_HIDDEN.otherReport))).toBeTruthy();
+    });
+
+    it("warns that a hide this report's notes do not claim stays", () => {
+      card({ resolutionNotes: "Warning issued — abuse" });
+      expect(screen.getByText(warning(RESTORE_KEEPS_HIDDEN.notThisReport))).toBeTruthy();
+    });
+
+    it("warns that the post stays hidden once this report's reviewed_at changed after its hide", () => {
+      card({ reviewedAt: T_LATER });
+      expect(screen.getByText(warning(RESTORE_KEEPS_HIDDEN.hiddenSince))).toBeTruthy();
+    });
+
+    it("warns of nothing for a post that is already visible", () => {
+      card({ hiddenAt: null, resolutionNotes: null });
+      expect(screen.queryByText(/leaves the post hidden/)).toBeNull();
+      expect(screen.queryByText(/hidden/)).toBeNull();
+    });
   });
 });

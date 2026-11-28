@@ -4,6 +4,12 @@ import { z } from "zod";
 import type { AuditAction } from "@/lib/audit-actions";
 import { assertModerator } from "@/lib/moderation.server";
 import { postEditedSinceReport } from "@/lib/post-fingerprint.server";
+import {
+  POST_HIDDEN_SUMMARY,
+  RESTORE_KEEPS_HIDDEN,
+  postRestoreBlocker,
+  restoreKeepsHidden,
+} from "@/lib/post-restore";
 import { reportStatusesFor } from "@/lib/report-status";
 
 /** Canonical audit action for each moderation outcome. */
@@ -67,26 +73,6 @@ export function isMissingPostIdColumn(
     (error.code === "42703" || error.code === "PGRST204") &&
     /\bpost_(id|body_md5)\b/.test(error.message ?? "")
   );
-}
-
-/** The summary Remove content writes on a post report; Restore reads it back to know that this report hid the post. */
-export const POST_HIDDEN_SUMMARY = "Post hidden";
-
-/**
- * Why Restore on a post report must leave a hidden post hidden, or null when it may unhide it. Restore undoes what this
- * report did, so it unhides the post only when this report's own Remove content hid it (its notes start with
- * POST_HIDDEN_SUMMARY) and no other report about the same post has been resolved or actioned: a moderator dismissing a
- * weak second report never puts back a post another report (or a superadmin) took down.
- */
-export function postRestoreBlocker(input: {
-  resolutionNotes: string | null;
-  otherClosedReports: number;
-}): string | null {
-  if (input.otherClosedReports > 0) return "another report about this post was acted on";
-  if (!(input.resolutionNotes ?? "").startsWith(POST_HIDDEN_SUMMARY)) {
-    return "this report did not hide it";
-  }
-  return null;
 }
 
 /** Report statuses that mean a moderator acted on the report (report-status.ts: the Resolved queue). */
@@ -164,7 +150,7 @@ export type ModerationPost = {
   moderationStatus: string;
   /** The text changed after this report (true), is what was reported (false), or nobody can tell (null). */
   editedSinceReport: boolean | null;
-  /** While the post is hidden: why Restore on this report would leave it hidden (postRestoreBlocker), else null. */
+  /** While the post is hidden: why Restore on this report would leave it hidden (post-restore.ts), else null. */
   restoreKeepsHidden: string | null;
 };
 
@@ -326,12 +312,12 @@ export const listReports = createServerFn({ method: "GET" })
               deleted: !!post.deleted_at,
               moderationStatus: post.moderation_status,
               editedSinceReport: postEditedSinceReport(post.body, r.post_body_md5),
-              restoreKeepsHidden: post.hidden_at
-                ? postRestoreBlocker({
-                    resolutionNotes: r.resolution_notes,
-                    otherClosedReports: otherActedOn(r),
-                  })
-                : null,
+              restoreKeepsHidden: restoreKeepsHidden({
+                resolutionNotes: r.resolution_notes,
+                reviewedAt: r.reviewed_at,
+                hiddenAt: post.hidden_at,
+                otherClosedReports: otherActedOn(r),
+              }),
             }
           : null,
       };
@@ -401,7 +387,7 @@ export const applyModerationAction = createServerFn({ method: "POST" })
     await assertModerator(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const ACTION_COLUMNS =
-      "id, reported_id, subject_type, game_id, message_id, reel_id, reason, resolution_notes";
+      "id, reported_id, subject_type, game_id, message_id, reel_id, reason, resolution_notes, reviewed_at";
     const { data: found, error: rErr } = await withPostIdIfPresent((withPostId) =>
       looseFrom(supabaseAdmin, "user_reports")
         .select(withPostId ? `${ACTION_COLUMNS}, post_id` : ACTION_COLUMNS)
@@ -421,6 +407,7 @@ export const applyModerationAction = createServerFn({ method: "POST" })
       | "post_id"
       | "reason"
       | "resolution_notes"
+      | "reviewed_at"
     >;
 
     const reason = data.reason?.trim() || null;
@@ -464,7 +451,8 @@ export const applyModerationAction = createServerFn({ method: "POST" })
           .eq("id", report.reel_id);
         summary = "Reel hidden";
       } else if (report.subject_type === "post" && report.post_id) {
-        // The same hide the superadmin content queue uses (hidden_at, written with the service role).
+        // The same hide the superadmin content queue uses (hidden_at, written with the service role). hidden_at and
+        // this report's reviewed_at (below) take the same `now`: Restore unhides only while they still match.
         await looseFrom(supabaseAdmin, "posts").update({ hidden_at: now }).eq("id", report.post_id);
         summary = POST_HIDDEN_SUMMARY;
       } else {
@@ -501,7 +489,7 @@ export const applyModerationAction = createServerFn({ method: "POST" })
           .eq("id", report.reel_id);
       summary = "Access and content restored";
       if (report.post_id) {
-        // Restore undoes this report's own hide only, never one another report or a superadmin made.
+        // Restore undoes this report's own hide only (post-restore.ts), never one anyone else made after it.
         const [{ data: post }, { data: acted }] = await Promise.all([
           looseFrom(supabaseAdmin, "posts")
             .select("id, hidden_at")
@@ -512,20 +500,30 @@ export const applyModerationAction = createServerFn({ method: "POST" })
             .eq("post_id", report.post_id)
             .in("status", ACTED_ON_STATUSES),
         ]);
-        const blocker = (post as { hidden_at: string | null } | null)?.hidden_at
-          ? postRestoreBlocker({
-              resolutionNotes: report.resolution_notes,
-              otherClosedReports: ((acted ?? []) as { id: string }[]).filter(
-                (a) => a.id !== report.id,
-              ).length,
-            })
-          : null;
-        if (blocker) {
-          summary = `Access restored; the post stays hidden (${blocker})`;
-        } else {
-          await looseFrom(supabaseAdmin, "posts")
-            .update({ hidden_at: null })
-            .eq("id", report.post_id);
+        const hiddenAt = (post as { hidden_at: string | null } | null)?.hidden_at ?? null;
+        // A post that is not hidden (or is gone) is not written.
+        if (hiddenAt) {
+          let blocker = postRestoreBlocker({
+            resolutionNotes: report.resolution_notes,
+            reviewedAt: report.reviewed_at,
+            hiddenAt,
+            otherClosedReports: ((acted ?? []) as { id: string }[]).filter(
+              (a) => a.id !== report.id,
+            ).length,
+          });
+          if (!blocker) {
+            // Only while hidden_at still holds what was read: a hide made since then is kept.
+            const { data: unhidden, error: unhideErr } = await looseFrom(supabaseAdmin, "posts")
+              .update({ hidden_at: null })
+              .eq("id", report.post_id)
+              .eq("hidden_at", hiddenAt)
+              .select("id");
+            if (unhideErr) blocker = "unhiding it failed";
+            else if (!((unhidden ?? []) as unknown[]).length) {
+              blocker = RESTORE_KEEPS_HIDDEN.hiddenSince;
+            }
+          }
+          if (blocker) summary = `Access restored; the post stays hidden (${blocker})`;
         }
       }
     }
