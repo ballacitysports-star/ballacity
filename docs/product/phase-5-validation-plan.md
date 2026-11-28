@@ -7,7 +7,7 @@ Sources: the analytics, feedback, pilot and privacy maps and the critique, all a
 ## Status (2026-11-27)
 
 - Shipped to production: WP 5.0 to 5.6 and WP 5.9, with the follow-up migrations through `20261204110000` (release records batch 23 to batch 31).
-- Waiting: WP 5.7 and 5.8 wait for counsel. WP 5.10 runs weekly from pilot week 2.
+- Waiting: WP 5.7 and 5.8 wait for counsel. WP 5.10 runs weekly from pilot week 2. WP 5.4 counts as done only after one real push reaches a real phone (checklist A3, gate 4); the WP 5.6 and 5.9 acceptances are checked later (`docs/product/open-items.md`, "Checks to run later").
 - Open items, one register: `docs/product/open-items.md`. Whether the pilot can start: `docs/product/pilot-checklist.md`.
 - The sections below keep the plan and its as-built notes as written at the time. Short corrections in parentheses, checked on 2026-11-27, mark sentences that stopped being true.
 

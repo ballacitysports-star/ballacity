@@ -103,7 +103,7 @@ Production (ledger 430, fingerprint 3538 d61b6719):
 - **Legal documents (A4).** One live published version each of privacy, terms and cookie preferences, version 2026-09-11, real text with no placeholder or review markers. None names Google Analytics (see Needs counsel). `payment_policy`, `ai_disclosure` and `youth_policy` have no row (checked 2026-11-28), so A4 stays open (Needs the owner). Source: `checklist:19`; `plan:144`.
 - **Seed accounts (A9).** 0 `*@lovable.test` accounts. Source: `checklist:24`; `plan:149`.
 - **Free mode (A10).** `platformFreeMode` is true. Source: `checklist:25`.
-- **Funnel history (WP 5.3 acceptance, A13).** `private_sec.funnel_daily` has 11 rows through 2026-11-26, and the last 5 runs of `snapshot-funnel-daily` succeeded. Source: `plan:302`.
+- **Funnel history live (A13).** `private_sec.funnel_daily` has 11 rows through 2026-11-26, and the last 5 runs of `snapshot-funnel-daily` succeeded (read-only check 2026-11-27). This shows the nightly rows only, not the frozen-day half of the WP 5.3 acceptance. Source: `plan:302`.
 - **Pilot start date.** `funnel_pilot_start` is `{"date": null}`, so it is unset. The owner sets it (A2 above). Source: `batch-24:67`.
 - **Stale approved requests.** 0 approved requests with no roster row on upcoming games. There are 0 upcoming games. Source: `plan:433`, `:439`; `batch-28:36`; `20261129130000:64`; `20261204110000:67-71`.
 - **Decline trigger residual.** 0 pending invitations under a later decline. The deadlock path can still leave one, so read it again each batch. Source: `plan:456`.
@@ -112,7 +112,7 @@ Production (ledger 430, fingerprint 3538 d61b6719):
 
 Staging:
 
-- **Ledger and isolation (A7, gate 1).** All five SQL Editor versions (`20261112150000`, `20261113120000`, `20261114100000`, `20261114110000`, `20261114120000`) are in `schema_migrations` (ledger 81). The owner verified isolation on 2026-11-14. The "for the owner to check" line carried in batches 22 to 30 is stale and can be dropped from future records. Source: `checklist:22`; `plan:147`, `:647`; `docs/release/sandbox-verification.md:63`, `:67-69`; `batch-22:61` and later.
+- **Ledger and isolation (A7, gate 1).** All five SQL Editor versions (`20261112150000`, `20261113120000`, `20261114100000`, `20261114110000`, `20261114120000`) are in `schema_migrations` (ledger 81). The owner verified isolation on 2026-11-14. The "for the owner to check" line carried in batches 22 to 30 is stale and can be dropped from future records. Source: `checklist:22`; `plan:147`, `:647`; `docs/release/sandbox-verification.md:63`, `:67-69` (four versions; `20261114120000` from the read-only check 2026-11-27); `batch-22:61` and later.
 
 ## Built in this PR
 
@@ -186,12 +186,12 @@ Release records:
 - The #452 notice is reworded, `20261130100000` (`three-owner-decisions:85`).
 - `20261130110000` is applied at ledger 425 (`managed-notice-production:68`).
 - Cron run history retention is applied, and the other session's `20261202100000` is covered by batch 30 (`scheduled-jobs-health-production:87-90`).
-- The first runs of the guardian-link, age-cohort and handover-expiry sweeps: all jobs' last runs succeeded on 2026-11-27 (`guardian-links-end-at-18-production:61`; `20261128110000:63`).
+- The first runs of the guardian-link, age-cohort and handover-expiry sweeps: all jobs' last runs succeeded on 2026-11-27 (pg_cron status only; the age-cohort sweep's per-person result was not read). Source: `cron-run-history-retention-production:102-105`.
 - `purge-diagnostics`' first run is recorded in batch 28 (`batch-27:59`).
 
 Privacy gap register:
 
-- The header's "No privacy change is merged ... NO-GO" (`register:3`).
+- The header's "No privacy change is merged ... NO-GO" (`register:3`), for the adults-only pilot. The teen gate (B4) still depends on the register's open items.
 - PRIV-1 applied, covered by the catalog fingerprint (`register:28`, `:52`).
 - F03 and F04 applied, and F05's refusal is on `main` (`register:31`).
 - `sandbox_exec`: login disabled, no longer an open question (`register:34-44`).
