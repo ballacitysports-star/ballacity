@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
 import { restoreSession } from "./helpers/signed-in";
+import { PAY_FIXTURE_HOST_ID, servePayEntryReads } from "./helpers/pay-fixtures";
 
 /**
  * E2E: while a join request is still unapproved, the pay page must not let
@@ -25,7 +26,7 @@ test.skip(
 );
 
 const GAME_ID = "g2";
-const FAKE_HOST_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+const FAKE_HOST_ID = PAY_FIXTURE_HOST_ID;
 const METHOD_ID = "mock-method-venmo";
 const ENTRY_FEE = 15;
 
@@ -149,6 +150,10 @@ test("payment submission is blocked while join request is unapproved", async ({ 
       });
     },
   );
+
+  // The game row, the viewer's roster and removal reads and the guardian checks, answered here rather than by the
+  // shared staging project, whose slow reads kept the page on "Loading payment options…" (run 1440, 2026-11-28).
+  await servePayEntryReads(page, GAME_ID);
 
   await restoreSession(page);
   await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });

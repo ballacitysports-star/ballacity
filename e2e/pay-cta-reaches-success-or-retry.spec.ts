@@ -1,6 +1,11 @@
 import { test, expect, type Page } from "@playwright/test";
 import { restoreSession } from "./helpers/signed-in";
-import { PAY_FIXTURE_HOST_ID, payFixtureGameRow, serveFixtureGame } from "./helpers/pay-fixtures";
+import {
+  PAY_FIXTURE_HOST_ID,
+  answerPayEntryChecks,
+  payFixtureGameRow,
+  serveFixtureGame,
+} from "./helpers/pay-fixtures";
 import { stubRiskAcknowledged } from "./helpers/risk-ack";
 
 /**
@@ -47,20 +52,8 @@ async function mockEmptyLists(page: Page) {
   await page.route((url) => tableUrl(url, "host_payment_methods"), empty);
   await page.route((url) => tableUrl(url, "payment_methods"), empty);
   await page.route((url) => tableUrl(url, "game_participants"), empty);
-  // The viewer's removal record: none. Unanswered it is a real staging read inside the pay page's viewer lookups.
-  await page.route((url) => tableUrl(url, "game_removals"), empty);
-  // The guardian checks, as the database answers them for an adult. Unanswered, the pay page sent them to the shared
-  // staging project with no deadline, and while one hung the page showed "Loading payment options…" in place of both
-  // outcomes this spec asserts (run 1439, 2026-11-28).
-  for (const rpc of ["game_payment_guardian_ready", "game_manual_claim_guardian_ready"]) {
-    await page.route(
-      (url) => String(url).includes(`/rest/v1/rpc/${rpc}`),
-      async (route) => {
-        if (route.request().method() !== "POST") return route.fallback();
-        await route.fulfill({ status: 200, contentType: "application/json", body: "true" });
-      },
-    );
-  }
+  // The guardian checks and the removal read (see answerPayEntryChecks).
+  await answerPayEntryChecks(page);
   // The pay screen reads the host's methods through this RPC, not the table
   // above. Unanswered, it asked the real database for the real g2 host's
   // methods: what the "ready" screen showed, and how fast, depended on that.
