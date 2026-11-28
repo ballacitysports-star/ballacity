@@ -97,42 +97,56 @@ Restore undoes only what this report's own action did):
   restricted)". **Warn** never lowers a suspension or ban to a warning. If a write fails, the action fails and the
   report is not resolved.
 - Each of these records what it wrote in its audit entry: Remove content the `hidden_at` it wrote
-  (`after.hiddenAt`), Suspend or Ban the `suspended_at` it wrote on an account nobody had restricted
-  (`after.suspendedAt`). That is how Restore knows this report's own changes, whatever happened to the report since:
+  (`after.hiddenAt`); Suspend or Ban the `suspended_at` it wrote, on an account nobody had restricted or filled in
+  where it was empty (`after.suspendedAt`), the `moderation_state` it wrote, on an account nobody had restricted or
+  raised to a ban (`after.moderationState`), whether it found the account unrestricted (`after.fresh`), and when it ran
+  (`after.actedAt`). That is how Restore knows this report's own changes, whatever happened to the report since:
   a second action on it (Remove content then Warn or Ban, or the other way round), a status change, or an earlier
   Restore. A report acted on before this was recorded is judged by its notes ("Post hidden", "Account suspended",
   "Account banned") and its `reviewed_at`, which its action wrote from the same timestamp; anything that changed the
   report since keeps the change in place (fail safe).
 - **Restore** on a post report reads everything it needs first: the post, every report about the post and every report
   about the author that is not dismissed, the author's profile, and the audit entries of every moderation action about
-  the author. If any read fails it changes nothing, leaves the report as it was, and says "Couldn't read what this report
-  changed, so Restore changed nothing. Please try again."
+  the author. It reads every row of each list, page by page in id order, each page with an exact count of the rows still
+  to come, so a server that cuts a response short (PostgREST's max-rows) never hides a report that keeps a change: a
+  flood of reports about the author or the post cannot push it out. If any read fails, is cut short and cannot be read
+  on, or needs more than 25 pages of 1,000 rows, it changes nothing, leaves the report as it was, and says "Couldn't
+  read what this report changed, so Restore changed nothing. Please try again."
 
   It unhides the post only when this report owns the hide (an audit entry of its own Remove content holds exactly the
   post's `hidden_at`, or, for an older report, its notes start with "Post hidden" and `hidden_at` is exactly its
   `reviewed_at`, to the microsecond) and no other report keeps it: one resolved or actioned (as before), or one not
   dismissed that chose Remove content (its notes, or its audit entry).
 
-  It lifts the author's suspension or ban (clearing `suspended_at` and `suspended_reason`, and setting
-  `moderation_state` to 'active', or back to 'warned' while another report's warning stands) only by the same rule:
-  this report owns the suspension, and no other report not dismissed suspended or banned the author or chose to (its
-  notes, with or without "(it was already restricted)", or its audit entry). When this report's ownership comes from its
-  audit entry, its Suspend or Ban found the account unrestricted, so another report whose last change came before that
-  is left out: whatever it did had been lifted by then. An older report (notes only) counts every such report, however
-  old. With `suspended_at` already cleared but `moderation_state` still 'suspended' or 'banned' (a superadmin's lift
-  leaves it), Restore changes nothing and names no screen, since none resets it.
+  It clears the author's `suspended_at` and `suspended_reason` only by the same rule: this report owns the suspension
+  (its audit entry, or for an older report its notes and `reviewed_at`). It sets `moderation_state` to 'active' (or
+  back to 'warned' while another report's warning stands) only when this report's own action set it: its latest Suspend
+  or Ban that recorded a state wrote exactly the state the account has, and no other Suspend or Ban may have written it
+  since (one that recorded a state, or one that does not say, such as another kind of report's). An older report's own
+  ban, by its notes, resets the state as before. This also holds once `suspended_at` is cleared: a superadmin's Restore
+  account leaves `moderation_state` 'banned', which the database's gates still read, and Restore on the report whose
+  Ban set it resets it. A `suspended_at` this report filled in on an account already banned is cleared, and the ban
+  state, which was there before, stays (the summary says so). A suspension that is not this report's keeps everything,
+  its state included. Either way only while no other report not dismissed suspended or banned the author or chose to
+  (its notes, with or without "(it was already restricted)", or its audit entry); otherwise Restore is refused. When
+  every action this report owns by found the account unrestricted, another report whose last change came before is left
+  out: whatever it did had been lifted by then. Otherwise, and for an older report (notes only), every such report
+  counts, however old. A state Restore keeps names no screen, since none resets it.
 
   It clears a warning only when this report issued it (its notes start with "Warning issued", or its audit entry) and no
   other report not dismissed did, and only while the state is still 'warned'. (Restore on the other kinds of report is
   unchanged here.)
 
-  When this report owns a hide or suspension that another report keeps, Restore is refused: it changes nothing, leaves
-  the report as it is, and says why ("Restore changed nothing and left this report as it is. … Dismiss that report
-  first if its action no longer applies, then Restore this one again."). Restore on that other report dismisses it
-  when it owns nothing, so two stacked reports can be restored in either order. Otherwise Restore undoes what it may,
-  then marks the report dismissed and writes its summary into the notes, but only while the report is as Restore read
-  it (`reviewed_at` unchanged); if another moderator acted on it meanwhile, its status and notes stay, and the summary
-  says so. Each write applies only while `hidden_at`, `suspended_at` or `moderation_state` still holds the value Restore
+  When this report owns a hide, suspension or state that another report keeps, Restore is refused: it changes nothing,
+  leaves the report as it is, and says why ("Restore changed nothing and left this report as it is. … Dismiss that
+  report first if its action no longer applies, then Restore this one again."). Otherwise Restore undoes what it may.
+  Only when it undid something does it mark the report dismissed and write its summary into the notes, and only while
+  the report is as Restore read it (`reviewed_at` unchanged); if another moderator acted on it meanwhile, its status and
+  notes stay, and the summary says so. A Restore that undoes nothing leaves the report's status, notes and
+  `reviewed_at` as they are ("Restore left this report as it is."): the report keeps counting as one that acted, and a
+  later Restore can still undo its own action. So of two stacked reports, the one that owns nothing stays as it is when
+  restored; a moderator dismisses it (Dismiss on its card) once its action no longer applies, and Restore on the other
+  then undoes its own change. Each write applies only while `hidden_at`, `suspended_at` or `moderation_state` still holds the value Restore
   read, so a change made in between is kept; a post that is not hidden is not written at all. If a write fails, the
   report keeps its status and notes so Restore can run again. A report resolved between Restore's read and its write
   (a window of milliseconds) is not seen; the guarded writes do not cover a status-only change.
@@ -143,6 +157,10 @@ Restore undoes only what this report's own action did):
     ran", or "it was hidden again, or this report was updated, after this report hid it";
   - the account: "this report's latest action did not suspend or ban it", "it was already suspended or banned when this
     report's action ran", or "the suspension was changed, or this report was updated, after this report's action";
+  - the moderation state, once `suspended_at` is cleared: "The account stays banned: its suspension is lifted, but its
+    moderation state is still banned, and …" "this report's latest action did not suspend or ban it", "Restore cannot
+    tell that this report's own Suspend or Ban set it", "it was already suspended or banned when this report's action
+    ran", or "another action may have set it after this report's own Suspend or Ban";
   - the warning: "this report's latest action did not issue it", or "another report about this account that is not
     dismissed issued a warning".
 
@@ -151,7 +169,8 @@ Restore undoes only what this report's own action did):
   records what it cleared (`metadata.restore.lifted`: the post's `hidden_at`; the account's `suspended_at`,
   `suspended_reason` and `moderation_state`), and an account lift gets a second entry on the user. The card says before
   Restore runs when it would leave the post hidden, or that Restore changes nothing while another report keeps this
-  report's own hide; if the card cannot read what it needs, it says so (Restore checks again). A superadmin unhides such
+  report's own hide; if the card cannot read what it needs (a failed read, or a list cut short that it cannot read on),
+  it says so (Restore checks again). A superadmin unhides such
   a post from the content queue (`/superadmin`, Content, Network posts), and lifts a suspension on `/superadmin`, Users
   & profiles, Restore account (`superadminSuspendUser`, which clears `suspended_at` and `suspended_reason` only).
 

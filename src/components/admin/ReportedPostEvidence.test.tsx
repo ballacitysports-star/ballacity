@@ -105,7 +105,7 @@ describe("ReportedPostEvidence (moderation queue, post reports)", () => {
     show("post-1", post({ hidden: true, restoreKeepsHidden: RESTORE_KEEPS_HIDDEN.hiddenSince }));
     expect(
       screen.getByText(
-        "Restore dismisses this report but leaves the post hidden: it was hidden again, or this report was updated, after this report hid it. A superadmin unhides it on /superadmin, Content, Network posts.",
+        "Restore leaves the post hidden: it was hidden again, or this report was updated, after this report hid it. A superadmin unhides it on /superadmin, Content, Network posts.",
       ),
     ).toBeTruthy();
     // Restore on a post report lifts only this report's own suspension or ban: the card never promises a lift
@@ -131,7 +131,7 @@ describe("ReportedPostEvidence (moderation queue, post reports)", () => {
       );
     };
     const warning = (why: string) =>
-      `Restore dismisses this report but leaves the post hidden: ${why}. A superadmin unhides it on /superadmin, Content, Network posts.`;
+      `Restore leaves the post hidden: ${why}. A superadmin unhides it on /superadmin, Content, Network posts.`;
     /** Another report keeps this report's own hide: Restore is refused and the report stays as it is. */
     const refusal =
       "Restore changes nothing while another report about this post was acted on: this report's own hide stays, and so does the report. Dismiss that report first if its action no longer applies.";
@@ -155,7 +155,7 @@ describe("ReportedPostEvidence (moderation queue, post reports)", () => {
     it("says Restore changes nothing, and keeps the report, while another report keeps this report's own hide", () => {
       card({ otherReports: 1 });
       expect(screen.getByText(refusal)).toBeTruthy();
-      expect(screen.queryByText(/dismisses this report/)).toBeNull();
+      expect(screen.queryByText(/leaves the post hidden/)).toBeNull();
     });
 
     it("knows this report's own hide after a second action, from its audit entry", () => {

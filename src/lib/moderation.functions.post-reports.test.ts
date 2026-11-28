@@ -11,83 +11,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * before the migration is applied and after its rollback.
  */
 
-// A server function is its handler for these tests: validate the input, then run it.
-vi.mock("@tanstack/react-start", () => ({
-  createServerFn: () => {
-    let validate = (d: unknown) => d;
-    const b = {
-      middleware() {
-        return b;
-      },
-      inputValidator(fn: (d: unknown) => unknown) {
-        validate = fn;
-        return b;
-      },
-      handler(fn: (ctx: { data: unknown; context: unknown }) => unknown) {
-        return async (arg?: { data?: unknown }) =>
-          fn({ data: validate(arg?.data), context: { userId: "mod-1", supabase: {} } });
-      },
-    };
-    return b;
-  },
-}));
+vi.mock(
+  "@tanstack/react-start",
+  async () => (await import("@/lib/moderation-post-reports-test-mock")).reactStart,
+);
 vi.mock("@/integrations/supabase/auth-middleware", () => ({ requireSupabaseAuth: {} }));
-
-type Result = { data: unknown; error: { code?: string; message?: string } | null };
-type Call = { table: string; ops: [string, ...unknown[]][] };
-
-const h = vi.hoisted(() => ({
-  calls: [] as Call[],
-  /** Answers per table, in order; the last one repeats. */
-  answers: {} as Record<string, Result[]>,
-  assertModerator: vi.fn(async (..._args: unknown[]) => undefined),
-  audit: vi.fn(async (..._args: unknown[]) => undefined),
+vi.mock("@/lib/moderation.server", async () => ({
+  assertModerator: (await import("@/lib/moderation-post-reports-test-mock")).h.assertModerator,
 }));
-
-vi.mock("@/lib/moderation.server", () => ({ assertModerator: h.assertModerator }));
-vi.mock("@/lib/audit-log.server", () => ({ logAdminAction: h.audit }));
-vi.mock("@/integrations/supabase/client.server", () => {
-  const answer = (table: string): Result => {
-    const list = h.answers[table] ?? [];
-    return (list.length > 1 ? list.shift() : list[0]) ?? { data: [], error: null };
-  };
-  const supabaseAdmin = {
-    from(table: string) {
-      const call: Call = { table, ops: [] };
-      h.calls.push(call);
-      const q: Record<string, unknown> = {};
-      for (const m of [
-        "select",
-        "eq",
-        "neq",
-        "is",
-        "in",
-        "like",
-        "order",
-        "limit",
-        "update",
-        "insert",
-      ]) {
-        q[m] = (...args: unknown[]) => {
-          call.ops.push([m, ...args]);
-          return q;
-        };
-      }
-      q.maybeSingle = () => {
-        call.ops.push(["maybeSingle"]);
-        const r = answer(table);
-        return Promise.resolve({
-          ...r,
-          data: Array.isArray(r.data) ? (r.data[0] ?? null) : r.data,
-        });
-      };
-      q.then = (resolve: (r: Result) => unknown, reject?: (e: unknown) => unknown) =>
-        Promise.resolve(answer(table)).then(resolve, reject);
-      return q;
-    },
-  };
-  return { supabaseAdmin };
-});
+vi.mock("@/lib/audit-log.server", async () => ({
+  logAdminAction: (await import("@/lib/moderation-post-reports-test-mock")).h.audit,
+}));
+vi.mock("@/integrations/supabase/client.server", async () => ({
+  supabaseAdmin: (await import("@/lib/moderation-post-reports-test-mock")).supabaseAdmin,
+}));
 
 import { createHash } from "crypto";
 import {
@@ -101,6 +38,8 @@ import {
   RESTORE_KEEPS_ACCOUNT,
   RESTORE_KEEPS_HIDDEN,
   RESTORE_KEEPS_WARNING,
+  RESTORE_KEEPS_STATE,
+  RESTORE_LEFT_AS_IS,
   RESTORE_LEFT_REPORT,
   RESTORE_READ_FAILED,
   RESTORE_REFUSED_PREFIX,
@@ -113,6 +52,35 @@ import {
   restoreKeepsHidden,
   restoreRefusal,
 } from "@/lib/post-restore";
+import {
+  BOOM,
+  COUNT,
+  MINE_ID,
+  NONE,
+  OTHER_ID,
+  PAGE,
+  T_EARLIER,
+  T_LATER,
+  T_MINE,
+  anyWrites,
+  auditCall,
+  auditRow,
+  author,
+  banned,
+  freshRestrict,
+  h,
+  hiddenAt,
+  mine,
+  ok,
+  report,
+  reports,
+  resetMock,
+  row,
+  selectsOf,
+  updatesOf,
+  writesTo,
+  type Result,
+} from "@/lib/moderation-post-reports-test-mock";
 
 const md5 = (s: string) => createHash("md5").update(s, "utf8").digest("hex");
 
@@ -120,62 +88,6 @@ const MISSING_POST_ID = {
   code: "42703",
   message: "column user_reports.post_id does not exist",
 };
-
-/** An earlier moment: a superadmin's hide or suspension, or another report's action, before this report's. */
-const T_EARLIER = "2026-11-27T09:00:00.789+00:00";
-/** This report's action: the value it wrote and its reviewed_at as PostgREST returns them, from one `now`. */
-const T_MINE = "2026-11-27T11:00:00.123+00:00";
-/** A later moment: a superadmin's or another moderator's hide, or a later change to this report. */
-const T_LATER = "2026-11-27T12:30:00.456+00:00";
-
-const MINE_ID = "11111111-1111-4111-8111-111111111111";
-const OTHER_ID = "22222222-2222-4222-8222-222222222222";
-
-const report = (over: Record<string, unknown> = {}) => ({
-  id: MINE_ID,
-  subject_type: "post",
-  reason: "harassment",
-  details: "nasty",
-  status: "new",
-  created_at: "2026-11-27T10:00:00Z",
-  reviewed_at: null,
-  resolution_notes: null,
-  reporter_id: "reporter",
-  reported_id: "author",
-  game_id: null,
-  conversation_id: null,
-  message_id: null,
-  reel_id: null,
-  post_id: "post-1",
-  post_body_md5: md5("Tryouts Sunday"),
-  ...over,
-});
-
-/** An admin_audit_log row of a report's action, as Restore and the card read it back. */
-const auditRow = (
-  reportId: string,
-  action: string,
-  after: Record<string, unknown> = {},
-  createdAt = T_MINE,
-) => ({
-  action,
-  before: { reportId, reportReason: "harassment" },
-  after: { summary: "x", reportedUserId: "author", ...after },
-  created_at: createdAt,
-});
-
-const selectsOf = (table: string) =>
-  h.calls
-    .filter((c) => c.table === table)
-    .flatMap((c) => c.ops.filter((o) => o[0] === "select").map((o) => String(o[1])));
-const updatesOf = (table: string) =>
-  h.calls
-    .filter((c) => c.table === table)
-    .flatMap((c) => {
-      const update = c.ops.find((o) => o[0] === "update");
-      const eq = c.ops.find((o) => o[0] === "eq");
-      return update ? [{ set: update[1], where: eq?.slice(1) }] : [];
-    });
 
 const visiblePost = (hidden_at: string | null) => ({
   id: "post-1",
@@ -189,12 +101,7 @@ const visiblePost = (hidden_at: string | null) => ({
   moderation_status: "approved",
 });
 
-beforeEach(() => {
-  h.calls = [];
-  h.answers = {};
-  h.assertModerator.mockClear();
-  h.audit.mockClear();
-});
+beforeEach(resetMock);
 
 describe("listReports with post reports", () => {
   it("reads post_id and shows the reported post with its context", async () => {
@@ -263,14 +170,6 @@ describe("listReports with post reports", () => {
   });
 
   /** This report, after its own Remove content: its notes, and reviewed_at = the hide's `now`. */
-  const mine = (over: Record<string, unknown> = {}) =>
-    report({
-      status: "resolved",
-      resolution_notes: "Post hidden — abuse",
-      reviewed_at: T_MINE,
-      ...over,
-    });
-
   it("tells a moderator before Restore that another report keeps this report's own hide", async () => {
     const r = mine();
     h.answers.user_reports = [
@@ -288,16 +187,18 @@ describe("listReports with post reports", () => {
     const out = await listReports({ data: { status: "new", subjectType: "post" } });
     const others = h.calls.filter((c) => c.table === "user_reports")[1];
     expect(others.ops).toEqual([
-      ["select", "id, post_id, status, resolution_notes"],
+      ["select", "id, post_id, status, resolution_notes", COUNT],
       ["in", "post_id", ["post-1"]],
       ["neq", "status", "dismissed"],
+      ...PAGE,
     ]);
     const audit = h.calls.find((c) => c.table === "admin_audit_log");
     expect(audit?.ops).toEqual([
-      ["select", "action, before, after, created_at"],
+      ["select", "id, action, before, after, created_at", COUNT],
       ["eq", "action", "content.remove"],
       ["eq", "target_type", "post"],
       ["in", "target_id", ["post-1"]],
+      ...PAGE,
     ]);
     expect(out.reports[0].post?.restoreKeepsHidden).toBe(RESTORE_KEEPS_HIDDEN.otherReport);
   });
@@ -391,6 +292,47 @@ describe("listReports with post reports", () => {
     h.answers.posts = [{ data: [visiblePost(null)], error: null }];
     const visible = await listReports({ data: { status: "all", subjectType: "post" } });
     expect(visible.reports[0].post?.restoreKeepsHidden).toBeNull();
+  });
+
+  it("says it could not check when a list it reads was cut short and the rest cannot be read, and reads on when it can", async () => {
+    const r = mine();
+    const cut = {
+      data: [
+        {
+          id: "aaaaaaaa-0000-4000-8000-000000000001",
+          post_id: "post-1",
+          status: "new",
+          resolution_notes: null,
+        },
+      ],
+      error: null,
+      count: 2,
+    };
+    for (const [answers, keeps] of [
+      // the rest of the post's reports never comes
+      [[cut, { data: [], error: null, count: 1 }], RESTORE_CHECK_FAILED],
+      // the rest comes on the next page: a resolved report that keeps this report's own hide
+      [
+        [
+          cut,
+          {
+            data: [
+              { id: OTHER_ID, post_id: "post-1", status: "resolved", resolution_notes: "dup" },
+            ],
+            error: null,
+            count: 1,
+          },
+        ],
+        RESTORE_KEEPS_HIDDEN.otherReport,
+      ],
+    ] as const) {
+      h.calls = [];
+      h.answers.user_reports = [{ data: [r], error: null }, ...answers];
+      h.answers.posts = [{ data: [visiblePost(T_MINE)], error: null }];
+      h.answers.admin_audit_log = [{ data: [], error: null }];
+      const out = await listReports({ data: { status: "all", subjectType: "post" } });
+      expect(out.reports[0].post?.restoreKeepsHidden).toBe(keeps);
+    }
   });
 
   it("tells a moderator before Restore when the post was hidden again after this report hid it", async () => {
@@ -497,15 +439,7 @@ describe("applyModerationAction on a post report", () => {
   const act = (action: string, reportId = MINE_ID) =>
     applyModerationAction({ data: { reportId, action, reason: "abuse" } });
 
-  /** Every write to a table, with all its filters. */
-  const writesTo = (table: string) =>
-    h.calls.filter((c) => c.table === table && c.ops.some((o) => o[0] === "update"));
   const postWrites = () => writesTo("posts");
-  const anyWrites = () => h.calls.filter((c) => c.ops.some((o) => o[0] === "update"));
-  const ok = (rows: unknown[] = [{ id: "x" }]) => ({ data: rows, error: null });
-  const NONE = ok([]);
-  const BOOM = { data: null, error: { message: "boom" } };
-  const auditCall = (i = 0) => h.audit.mock.calls[i][2] as Record<string, unknown>;
 
   describe("Remove content", () => {
     it("hides a post that is not hidden yet, resolves the report, and records the hide it wrote", async () => {
@@ -589,7 +523,13 @@ describe("applyModerationAction on a post report", () => {
       expect(updatesOf("user_reports")[0].set).toMatchObject({ reviewed_at: set.suspended_at });
       expect(auditCall()).toMatchObject({
         action: "user.ban",
-        after: { summary: "Account banned", suspendedAt: set.suspended_at },
+        after: {
+          summary: "Account banned",
+          suspendedAt: set.suspended_at,
+          moderationState: "banned",
+          fresh: true,
+          actedAt: set.suspended_at,
+        },
       });
     });
 
@@ -625,9 +565,30 @@ describe("applyModerationAction on a post report", () => {
         ["in", "moderation_state", ["active", "warned", "suspended"]],
         ["select", "id"],
       ]);
+      // it wrote the ban state (raised), not the suspension: Restore may undo only that
       expect(auditCall().after).toEqual({
         summary: "Account banned (it was already restricted)",
         reportedUserId: "author",
+        moderationState: "banned",
+        fresh: false,
+        actedAt: expect.any(String),
+      });
+    });
+
+    it("Ban on an author still banned with suspended_at cleared fills it in, and records that it wrote it", async () => {
+      // a superadmin's Restore account cleared suspended_at and left 'banned'
+      h.answers.user_reports = [{ data: [report()], error: null }];
+      h.answers.profiles = [NONE, ok(), NONE];
+      const out = await act("ban");
+      expect(out.summary).toBe("Account banned (it was already restricted)");
+      const filled = (writesTo("profiles")[1].ops[0][1] as { suspended_at: string }).suspended_at;
+      // its own suspended_at, which its Restore may lift; not the ban state, which was there before
+      expect(auditCall().after).toEqual({
+        summary: "Account banned (it was already restricted)",
+        reportedUserId: "author",
+        suspendedAt: filled,
+        fresh: false,
+        actedAt: filled,
       });
     });
 
@@ -638,6 +599,13 @@ describe("applyModerationAction on a post report", () => {
       expect(out.summary).toBe("Account suspended (it was already restricted)");
       const raise = writesTo("profiles")[2].ops;
       expect(raise).toContainEqual(["in", "moderation_state", ["active", "warned"]]);
+      // it wrote nothing, and says so
+      expect(auditCall().after).toEqual({
+        summary: "Account suspended (it was already restricted)",
+        reportedUserId: "author",
+        fresh: false,
+        actedAt: expect.any(String),
+      });
     });
 
     it("Suspend or Ban fails without resolving the report when a write fails", async () => {
@@ -679,48 +647,13 @@ describe("applyModerationAction on a post report", () => {
   });
 
   describe("Restore", () => {
-    /** The author's profile as Restore reads it. */
-    const author = (suspended_at: string | null, moderation_state: string) =>
-      ok([
-        {
-          id: "author",
-          suspended_at,
-          suspended_reason: suspended_at ? "abuse" : null,
-          moderation_state,
-        },
-      ]);
     const ACTIVE = author(null, "active");
-    /** This report, after its own Remove content: its notes, and reviewed_at = the hide's `now`. */
-    const mine = (over: Record<string, unknown> = {}) =>
-      report({
-        status: "resolved",
-        resolution_notes: "Post hidden — abuse",
-        reviewed_at: T_MINE,
-        ...over,
-      });
-    const row = (
-      id: string,
-      status: string,
-      notes: string | null,
-      reviewed_at: string | null = T_LATER,
-    ) => ({
-      id,
-      status,
-      resolution_notes: notes,
-      reviewed_at,
-    });
-    /**
-     * Restore's answers for user_reports: the report, the post's reports (not dismissed), the author's reports (not
-     * dismissed), then the guarded update of the report.
-     */
-    const reports = (
-      r: { id: string },
-      postRows: unknown[] = [],
-      accountRows: unknown[] = [],
-      update: Result = ok([{ id: r.id }]),
-    ) => [ok([r]), ok(postRows), ok(accountRows), update];
-    const hiddenAt = (at: string | null) => ok([{ id: "post-1", hidden_at: at }]);
-    const nothingUndone = (...kept: string[]) => ["Nothing undone.", ...kept].join(" ");
+    /** A Restore that undid nothing: it leaves the report as it is, so it can still undo its own action later. */
+    const nothingUndone = (...kept: string[]) =>
+      ["Nothing undone.", ...kept, RESTORE_LEFT_AS_IS].join(" ");
+    /** A Restore whose write failed: the report stays as it was, so Restore can run again. */
+    const writeFailed = (...kept: string[]) =>
+      ["Nothing undone.", ...kept, RESTORE_LEFT_REPORT].join(" ");
     const reportUpdate = () => writesTo("user_reports").at(-1);
 
     it("unhides the post when this report's own Remove content hid it, then dismisses the report while it is as read", async () => {
@@ -775,20 +708,24 @@ describe("applyModerationAction on a post report", () => {
       h.answers.posts = [hiddenAt(null)];
       await act("restore");
       const [, postReads, accountReads] = h.calls.filter((c) => c.table === "user_reports");
+      // every row of each list, page by page, each page counted (readAllRows)
       expect(postReads.ops).toEqual([
-        ["select", "id, status, resolution_notes"],
+        ["select", "id, status, resolution_notes", COUNT],
         ["eq", "post_id", "post-1"],
         ["neq", "status", "dismissed"],
+        ...PAGE,
       ]);
       expect(accountReads.ops).toEqual([
-        ["select", "id, status, resolution_notes, reviewed_at"],
+        ["select", "id, status, resolution_notes, reviewed_at", COUNT],
         ["eq", "reported_id", "author"],
         ["neq", "status", "dismissed"],
+        ...PAGE,
       ]);
       expect(h.calls.find((c) => c.table === "admin_audit_log")?.ops).toEqual([
-        ["select", "action, before, after, created_at"],
+        ["select", "id, action, before, after, created_at", COUNT],
         ["eq", "after->>reportedUserId", "author"],
         ["in", "action", ["content.remove", "user.suspend", "user.ban", "user.warn"]],
+        ...PAGE,
       ]);
       expect(selectsOf("profiles")[0]).toBe("id, suspended_at, suspended_reason, moderation_state");
     });
@@ -800,8 +737,12 @@ describe("applyModerationAction on a post report", () => {
       expect(postWrites()).toEqual([]);
       const summary = nothingUndone(keptPostSentence(RESTORE_KEEPS_HIDDEN.hiddenSince));
       expect(out.summary).toBe(summary);
-      expect(auditCall()).toMatchObject({ after: { summary } });
-      expect(reportUpdate()?.ops[0][1]).toMatchObject({ status: "dismissed" });
+      expect(auditCall()).toMatchObject({
+        after: { summary },
+        metadata: { restore: { lifted: [], reportUpdated: false } },
+      });
+      // nothing undone: the report keeps its status, notes and reviewed_at
+      expect(writesTo("user_reports")).toEqual([]);
     });
 
     it("leaves a hide that was there before this report's Remove content (superadmin at T0, Remove content at T1)", async () => {
@@ -815,7 +756,7 @@ describe("applyModerationAction on a post report", () => {
       expect(out.summary).toBe(nothingUndone(keptPostSentence(RESTORE_KEEPS_HIDDEN.alreadyHidden)));
     });
 
-    it("leaves a post hidden that this report's latest action did not hide, and dismisses the report", async () => {
+    it("leaves a post hidden that this report's latest action did not hide, and the report as it is", async () => {
       for (const notes of [null, "Warning issued — abuse", "Post unhidden."]) {
         h.calls = [];
         h.answers.user_reports = reports(mine({ resolution_notes: notes }));
@@ -825,7 +766,7 @@ describe("applyModerationAction on a post report", () => {
         expect(out.summary).toBe(
           nothingUndone(keptPostSentence(RESTORE_KEEPS_HIDDEN.notThisReport)),
         );
-        expect(reportUpdate()?.ops[0][1]).toMatchObject({ status: "dismissed" });
+        expect(writesTo("user_reports")).toEqual([]);
       }
     });
 
@@ -892,7 +833,7 @@ describe("applyModerationAction on a post report", () => {
           [row(OTHER_ID, "escalated", "Account banned (it was already restricted) — x")],
         );
         h.answers.profiles = [author(T_MINE, "banned")];
-        h.answers.admin_audit_log = [ok([auditRow(r.id, "user.ban", { suspendedAt: T_MINE })])];
+        h.answers.admin_audit_log = [ok([freshRestrict(r.id, T_MINE)])];
         await expect(act("restore")).rejects.toThrow(
           restoreRefusal([`The account stays banned: ${RESTORE_KEEPS_ACCOUNT.otherReport}.`]),
         );
@@ -908,7 +849,7 @@ describe("applyModerationAction on a post report", () => {
           nothingUndone(keptAccountSentence("banned", RESTORE_KEEPS_ACCOUNT.notThisReport)),
         );
         expect(writesTo("profiles")).toEqual([]);
-        expect(reportUpdate()?.ops[0][1]).toMatchObject({ status: "dismissed" });
+        expect(writesTo("user_reports")).toEqual([]);
       });
 
       it("refuses by another report's audit entry when a later action replaced its notes", async () => {
@@ -921,7 +862,7 @@ describe("applyModerationAction on a post report", () => {
         h.answers.profiles = [author(T_MINE, "suspended")];
         h.answers.admin_audit_log = [
           ok([
-            auditRow(r.id, "user.suspend", { suspendedAt: T_MINE }),
+            freshRestrict(r.id, T_MINE, "user.suspend"),
             auditRow(OTHER_ID, "user.ban", {}, T_LATER),
           ]),
         ];
@@ -930,7 +871,7 @@ describe("applyModerationAction on a post report", () => {
       });
 
       it("undoes nothing of a stacked pair until the other is dismissed, in either order", async () => {
-        // ME hid the post at T_MINE; OTHER's later Remove content found it hidden. Restore OTHER first, then ME.
+        // ME hid the post at T_MINE; OTHER's later Remove content found it hidden.
         const me = mine();
         const other = mine({
           id: OTHER_ID,
@@ -941,26 +882,27 @@ describe("applyModerationAction on a post report", () => {
           row(me.id, "resolved", me.resolution_notes),
           row(OTHER_ID, "resolved", other.resolution_notes),
         ];
+        // Restore OTHER first: it owns nothing, so nothing is undone and OTHER stays as it is (still resolved)
         h.answers.user_reports = reports(other, both);
         h.answers.posts = [hiddenAt(T_MINE)];
         const first = await act("restore", OTHER_ID);
         expect(first.summary).toBe(
           nothingUndone(keptPostSentence(RESTORE_KEEPS_HIDDEN.alreadyHidden)),
         );
-        expect(postWrites()).toEqual([]);
-        expect(reportUpdate()?.ops).toContainEqual(["eq", "id", OTHER_ID]);
+        expect(anyWrites()).toEqual([]);
 
-        h.calls = [];
-        h.answers.user_reports = reports(me, [both[0]]);
-        h.answers.posts = [hiddenAt(T_MINE), ok()];
-        expect((await act("restore")).summary).toBe("Post unhidden.");
-
-        // the other order: ME is refused and stays as it is, OTHER is dismissed, then ME undoes its hide
+        // so ME is still refused while OTHER stands, and changes nothing
         h.calls = [];
         h.answers.user_reports = reports(me, both);
         h.answers.posts = [hiddenAt(T_MINE)];
         await expect(act("restore")).rejects.toThrow(RESTORE_REFUSED_PREFIX);
         expect(anyWrites()).toEqual([]);
+
+        // once a moderator dismisses OTHER (it is no longer read), ME undoes its own hide
+        h.calls = [];
+        h.answers.user_reports = reports(me, [both[0]]);
+        h.answers.posts = [hiddenAt(T_MINE), ok()];
+        expect((await act("restore")).summary).toBe("Post unhidden.");
       });
     });
 
@@ -989,7 +931,7 @@ describe("applyModerationAction on a post report", () => {
         h.answers.admin_audit_log = [
           ok([
             auditRow(r.id, "content.remove", { hiddenAt: T_MINE }),
-            auditRow(r.id, "user.ban", { suspendedAt: T_LATER }, T_LATER),
+            freshRestrict(r.id, T_LATER),
           ]),
         ];
         expect((await act("restore")).summary).toBe("Ban lifted, post unhidden.");
@@ -1002,7 +944,7 @@ describe("applyModerationAction on a post report", () => {
         h.answers.posts = [hiddenAt(T_LATER), ok()];
         h.answers.admin_audit_log = [
           ok([
-            auditRow(r.id, "user.ban", { suspendedAt: T_MINE }),
+            freshRestrict(r.id, T_MINE),
             auditRow(r.id, "content.remove", { hiddenAt: T_LATER }, T_LATER),
           ]),
         ];
@@ -1037,9 +979,7 @@ describe("applyModerationAction on a post report", () => {
         h.answers.user_reports = reports(mine());
         h.answers.posts = [hiddenAt(T_MINE), BOOM];
         const out = await act("restore");
-        expect(out.summary).toBe(
-          `${nothingUndone(keptPostSentence("unhiding it failed"))} ${RESTORE_LEFT_REPORT}`,
-        );
+        expect(out.summary).toBe(writeFailed(keptPostSentence("unhiding it failed")));
         expect(writesTo("user_reports")).toEqual([]);
         expect(auditCall()).toMatchObject({
           metadata: { restore: { lifted: [], reportUpdated: false } },
@@ -1067,28 +1007,31 @@ describe("applyModerationAction on a post report", () => {
       });
 
       it("guards a report never reviewed on reviewed_at being empty", async () => {
+        // its audit entry shows its own hide, though reviewed_at is empty
         h.answers.user_reports = reports(report());
-        h.answers.posts = [hiddenAt(null)];
+        h.answers.posts = [hiddenAt(T_MINE), ok()];
+        h.answers.admin_audit_log = [
+          ok([auditRow(MINE_ID, "content.remove", { hiddenAt: T_MINE })]),
+        ];
         const out = await act("restore");
-        expect(out.summary).toBe("Nothing to undo.");
+        expect(out.summary).toBe("Post unhidden.");
         expect(reportUpdate()?.ops).toContainEqual(["is", "reviewed_at", null]);
       });
 
-      it("writes nothing to a post that is already visible", async () => {
+      it("writes nothing to a post that is already visible, and leaves the report as it is", async () => {
         h.answers.user_reports = reports(mine());
         h.answers.profiles = [ACTIVE];
         h.answers.posts = [hiddenAt(null)];
         const out = await act("restore");
-        expect(out.summary).toBe("Nothing to undo.");
-        expect(postWrites()).toEqual([]);
-        expect(writesTo("profiles")).toEqual([]);
+        expect(out.summary).toBe(`Nothing to undo. ${RESTORE_LEFT_AS_IS}`);
+        expect(anyWrites()).toEqual([]);
+        expect(auditCall()).toMatchObject({
+          metadata: { restore: { lifted: [], reportUpdated: false } },
+        });
       });
     });
 
     describe("the author's account (only this report's own Suspend or Ban is lifted)", () => {
-      /** This report, after its own Ban: notes, and reviewed_at = suspended_at = the ban's `now`. */
-      const banned = (over: Record<string, unknown> = {}) =>
-        mine({ resolution_notes: "Account banned — abuse", ...over });
       const keptBan = (why: string) => keptAccountSentence("banned", why);
       const liftOps = (to = "active", state = "banned") => [
         ["update", { suspended_at: null, suspended_reason: null, moderation_state: to }],
@@ -1184,7 +1127,7 @@ describe("applyModerationAction on a post report", () => {
           [row(OTHER_ID, "resolved", "Account banned — months ago", T_EARLIER)],
         );
         h.answers.profiles = [author(T_MINE, "banned"), ok()];
-        h.answers.admin_audit_log = [ok([auditRow(r.id, "user.ban", { suspendedAt: T_MINE })])];
+        h.answers.admin_audit_log = [ok([freshRestrict(r.id, T_MINE)])];
         expect((await act("restore")).summary).toBe("Ban lifted.");
       });
 
@@ -1226,12 +1169,15 @@ describe("applyModerationAction on a post report", () => {
         }
       });
 
-      it("keeps a ban whose suspension a superadmin lifted (still 'banned', suspended_at cleared), and names no screen", async () => {
+      it("keeps a ban whose suspension a superadmin lifted when only its notes claim it (still 'banned'), and names no screen", async () => {
         h.answers.user_reports = reports(banned());
         h.answers.profiles = [author(null, "banned")];
         const out = await act("restore");
         expect(writesTo("profiles")).toEqual([]);
-        expect(out.summary).toBe(nothingUndone(keptStateSentence("banned")));
+        expect(out.summary).toBe(
+          nothingUndone(keptStateSentence("banned", RESTORE_KEEPS_STATE.unknown)),
+        );
+        expect(out.summary).not.toMatch(/superadmin|Restore account/);
       });
 
       it("keeps a ban or lift made between its read and its write", async () => {
@@ -1247,9 +1193,7 @@ describe("applyModerationAction on a post report", () => {
         h.answers.user_reports = reports(banned());
         h.answers.profiles = [author(T_MINE, "banned"), BOOM];
         const out = await act("restore");
-        expect(out.summary).toBe(
-          `${nothingUndone(keptBan("lifting it failed"))} ${RESTORE_LEFT_REPORT}`,
-        );
+        expect(out.summary).toBe(writeFailed(keptBan("lifting it failed")));
         expect(writesTo("user_reports")).toEqual([]);
       });
 
@@ -1296,9 +1240,7 @@ describe("applyModerationAction on a post report", () => {
         h.answers.user_reports = reports(mine({ resolution_notes: "Warning issued" }));
         h.answers.profiles = [author(null, "warned"), BOOM];
         const out = await act("restore");
-        expect(out.summary).toBe(
-          `${nothingUndone(keptWarningSentence("clearing it failed"))} ${RESTORE_LEFT_REPORT}`,
-        );
+        expect(out.summary).toBe(writeFailed(keptWarningSentence("clearing it failed")));
         expect(writesTo("user_reports")).toEqual([]);
       });
 
@@ -1311,7 +1253,7 @@ describe("applyModerationAction on a post report", () => {
         expect(h.calls.some((c) => c.table === "posts")).toBe(false);
         expect(writesTo("profiles")).toEqual([]);
         expect(out.summary).toBe(nothingUndone(keptBan(RESTORE_KEEPS_ACCOUNT.notThisReport)));
-        expect(reportUpdate()?.ops[0][1]).toMatchObject({ status: "dismissed" });
+        expect(writesTo("user_reports")).toEqual([]);
       });
     });
 

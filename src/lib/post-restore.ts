@@ -9,6 +9,11 @@
  * lose its earlier action. A report acted on before that was recorded owns a change by its notes and reviewed_at, as
  * before. Remove content, Suspend and Ban never overwrite a hide or suspension that is already there, so a report never
  * takes over a change someone else made.
+ *
+ * Suspend and Ban also record the moderation_state they wrote (after.moderationState), whether they found the account
+ * unrestricted (after.fresh), and when they ran (after.actedAt). A superadmin's lift clears suspended_at and leaves
+ * moderation_state, which the database's gates still read; Restore resets that state only when this report's own
+ * action wrote it and nothing else may have written it since (stateOwnership).
  */
 
 /** The summary Remove content writes on a post report when it hid the post. */
@@ -44,6 +49,12 @@ export const REPORT_ACTION_AUDITS = [
 /** Report statuses that mean a moderator acted on the report (report-status.ts: the Resolved queue). */
 export const ACTED_ON_STATUSES = ["resolved", "actioned"] as const;
 
+/** A profile in these states is restricted, as the database's own gates read it (with suspended_at set or not). */
+export const RESTRICTED_STATES: readonly string[] = ["suspended", "banned"];
+
+/** The audit actions that may write moderation_state to suspended or banned. */
+const RESTRICTING_AUDITS: readonly string[] = ["user.suspend", "user.ban"];
+
 /**
  * Why Restore leaves a hidden post hidden, in the words the summary and the queue card both use. Each is true whenever
  * it is given. notThisReport says "latest action": a report acted on before its actions were recorded in the audit log
@@ -63,6 +74,17 @@ export const RESTORE_KEEPS_ACCOUNT = {
   alreadyRestricted: "it was already suspended or banned when this report's action ran",
   changedSince:
     "the suspension was changed, or this report was updated, after this report's action",
+} as const;
+
+/**
+ * Why Restore on a post report leaves the author's moderation_state 'suspended' or 'banned' once suspended_at is cleared
+ * (a superadmin's lift, or this Restore's lift of a suspended_at this report filled in on an account already banned).
+ */
+export const RESTORE_KEEPS_STATE = {
+  notThisReport: "this report's latest action did not suspend or ban it",
+  unknown: "Restore cannot tell that this report's own Suspend or Ban set it",
+  already: "it was already suspended or banned when this report's action ran",
+  changedSince: "another action may have set it after this report's own Suspend or Ban",
 } as const;
 
 /** Why Restore on a post report leaves the author's warning in place. */
@@ -86,6 +108,9 @@ export const RESTORE_REPORT_CHANGED =
 /** Restore's update of the report failed: what it undid stays undone, and the report keeps its status and notes. */
 export const RESTORE_REPORT_UPDATE_FAILED =
   "Couldn't update this report, so its status and notes were left as they are.";
+
+/** A Restore that undid nothing leaves the report as it is, so it keeps counting, and can undo its own action later. */
+export const RESTORE_LEFT_AS_IS = "Restore left this report as it is.";
 
 /** How a refused Restore starts: this report's own action is in force, but another report stands behind it. */
 export const RESTORE_REFUSED_PREFIX = "Restore changed nothing and left this report as it is.";
@@ -125,8 +150,17 @@ export type ReportAction = {
   action: string;
   /** The hidden_at this action's Remove content wrote; null when it wrote none (or before this was recorded). */
   hiddenAt: string | null;
-  /** The suspended_at this action's Suspend or Ban wrote on an unrestricted account; null otherwise. */
+  /** The suspended_at this action's Suspend or Ban wrote (on an unrestricted account, or filled in); null otherwise. */
   suspendedAt: string | null;
+  /** The moderation_state this action's Suspend or Ban wrote; null when it wrote none (or before this was recorded). */
+  moderationState?: string | null;
+  /** Its Suspend or Ban found the account unrestricted (suspended_at empty, 'active' or 'warned'). */
+  fresh?: boolean;
+  /**
+   * When its Suspend or Ban ran (its `now`, before it wrote); null before this was recorded. An entry with it records
+   * every profile write it made, so one without moderationState wrote none.
+   */
+  actedAt?: string | null;
   createdAt: string | null;
 };
 
@@ -146,6 +180,9 @@ export function reportActionFromAudit(row: {
     action: text(row.action) ?? "",
     hiddenAt: text(after.hiddenAt),
     suspendedAt: text(after.suspendedAt),
+    moderationState: text(after.moderationState),
+    fresh: after.fresh === true,
+    actedAt: text(after.actedAt),
     createdAt: text(row.created_at),
   };
 }
@@ -238,6 +275,77 @@ export function ownSuspensions(actions: readonly ReportAction[], reportId: strin
   return actionsBy(actions, reportId, ["user.suspend", "user.ban"]).flatMap((a) =>
     a.suspendedAt ? [a.suspendedAt] : [],
   );
+}
+
+/** When an action ran: its actedAt (before it wrote), else its audit entry's created_at. */
+const ranAt = (a: ReportAction) => a.actedAt ?? a.createdAt;
+
+/**
+ * This report's own latest Suspend or Ban that recorded the moderation_state it wrote, or null when none did (or when
+ * one of them has no time, so the latest cannot be told).
+ */
+export function ownStateWrite(
+  actions: readonly ReportAction[],
+  reportId: string,
+): ReportAction | null {
+  const writes = actionsBy(actions, reportId, RESTRICTING_AUDITS).filter((a) => a.moderationState);
+  const times = writes.map((a) => timestampMicros(ranAt(a)));
+  if (!writes.length || times.some((t) => t === null)) return null;
+  const at = times as number[];
+  return writes[at.indexOf(Math.max(...at))];
+}
+
+/**
+ * Whether an action other than `write` may have written moderation_state at or after `at`: a Suspend or Ban (of any
+ * report, this one included) whose audit entry recorded a state it wrote, or one that does not say (recorded before
+ * this was, or on another kind of report, whose Suspend and Ban write it unguarded). An entry that records its writes
+ * and wrote no state did not write it. Restore and Warn never write suspended or banned, and nothing else writes
+ * moderation_state. Entries are compared by created_at, which comes after their write; one with no time counts.
+ */
+export function stateWrittenSince(
+  actions: readonly ReportAction[],
+  write: ReportAction,
+  at: string | null,
+): boolean {
+  const from = timestampMicros(at);
+  return actions.some((a) => {
+    if (a === write || !RESTRICTING_AUDITS.includes(a.action)) return false;
+    if (a.actedAt && !a.moderationState) return false;
+    const t = timestampMicros(a.createdAt);
+    return from === null || t === null || t >= from;
+  });
+}
+
+/**
+ * This report's own Suspend or Ban that set the author's moderation_state as it is now ('suspended' or 'banned'), or
+ * null: its latest one that recorded a state wrote exactly this state, and no other action may have written it since
+ * (stateWrittenSince). With suspended_at cleared (a superadmin's lift leaves moderation_state as it was), this is what
+ * lets Restore reset the state this report's own action left, and nothing else.
+ */
+export function stateOwnership(
+  actions: readonly ReportAction[],
+  reportId: string,
+  moderationState: string,
+): ReportAction | null {
+  if (!RESTRICTED_STATES.includes(moderationState)) return null;
+  const write = ownStateWrite(actions, reportId);
+  if (!write || write.moderationState !== moderationState) return null;
+  return stateWrittenSince(actions, write, ranAt(write)) ? null : write;
+}
+
+/** Why Restore leaves the author's moderation_state suspended or banned once suspended_at is clear (RESTORE_KEEPS_STATE). */
+export function stateKeptReason(input: {
+  resolutionNotes: string | null;
+  actions: readonly ReportAction[];
+  reportId: string;
+}): string {
+  const own = actionsBy(input.actions, input.reportId, RESTRICTING_AUDITS);
+  if (own.some((a) => a.moderationState)) return RESTORE_KEEPS_STATE.changedSince;
+  if (own.some((a) => a.actedAt)) return RESTORE_KEEPS_STATE.already;
+  if (own.length || notesClaimAccountAction(input.resolutionNotes)) {
+    return RESTORE_KEEPS_STATE.unknown;
+  }
+  return RESTORE_KEEPS_STATE.notThisReport;
 }
 
 /**
@@ -339,6 +447,93 @@ export function accountRestoreBlocker(input: {
   return null;
 }
 
+/** What Restore on a post report does with the author's account (accountRestorePlan). */
+export type AccountRestore = {
+  /** Clear suspended_at and suspended_reason: this report's own Suspend or Ban wrote them. */
+  clearSuspension: boolean;
+  /** Reset moderation_state (to 'active', or 'warned' while another report's warning stands): this report's action set it. */
+  resetState: boolean;
+  /** What stays, as the summary says it, when Restore lifts nothing; null when it lifts something or there is nothing. */
+  kept: string | null;
+  /** What stays once the lift succeeded: a moderation_state this report did not set; null when none. */
+  keptAfter: string | null;
+  /** Restore is refused: this report owns the suspension or state, but another report keeps it (the reason). */
+  refused: string | null;
+};
+
+/**
+ * What Restore on a post report may do with the author's account, before any write:
+ * - suspended_at that is not this report's own (suspensionOwnership) stays, and so does the moderation_state with it;
+ * - suspended_at this report owns is cleared; moderation_state is reset only when this report's own action set it
+ *   (stateOwnership; for a report acted on before that was recorded, its notes, as before);
+ * - with suspended_at clear, a 'suspended' or 'banned' state is reset only when this report's own action set it;
+ * - and only while no other report keeps it (otherAccountReports): otherwise Restore is refused. Another report whose
+ *   last change came before this report's action is left out only when every action this report owns by found the
+ *   account unrestricted: whatever that report did had been lifted by then.
+ */
+export function accountRestorePlan(input: {
+  reportId: string;
+  resolutionNotes: string | null;
+  reviewedAt: string | null;
+  suspendedAt: string | null;
+  moderationState: string;
+  actions: readonly ReportAction[];
+  reports: readonly OtherReport[];
+}): AccountRestore {
+  const { actions, reportId, suspendedAt, moderationState: state } = input;
+  const none: AccountRestore = {
+    clearSuspension: false,
+    resetState: false,
+    kept: null,
+    keptAfter: null,
+    refused: null,
+  };
+  const restricted = RESTRICTED_STATES.includes(state);
+  const base = {
+    resolutionNotes: input.resolutionNotes,
+    reviewedAt: input.reviewedAt,
+    suspendedAt,
+    ownSuspensions: ownSuspensions(actions, reportId),
+  };
+  const suspension = suspensionOwnership(base);
+  if (suspendedAt !== null && !suspension) {
+    const why =
+      accountRestoreBlocker({ ...base, otherReports: 0 }) ?? RESTORE_KEEPS_ACCOUNT.notThisReport;
+    return { ...none, kept: keptAccountSentence(state, why) };
+  }
+  const stateWrite = suspension === "notes" ? null : stateOwnership(actions, reportId, state);
+  const resetState = suspension === "notes" || stateWrite !== null;
+  const stateStays = () => keptStateSentence(state, stateKeptReason({ ...input }));
+  if (suspendedAt === null && !resetState)
+    return restricted ? { ...none, kept: stateStays() } : none;
+
+  // The actions this report owns by: the one that wrote suspended_at, the one that set moderation_state.
+  const at = timestampMicros(suspendedAt);
+  const owning = [
+    ...(suspension === "audit"
+      ? actionsBy(actions, reportId, RESTRICTING_AUDITS).filter(
+          (a) => at !== null && timestampMicros(a.suspendedAt) === at,
+        )
+      : []),
+    ...(stateWrite ? [stateWrite] : []),
+  ];
+  const times = owning.map((a) => timestampMicros(ranAt(a)));
+  // None for an older report, owned by its notes: every other report counts, however old.
+  const since =
+    owning.length > 0 && owning.every((a) => a.fresh) && times.every((t) => t !== null)
+      ? ranAt(owning[times.indexOf(Math.min(...(times as number[])))])
+      : null;
+  if (otherAccountReports(input.reports, actions, reportId, since) > 0) {
+    return { ...none, refused: RESTORE_KEEPS_ACCOUNT.otherReport };
+  }
+  return {
+    ...none,
+    clearSuspension: suspendedAt !== null,
+    resetState,
+    keptAfter: !resetState && restricted ? stateStays() : null,
+  };
+}
+
 /**
  * Why Restore must leave the author's warning ('warned') in place, or null when it may clear it: this report warned them
  * (its notes, or an audit entry of its own Warn) and no other report did (otherWarningReports). A warning has no
@@ -365,12 +560,13 @@ export function keptAccountSentence(moderationState: string, why: string): strin
 }
 
 /**
- * The account Restore keeps when its suspended_at is already cleared but moderation_state still says suspended or banned
- * (a superadmin's lift leaves moderation_state as it was): no screen lifts what is left, so the sentence names none.
+ * The account Restore keeps when its suspended_at is cleared but moderation_state still says suspended or banned (a
+ * superadmin's lift leaves moderation_state as it was), and why (RESTORE_KEEPS_STATE): no screen resets what is left,
+ * so the sentence names none.
  */
-export function keptStateSentence(moderationState: string): string {
+export function keptStateSentence(moderationState: string, why: string): string {
   const state = moderationState === "banned" ? "banned" : "suspended";
-  return `The account stays ${state}: its suspension was lifted already, but its moderation state is still ${state}, and Restore on a post report does not change that.`;
+  return `The account stays ${state}: its suspension is lifted, but its moderation state is still ${state}, and ${why}.`;
 }
 
 /** The post Restore keeps hidden, and where a superadmin unhides it (/superadmin, Content, Network posts). */
@@ -401,7 +597,7 @@ export function restoreCardNote(why: string): string {
   if (why === RESTORE_KEEPS_HIDDEN.otherReport) {
     return `Restore changes nothing while ${why}: this report's own hide stays, and so does the report. Dismiss that report first if its action no longer applies.`;
   }
-  return `Restore dismisses this report but leaves the post hidden: ${why}. A superadmin unhides it on /superadmin, Content, Network posts.`;
+  return `Restore leaves the post hidden: ${why}. A superadmin unhides it on /superadmin, Content, Network posts.`;
 }
 
 /**

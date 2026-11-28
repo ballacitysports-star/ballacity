@@ -14,28 +14,27 @@ import {
   RESTORE_CHECK_FAILED,
   RESTORE_KEEPS_ACCOUNT,
   RESTORE_KEEPS_HIDDEN,
+  RESTORE_KEEPS_STATE,
   RESTORE_KEEPS_WARNING,
+  RESTORE_LEFT_AS_IS,
   RESTORE_LEFT_REPORT,
   RESTORE_READ_FAILED,
   RESTORE_REPORT_CHANGED,
   RESTORE_REPORT_UPDATE_FAILED,
-  accountRestoreBlocker,
+  accountRestorePlan,
   keptAccountSentence,
   keptPostSentence,
   keptStateSentence,
   keptWarningSentence,
-  otherAccountReports,
   otherPostReports,
   otherWarningReports,
   ownHides,
-  ownSuspensions,
   ownWarnings,
   postRestoreBlocker,
   reportActionFromAudit,
   restoreKeepsHidden,
   restoreRefusal,
   restoreSummary,
-  suspensionOwnership,
   warningRestoreBlocker,
   type OtherReport,
 } from "@/lib/post-restore";
@@ -104,15 +103,21 @@ export function isMissingPostIdColumn(
   );
 }
 
-type QueryResult = { data: unknown; error: { code?: string; message?: string } | null };
+type QueryResult = {
+  data: unknown;
+  error: { code?: string; message?: string } | null;
+  /** The rows the read matched in all, with `{ count: "exact" }`; may be more than `data` holds (max-rows). */
+  count?: number | null;
+};
 
 /**
  * The query-builder calls these reads and writes make, for what the generated client types do not know yet
  * (user_reports.post_id, the posts table).
  */
 type LooseQuery = PromiseLike<QueryResult> & {
-  select(columns: string): LooseQuery;
+  select(columns: string, options?: { count: "exact" }): LooseQuery;
   eq(column: string, value: unknown): LooseQuery;
+  gt(column: string, value: unknown): LooseQuery;
   neq(column: string, value: unknown): LooseQuery;
   is(column: string, value: null): LooseQuery;
   in(column: string, values: readonly unknown[]): LooseQuery;
@@ -126,6 +131,39 @@ const looseFrom = (admin: unknown, table: string): LooseQuery =>
 
 /** The rows a write's `.select("id")` returned. */
 const rowsOf = (res: QueryResult): unknown[] => (res.data ?? []) as unknown[];
+
+/** Rows per page of a list read (PostgREST cuts a response at its max-rows, 1000 by default, and may cut it shorter). */
+const PAGE_ROWS = 1000;
+/** A list read gives up after this many pages: Restore then changes nothing, and the card says it could not check. */
+const MAX_PAGES = 25;
+
+/**
+ * Every row a list read matches, page by page in id order: `read` builds the filtered query, and each page asks for an
+ * exact count of the rows still to come, so a response the server cut short (max-rows) is never taken for the whole
+ * list. A failed page, a page without a count, an empty page while rows remain, or more than MAX_PAGES pages returns an
+ * error instead: Restore fails closed on it (RESTORE_READ_FAILED), and the card says it could not check.
+ */
+async function readAllRows(read: (count: { count: "exact" }) => LooseQuery): Promise<QueryResult> {
+  const rows: unknown[] = [];
+  let after: unknown = null;
+  for (let page = 0; page < MAX_PAGES; page++) {
+    let q = read({ count: "exact" });
+    if (after !== null) q = q.gt("id", after);
+    const res = await q.order("id", { ascending: true }).limit(PAGE_ROWS);
+    if (res.error) return res;
+    const got = rowsOf(res);
+    rows.push(...got);
+    if (typeof res.count !== "number") {
+      return { data: null, error: { message: "The read did not say how many rows it matched." } };
+    }
+    if (got.length >= res.count) return { data: rows, error: null };
+    after = (got.at(-1) as { id?: unknown } | undefined)?.id ?? null;
+    if (after === null) {
+      return { data: null, error: { message: "The read was cut short." } };
+    }
+  }
+  return { data: null, error: { message: "Too many rows to read." } };
+}
 
 /** An admin_audit_log row as the queue reads it back (post-restore.ts reportActionFromAudit). */
 type AuditRow = Parameters<typeof reportActionFromAudit>[0];
@@ -281,20 +319,25 @@ export const listReports = createServerFn({ method: "GET" })
       postIds.length
         ? looseFrom(supabaseAdmin, "posts").select(POST_COLUMNS).in("id", postIds)
         : Promise.resolve<QueryResult>({ data: [], error: null }),
-      // Every report about these posts that is not dismissed, whatever the filter: what Restore must not overturn.
+      // Every report about these posts that is not dismissed, whatever the filter: what Restore must not overturn. All
+      // of them, page by page (readAllRows), or the card says it could not check.
       postIds.length
-        ? looseFrom(supabaseAdmin, "user_reports")
-            .select("id, post_id, status, resolution_notes")
-            .in("post_id", postIds)
-            .neq("status", "dismissed")
+        ? readAllRows((count) =>
+            looseFrom(supabaseAdmin, "user_reports")
+              .select("id, post_id, status, resolution_notes", count)
+              .in("post_id", postIds)
+              .neq("status", "dismissed"),
+          )
         : Promise.resolve<QueryResult>({ data: [], error: null }),
       // Every Remove content on these posts, with the hidden_at it wrote: which report owns a hide (post-restore.ts).
       postIds.length
-        ? looseFrom(supabaseAdmin, "admin_audit_log")
-            .select("action, before, after, created_at")
-            .eq("action", "content.remove")
-            .eq("target_type", "post")
-            .in("target_id", postIds)
+        ? readAllRows((count) =>
+            looseFrom(supabaseAdmin, "admin_audit_log")
+              .select("id, action, before, after, created_at", count)
+              .eq("action", "content.remove")
+              .eq("target_type", "post")
+              .in("target_id", postIds),
+          )
         : Promise.resolve<QueryResult>({ data: [], error: null }),
     ]);
 
@@ -442,15 +485,21 @@ type PostRestoreOutcome = {
   lifted: Record<string, unknown>[];
   /** The account lift (the values it cleared), for an audit entry on the user; null when none. */
   accountLift: Record<string, unknown> | null;
-  /** A write failed: the report keeps its status and notes, so Restore can run again. */
-  keepReport: boolean;
+  /**
+   * Whether Restore marks the report dismissed and writes its summary into the notes: only when it undid something and
+   * no write failed. Otherwise the report keeps its status, notes and reviewed_at, so it keeps counting as a report that
+   * acted, and a later Restore can still undo its own action.
+   */
+  updateReport: boolean;
 };
 
 /**
  * Restore on a post report (owner decision 2026-11-28): undoes only this report's own actions, never what anyone else
- * did (post-restore.ts). It reads everything first, and a failed read changes nothing (RESTORE_READ_FAILED). Then it
- * plans, before any write:
- * - the author's suspension or ban is lifted only when this report owns it and no other report keeps it;
+ * did (post-restore.ts). It reads everything first, every row of each list (readAllRows), and a failed or cut-short read
+ * changes nothing (RESTORE_READ_FAILED). Then it plans, before any write:
+ * - the author's suspended_at is cleared only when this report owns it, and moderation_state is reset only when this
+ *   report's own action set it, also once a superadmin cleared suspended_at, and only while no other report keeps
+ *   either (accountRestorePlan);
  * - the author's warning is cleared only when this report issued it and no other report did;
  * - the post is unhidden only when this report owns the hide and no other report keeps it.
  * When this report owns a hide or suspension that another report keeps, Restore is refused: it throws restoreRefusal,
@@ -467,26 +516,33 @@ async function restorePostReport(
       ? looseFrom(admin, "posts").select("id, hidden_at").eq("id", report.post_id).maybeSingle()
       : none,
     report.post_id
-      ? looseFrom(admin, "user_reports")
-          .select("id, status, resolution_notes")
-          .eq("post_id", report.post_id)
-          .neq("status", "dismissed")
+      ? readAllRows((count) =>
+          looseFrom(admin, "user_reports")
+            .select("id, status, resolution_notes", count)
+            .eq("post_id", report.post_id)
+            .neq("status", "dismissed"),
+        )
       : none,
     looseFrom(admin, "profiles")
       .select("id, suspended_at, suspended_reason, moderation_state")
       .eq("id", report.reported_id)
       .maybeSingle(),
-    looseFrom(admin, "user_reports")
-      .select("id, status, resolution_notes, reviewed_at")
-      .eq("reported_id", report.reported_id)
-      .neq("status", "dismissed"),
+    readAllRows((count) =>
+      looseFrom(admin, "user_reports")
+        .select("id, status, resolution_notes, reviewed_at", count)
+        .eq("reported_id", report.reported_id)
+        .neq("status", "dismissed"),
+    ),
     // Every moderation action on any report about the author, with what it wrote (this report's own among them).
-    looseFrom(admin, "admin_audit_log")
-      .select("action, before, after, created_at")
-      .eq("after->>reportedUserId", report.reported_id)
-      .in("action", REPORT_ACTION_AUDITS),
+    readAllRows((count) =>
+      looseFrom(admin, "admin_audit_log")
+        .select("id, action, before, after, created_at", count)
+        .eq("after->>reportedUserId", report.reported_id)
+        .in("action", REPORT_ACTION_AUDITS),
+    ),
   ]);
-  // Fail closed: without every read, Restore cannot tell whose change it would undo.
+  // Fail closed: without every row of every read, Restore cannot tell whose change it would undo. A flood of reports
+  // about the author or the post cannot push the one that keeps a change out of what Restore reads.
   if (reads.some((r) => r.error)) throw new Error(RESTORE_READ_FAILED);
   const [post, postRows, profile, accountRows, audit] = reads;
   const actions = ((audit.data ?? []) as AuditRow[]).map(reportActionFromAudit);
@@ -495,7 +551,12 @@ async function restorePostReport(
 
   const refused: string[] = [];
   const kept: string[] = [];
-  let lift: { suspendedAt: string; reason: string | null } | null = null;
+  let lift: {
+    suspendedAt: string | null;
+    reason: string | null;
+    resetState: boolean;
+    keptAfter: string | null;
+  } | null = null;
   let clearWarning = false;
   let unhide: string | null = null;
 
@@ -508,30 +569,30 @@ async function restorePostReport(
   const otherWarnings = otherWarningReports(accountReports, actions, report.id);
   if (p) {
     const suspendedAt = p.suspended_at ?? null;
-    if (suspendedAt === null && (state === "suspended" || state === "banned")) {
-      // A superadmin cleared suspended_at and left moderation_state: nothing this report can tell it owns.
-      kept.push(keptStateSentence(state));
-    } else if (suspendedAt !== null) {
-      const base = {
-        resolutionNotes: report.resolution_notes,
-        reviewedAt: report.reviewed_at,
+    const plan = accountRestorePlan({
+      reportId: report.id,
+      resolutionNotes: report.resolution_notes,
+      reviewedAt: report.reviewed_at,
+      suspendedAt,
+      moderationState: state,
+      actions,
+      reports: accountReports,
+    });
+    if (plan.refused) {
+      refused.push(
+        `The account stays ${state === "banned" ? "banned" : "suspended"}: ${plan.refused}.`,
+      );
+    } else if (plan.kept) {
+      kept.push(plan.kept);
+    } else if (plan.clearSuspension || plan.resetState) {
+      lift = {
         suspendedAt,
-        ownSuspensions: ownSuspensions(actions, report.id),
+        reason: p.suspended_reason ?? null,
+        resetState: plan.resetState,
+        keptAfter: plan.keptAfter,
       };
-      const since = suspensionOwnership(base) === "audit" ? suspendedAt : null;
-      const block = accountRestoreBlocker({
-        ...base,
-        otherReports: otherAccountReports(accountReports, actions, report.id, since),
-      });
-      if (block === RESTORE_KEEPS_ACCOUNT.otherReport) {
-        refused.push(`The account stays ${state === "banned" ? "banned" : "suspended"}: ${block}.`);
-      } else if (block) {
-        kept.push(keptAccountSentence(state, block));
-      } else {
-        lift = { suspendedAt, reason: p.suspended_reason ?? null };
-      }
     }
-    if (!lift && state === "warned") {
+    if (!lift?.resetState && state === "warned") {
       const block = warningRestoreBlocker({
         resolutionNotes: report.resolution_notes,
         ownWarnings: ownWarnings(actions, report.id),
@@ -564,26 +625,45 @@ async function restorePostReport(
   const undone: string[] = [];
   const lifted: Record<string, unknown>[] = [];
   let accountLift: Record<string, unknown> | null = null;
-  let keepReport = false;
+  let failed = false;
 
   if (lift) {
-    // Back to 'warned' while another report's warning stands, else 'active'. Only while suspended_at and
-    // moderation_state still hold what was read: a suspension, ban or lift made since is kept.
-    const to = otherWarnings > 0 ? "warned" : "active";
-    const res = await looseFrom(admin, "profiles")
-      .update({ suspended_at: null, suspended_reason: null, moderation_state: to })
-      .eq("id", report.reported_id)
-      .eq("suspended_at", lift.suspendedAt)
-      .eq("moderation_state", state)
-      .select("id");
+    // Back to 'warned' while another report's warning stands, else 'active'; a moderation_state this report did not set
+    // stays as it is. Only while suspended_at and moderation_state still hold what was read: a suspension, ban or lift
+    // made since is kept.
+    const to = !lift.resetState ? state : otherWarnings > 0 ? "warned" : "active";
+    const keptAccountNow = (why: string) =>
+      lift.suspendedAt === null ? keptStateSentence(state, why) : keptAccountSentence(state, why);
+    let q = looseFrom(admin, "profiles")
+      .update({
+        ...(lift.suspendedAt !== null ? { suspended_at: null, suspended_reason: null } : {}),
+        ...(lift.resetState ? { moderation_state: to } : {}),
+      })
+      .eq("id", report.reported_id);
+    q =
+      lift.suspendedAt === null
+        ? q.is("suspended_at", null)
+        : q.eq("suspended_at", lift.suspendedAt);
+    const res = await q.eq("moderation_state", state).select("id");
     if (res.error) {
-      keepReport = true;
-      kept.push(keptAccountSentence(state, "lifting it failed"));
+      failed = true;
+      kept.push(
+        keptAccountNow(lift.suspendedAt === null ? "resetting it failed" : "lifting it failed"),
+      );
     } else if (!rowsOf(res).length) {
-      kept.push(keptAccountSentence(state, RESTORE_KEEPS_ACCOUNT.changedSince));
+      kept.push(
+        keptAccountNow(
+          lift.suspendedAt === null
+            ? RESTORE_KEEPS_STATE.changedSince
+            : RESTORE_KEEPS_ACCOUNT.changedSince,
+        ),
+      );
     } else {
-      undone.push(state === "banned" ? "ban lifted" : "suspension lifted");
-      if (to === "warned") kept.push(keptWarningSentence(RESTORE_KEEPS_WARNING.otherReport));
+      undone.push(lift.resetState && state === "banned" ? "ban lifted" : "suspension lifted");
+      if (lift.resetState && to === "warned") {
+        kept.push(keptWarningSentence(RESTORE_KEEPS_WARNING.otherReport));
+      }
+      if (lift.keptAfter) kept.push(lift.keptAfter);
       accountLift = {
         suspended_at: lift.suspendedAt,
         suspended_reason: lift.reason,
@@ -601,7 +681,7 @@ async function restorePostReport(
       .eq("moderation_state", "warned")
       .select("id");
     if (res.error) {
-      keepReport = true;
+      failed = true;
       kept.push(keptWarningSentence("clearing it failed"));
     } else if (rowsOf(res).length) {
       undone.push("warning cleared");
@@ -616,7 +696,7 @@ async function restorePostReport(
       .eq("hidden_at", unhide)
       .select("id");
     if (res.error) {
-      keepReport = true;
+      failed = true;
       kept.push(keptPostSentence("unhiding it failed"));
     } else if (!rowsOf(res).length) {
       kept.push(keptPostSentence(RESTORE_KEEPS_HIDDEN.hiddenSince));
@@ -626,19 +706,36 @@ async function restorePostReport(
     }
   }
   const summary = restoreSummary(undone, kept);
+  const updateReport = undone.length > 0 && !failed;
   return {
-    summary: keepReport ? `${summary} ${RESTORE_LEFT_REPORT}` : summary,
+    summary: failed
+      ? `${summary} ${RESTORE_LEFT_REPORT}`
+      : updateReport
+        ? summary
+        : `${summary} ${RESTORE_LEFT_AS_IS}`,
     lifted,
     accountLift,
-    keepReport,
+    updateReport,
   };
 }
+
+/** What a post report's Suspend or Ban wrote on the author's profile, as its audit entry records it (post-restore.ts). */
+type AccountWrite = {
+  /** The suspended_at it wrote: on an account nobody had restricted, or filled in where it was empty. */
+  suspendedAt?: string;
+  /** The moderation_state it wrote: on an account nobody had restricted, or a suspension (or none) raised to a ban. */
+  moderationState?: string;
+  /** It found the account unrestricted (suspended_at empty, 'active' or 'warned'). */
+  fresh: boolean;
+  /** Its `now`, before it wrote: entries with it record every profile write they made. */
+  actedAt: string;
+};
 
 /**
  * Suspend or Ban on a post report: restricts the author only where nobody has (suspended_at empty, moderation_state
  * 'active' or 'warned'), so this report owns only a suspension it made. On an account that is already restricted it
  * keeps that suspension's suspended_at and reason, fills suspended_at only where it is empty (the gates that read only
- * it), raises a suspension to a ban, and never lowers anything. Returns whether it made a new suspension.
+ * it), raises a suspension to a ban, and never lowers anything. Returns what it wrote: Restore undoes only that.
  */
 async function restrictPostAuthor(
   admin: unknown,
@@ -646,7 +743,7 @@ async function restrictPostAuthor(
   action: "suspend" | "ban",
   now: string,
   suspendedReason: string,
-): Promise<boolean> {
+): Promise<AccountWrite> {
   const state = action === "ban" ? "banned" : "suspended";
   const fresh = await looseFrom(admin, "profiles")
     .update({ suspended_at: now, suspended_reason: suspendedReason, moderation_state: state })
@@ -655,13 +752,17 @@ async function restrictPostAuthor(
     .in("moderation_state", ["active", "warned"])
     .select("id");
   if (fresh.error) throw new Error(fresh.error.message);
-  if (rowsOf(fresh).length) return true;
+  if (rowsOf(fresh).length) {
+    return { suspendedAt: now, moderationState: state, fresh: true, actedAt: now };
+  }
+  const wrote: AccountWrite = { fresh: false, actedAt: now };
   const fill = await looseFrom(admin, "profiles")
     .update({ suspended_at: now, suspended_reason: suspendedReason })
     .eq("id", userId)
     .is("suspended_at", null)
     .select("id");
   if (fill.error) throw new Error(fill.error.message);
+  if (rowsOf(fill).length) wrote.suspendedAt = now;
   const raise = await looseFrom(admin, "profiles")
     .update({ moderation_state: state })
     .eq("id", userId)
@@ -671,7 +772,8 @@ async function restrictPostAuthor(
     )
     .select("id");
   if (raise.error) throw new Error(raise.error.message);
-  return false;
+  if (rowsOf(raise).length) wrote.moderationState = state;
+  return wrote;
 }
 
 const ACTION = z.enum(["warn", "remove_content", "suspend", "ban", "restore"]);
@@ -708,7 +810,7 @@ export const applyModerationAction = createServerFn({ method: "POST" })
     const now = new Date().toISOString();
     let summary = "";
     // What a post report's action wrote, recorded in its audit entry so Restore knows this report's own changes.
-    const wrote: { hiddenAt?: string; suspendedAt?: string } = {};
+    const wrote: { hiddenAt?: string } & Partial<AccountWrite> = {};
     const targetId =
       report.subject_type === "game"
         ? report.game_id
@@ -726,7 +828,7 @@ export const applyModerationAction = createServerFn({ method: "POST" })
       const out = await restorePostReport(supabaseAdmin, report);
       summary = out.summary;
       let reportUpdated = false;
-      if (!out.keepReport) {
+      if (out.updateReport) {
         // Only while the report is as Restore read it: an action another moderator took on it meanwhile stays its own.
         let q = looseFrom(supabaseAdmin, "user_reports")
           .update({
@@ -837,15 +939,15 @@ export const applyModerationAction = createServerFn({ method: "POST" })
       const own = data.action === "ban" ? ACCOUNT_BANNED_SUMMARY : ACCOUNT_SUSPENDED_SUMMARY;
       const suspendedReason = reason ?? `Moderation action: ${data.action}`;
       if (isPost) {
-        const fresh = await restrictPostAuthor(
+        const account = await restrictPostAuthor(
           supabaseAdmin,
           report.reported_id,
           data.action,
           now,
           suspendedReason,
         );
-        if (fresh) wrote.suspendedAt = now;
-        summary = fresh ? own : `${own}${ALREADY_RESTRICTED_NOTE}`;
+        Object.assign(wrote, account);
+        summary = account.fresh ? own : `${own}${ALREADY_RESTRICTED_NOTE}`;
       } else {
         await supabaseAdmin
           .from("profiles")

@@ -11,10 +11,12 @@ import {
   RESTORE_CHECK_FAILED,
   RESTORE_KEEPS_ACCOUNT,
   RESTORE_KEEPS_HIDDEN,
+  RESTORE_KEEPS_STATE,
   RESTORE_KEEPS_WARNING,
   RESTORE_READ_FAILED,
   RESTORE_REFUSED_PREFIX,
   accountRestoreBlocker,
+  accountRestorePlan,
   keptAccountSentence,
   keptPostSentence,
   keptStateSentence,
@@ -24,6 +26,7 @@ import {
   otherWarningReports,
   ownHides,
   ownSuspensions,
+  ownStateWrite,
   ownWarnings,
   postRestoreBlocker,
   reportActionFromAudit,
@@ -32,6 +35,9 @@ import {
   restoreMessageShownAsIs,
   restoreRefusal,
   restoreSummary,
+  stateKeptReason,
+  stateOwnership,
+  stateWrittenSince,
   suspensionOwnership,
   timestampMicros,
   warningRestoreBlocker,
@@ -372,6 +378,227 @@ describe("the Restore rule (post-restore.ts)", () => {
     });
   });
 
+  describe("the moderation state (once suspended_at is cleared)", () => {
+    /** A Suspend or Ban that records what it wrote. */
+    const wrote = (
+      reportId: string,
+      at: string,
+      over: Partial<ReportAction> = {},
+      action = "user.ban",
+    ) =>
+      act(reportId, action, {
+        moderationState: action === "user.ban" ? "banned" : "suspended",
+        fresh: true,
+        actedAt: at,
+        createdAt: at,
+        ...over,
+      });
+
+    it("owns the state its own latest Suspend or Ban wrote, while nothing else may have written it since", () => {
+      const ban = wrote(MINE_ID, T_MINE);
+      expect(stateOwnership([ban], MINE_ID, "banned")).toBe(ban);
+      // not a state it did not write, nor one that is not restricted
+      expect(stateOwnership([ban], MINE_ID, "suspended")).toBeNull();
+      expect(stateOwnership([ban], MINE_ID, "warned")).toBeNull();
+      expect(stateOwnership([ban], MINE_ID, "active")).toBeNull();
+      expect(stateOwnership([ban], OTHER_ID, "banned")).toBeNull();
+      // its latest one counts: a Suspend after its Ban (once the ban was lowered by a Restore) owns 'suspended'
+      const later = wrote(MINE_ID, T_LATER, {}, "user.suspend");
+      expect(stateOwnership([ban, later], MINE_ID, "suspended")).toBe(later);
+      expect(stateOwnership([later, ban], MINE_ID, "banned")).toBeNull();
+      // a Warn or Remove content never writes a restricted state
+      expect(
+        stateOwnership(
+          [ban, act(OTHER_ID, "user.warn", { createdAt: T_LATER })],
+          MINE_ID,
+          "banned",
+        ),
+      ).toBe(ban);
+    });
+
+    it("never owns it when another Suspend or Ban may have written it since", () => {
+      const ban = wrote(MINE_ID, T_MINE);
+      // one that does not record what it wrote (another kind of report, or before this was recorded)
+      expect(
+        stateOwnership([ban, act(OTHER_ID, "user.ban", { createdAt: T_LATER })], MINE_ID, "banned"),
+      ).toBeNull();
+      // one that recorded a state it wrote
+      expect(
+        stateOwnership([ban, wrote(OTHER_ID, T_LATER, { fresh: false })], MINE_ID, "banned"),
+      ).toBeNull();
+      // at the same moment, or with no time, counts too
+      expect(
+        stateOwnership(
+          [ban, act(OTHER_ID, "user.suspend", { createdAt: T_MINE })],
+          MINE_ID,
+          "banned",
+        ),
+      ).toBeNull();
+      expect(
+        stateOwnership(
+          [ban, act(OTHER_ID, "user.suspend", { createdAt: null })],
+          MINE_ID,
+          "banned",
+        ),
+      ).toBeNull();
+      // its own unrecorded entry after it counts as well
+      expect(
+        stateOwnership([ban, act(MINE_ID, "user.ban", { createdAt: T_LATER })], MINE_ID, "banned"),
+      ).toBeNull();
+      // one before it does not; nor one that recorded its writes and wrote no state
+      expect(
+        stateOwnership(
+          [
+            ban,
+            act(OTHER_ID, "user.ban", { createdAt: T_EARLIER }),
+            act(OTHER_ID, "user.ban", { actedAt: T_LATER, createdAt: T_LATER }),
+          ],
+          MINE_ID,
+          "banned",
+        ),
+      ).toBe(ban);
+      expect(stateWrittenSince([ban], ban, T_MINE)).toBe(false);
+      expect(stateWrittenSince([ban, act(OTHER_ID, "user.ban")], ban, null)).toBe(true);
+    });
+
+    it("cannot tell its latest state write when one of them has no time", () => {
+      const ban = wrote(MINE_ID, T_MINE);
+      expect(
+        ownStateWrite([ban, wrote(MINE_ID, T_LATER, { actedAt: null, createdAt: null })], MINE_ID),
+      ).toBeNull();
+      expect(ownStateWrite([act(MINE_ID, "user.ban")], MINE_ID)).toBeNull();
+      expect(ownStateWrite([ban, act(MINE_ID, "user.ban", { createdAt: T_LATER })], MINE_ID)).toBe(
+        ban,
+      );
+    });
+
+    it("says why it keeps the state, in words true for what it knows", () => {
+      const reason = (actions: ReportAction[], notes: string | null = null) =>
+        stateKeptReason({ resolutionNotes: notes, actions, reportId: MINE_ID });
+      expect(reason([wrote(MINE_ID, T_MINE)])).toBe(RESTORE_KEEPS_STATE.changedSince);
+      expect(reason([act(MINE_ID, "user.ban", { actedAt: T_MINE })])).toBe(
+        RESTORE_KEEPS_STATE.already,
+      );
+      expect(reason([act(MINE_ID, "user.ban")])).toBe(RESTORE_KEEPS_STATE.unknown);
+      expect(reason([], "Account banned — x")).toBe(RESTORE_KEEPS_STATE.unknown);
+      expect(reason([act(OTHER_ID, "user.ban", { actedAt: T_MINE })], "Post hidden")).toBe(
+        RESTORE_KEEPS_STATE.notThisReport,
+      );
+    });
+
+    describe("what Restore does with the account (accountRestorePlan)", () => {
+      const plan = (over: Partial<Parameters<typeof accountRestorePlan>[0]> = {}) =>
+        accountRestorePlan({
+          reportId: MINE_ID,
+          resolutionNotes: "Account banned — abuse",
+          reviewedAt: T_MINE,
+          suspendedAt: null,
+          moderationState: "banned",
+          actions: [wrote(MINE_ID, T_MINE, { suspendedAt: T_MINE })],
+          reports: [],
+          ...over,
+        });
+      const old = (reviewed_at: string) => ({
+        id: OTHER_ID,
+        status: "resolved",
+        resolution_notes: "Account banned — old",
+        reviewed_at,
+      });
+
+      it("resets the state its own fresh Ban set, and leaves out reports from before it", () => {
+        expect(plan()).toEqual({
+          clearSuspension: false,
+          resetState: true,
+          kept: null,
+          keptAfter: null,
+          refused: null,
+        });
+        expect(plan({ reports: [old(T_EARLIER)] }).resetState).toBe(true);
+        expect(plan({ reports: [old(T_LATER)] }).refused).toBe(RESTORE_KEEPS_ACCOUNT.otherReport);
+      });
+
+      it("counts every other report when an action it owns by found the account restricted", () => {
+        const raised = [wrote(MINE_ID, T_MINE, { fresh: false })];
+        expect(plan({ actions: raised, reports: [old(T_EARLIER)] }).refused).toBe(
+          RESTORE_KEEPS_ACCOUNT.otherReport,
+        );
+        // its fill on top of its own earlier fresh Ban: one of the two found it restricted
+        const both = [
+          wrote(MINE_ID, T_EARLIER),
+          act(MINE_ID, "user.ban", {
+            suspendedAt: T_MINE,
+            fresh: false,
+            actedAt: T_MINE,
+            createdAt: T_MINE,
+          }),
+        ];
+        expect(
+          plan({ actions: both, suspendedAt: T_MINE, reports: [old("2026-11-26T09:00:00Z")] })
+            .refused,
+        ).toBe(RESTORE_KEEPS_ACCOUNT.otherReport);
+        expect(plan({ actions: both, suspendedAt: T_MINE })).toMatchObject({
+          clearSuspension: true,
+          resetState: true,
+        });
+      });
+
+      it("clears a suspended_at it owns, and keeps a state it did not set (saying why, after the lift)", () => {
+        const fill = [
+          act(MINE_ID, "user.suspend", {
+            suspendedAt: T_MINE,
+            fresh: false,
+            actedAt: T_MINE,
+            createdAt: T_MINE,
+          }),
+        ];
+        expect(plan({ actions: fill, suspendedAt: T_MINE })).toEqual({
+          clearSuspension: true,
+          resetState: false,
+          kept: null,
+          keptAfter: keptStateSentence("banned", RESTORE_KEEPS_STATE.already),
+          refused: null,
+        });
+        // nothing to say once the state is not restricted
+        expect(
+          plan({ actions: fill, suspendedAt: T_MINE, moderationState: "warned" }).keptAfter,
+        ).toBeNull();
+      });
+
+      it("keeps a suspension that is not its own, and the state with it", () => {
+        expect(plan({ suspendedAt: T_LATER })).toEqual({
+          clearSuspension: false,
+          resetState: false,
+          kept: keptAccountSentence("banned", RESTORE_KEEPS_ACCOUNT.changedSince),
+          keptAfter: null,
+          refused: null,
+        });
+      });
+
+      it("lifts an older report's own ban by its notes as before (state included, every other report counted)", () => {
+        expect(plan({ actions: [], suspendedAt: T_MINE })).toMatchObject({
+          clearSuspension: true,
+          resetState: true,
+        });
+        expect(plan({ actions: [], suspendedAt: T_MINE, reports: [old(T_EARLIER)] }).refused).toBe(
+          RESTORE_KEEPS_ACCOUNT.otherReport,
+        );
+      });
+
+      it("keeps a state it cannot tell it set, and does nothing to an account nobody restricted", () => {
+        expect(plan({ actions: [] }).kept).toBe(
+          keptStateSentence("banned", RESTORE_KEEPS_STATE.unknown),
+        );
+        expect(plan({ actions: [], moderationState: "active" })).toEqual({
+          clearSuspension: false,
+          resetState: false,
+          kept: null,
+          keptAfter: null,
+          refused: null,
+        });
+      });
+    });
+  });
+
   describe("the warning", () => {
     it("clears a warning only this report issued", () => {
       expect(
@@ -446,8 +673,30 @@ describe("the Restore rule (post-restore.ts)", () => {
       action: "content.remove",
       hiddenAt: T_MINE,
       suspendedAt: null,
+      moderationState: null,
+      fresh: false,
+      actedAt: null,
       createdAt: T_MINE,
     });
+    expect(
+      reportActionFromAudit(
+        auditRow(MINE_ID, "user.ban", {
+          suspendedAt: T_MINE,
+          moderationState: "banned",
+          fresh: true,
+          actedAt: T_MINE,
+        }),
+      ),
+    ).toMatchObject({
+      suspendedAt: T_MINE,
+      moderationState: "banned",
+      fresh: true,
+      actedAt: T_MINE,
+    });
+    // only a literal true is fresh
+    expect(reportActionFromAudit(auditRow(MINE_ID, "user.ban", { fresh: "true" })).fresh).toBe(
+      false,
+    );
     // a superadmin's entry names no report
     expect(
       reportActionFromAudit({
@@ -460,6 +709,9 @@ describe("the Restore rule (post-restore.ts)", () => {
       action: "user.suspend",
       hiddenAt: null,
       suspendedAt: null,
+      moderationState: null,
+      fresh: false,
+      actedAt: null,
       createdAt: null,
     });
     expect(
@@ -491,11 +743,14 @@ describe("the Restore rule (post-restore.ts)", () => {
     );
     expect(keptAccountSentence("warned", "x")).toMatch(/^The account stays suspended: x\./);
     expect(keptAccountSentence("banned", "x")).toMatch(/^The account stays banned: x\./);
-    // suspended_at already cleared: no screen is named, since none lifts what is left
-    expect(keptStateSentence("banned")).toBe(
-      "The account stays banned: its suspension was lifted already, but its moderation state is still banned, and Restore on a post report does not change that.",
+    // suspended_at cleared: no screen is named, since none resets what is left
+    expect(keptStateSentence("banned", RESTORE_KEEPS_STATE.changedSince)).toBe(
+      "The account stays banned: its suspension is lifted, but its moderation state is still banned, and another action may have set it after this report's own Suspend or Ban.",
     );
-    expect(keptStateSentence("suspended")).not.toMatch(/superadmin|Restore account/);
+    expect(keptStateSentence("suspended", "x")).toBe(
+      "The account stays suspended: its suspension is lifted, but its moderation state is still suspended, and x.",
+    );
+    expect(keptStateSentence("suspended", "x")).not.toMatch(/superadmin|Restore account/);
     expect(keptWarningSentence("x")).toBe("The warning stays: x.");
     expect(restoreRefusal(["The post stays hidden: y."])).toBe(
       `${RESTORE_REFUSED_PREFIX} The post stays hidden: y. Dismiss that report first if its action no longer applies, then Restore this one again.`,
@@ -503,8 +758,9 @@ describe("the Restore rule (post-restore.ts)", () => {
     expect(restoreCardNote(RESTORE_KEEPS_HIDDEN.otherReport)).toBe(
       "Restore changes nothing while another report about this post was acted on: this report's own hide stays, and so does the report. Dismiss that report first if its action no longer applies.",
     );
+    // it does not say Restore dismisses the report: a Restore that undoes nothing leaves the report as it is
     expect(restoreCardNote(RESTORE_KEEPS_HIDDEN.notThisReport)).toBe(
-      "Restore dismisses this report but leaves the post hidden: this report's latest action did not hide it. A superadmin unhides it on /superadmin, Content, Network posts.",
+      "Restore leaves the post hidden: this report's latest action did not hide it. A superadmin unhides it on /superadmin, Content, Network posts.",
     );
     expect(restoreCardNote(RESTORE_CHECK_FAILED)).toBe(RESTORE_CHECK_FAILED);
     for (const s of [
