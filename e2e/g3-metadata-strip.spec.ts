@@ -49,20 +49,26 @@ test.describe("G3 metadata stripping on real Storage", () => {
 
     const { context, page } = await openAs(browser, player);
     try {
-      // Load the app again so its Supabase client starts with the fixture session.
-      await page.goto("/", { waitUntil: "domcontentloaded" });
-      const result = await page.evaluate(async (p) => {
-        // @ts-expect-error - dev-server module path
-        const mod = await import("/src/lib/image-uploads.functions.ts");
-        try {
-          return {
-            ok: true,
-            value: await mod.finalizeImageUpload({ data: { bucket: "avatars", path: p } }),
-          };
-        } catch (e) {
-          return { ok: false, error: e instanceof Error ? e.message : String(e) };
-        }
-      }, path);
+      // Called straight from the module, outside the app's start instance, the call does not go through the global
+      // middleware that attaches the session's bearer token, so the spec passes the fixture's token itself.
+      const result = await page.evaluate(
+        async ({ p, token }) => {
+          // @ts-expect-error - dev-server module path
+          const mod = await import("/src/lib/image-uploads.functions.ts");
+          try {
+            return {
+              ok: true,
+              value: await mod.finalizeImageUpload({
+                data: { bucket: "avatars", path: p },
+                headers: { Authorization: `Bearer ${token}` },
+              }),
+            };
+          } catch (e) {
+            return { ok: false, error: e instanceof Error ? e.message : String(e) };
+          }
+        },
+        { p: path, token: player.session.access_token },
+      );
       expect(result, JSON.stringify(result)).toMatchObject({ ok: true });
 
       const { data: blob, error: dlErr } = await player.db.storage.from("avatars").download(path);
