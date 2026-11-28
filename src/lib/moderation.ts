@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { isMissingFunctionError } from "@/lib/managed-profile-names";
+import { userErrorMessage } from "@/lib/user-error";
 
 export type ReportReason =
   | "spam"
@@ -25,7 +26,7 @@ export type ReportReason =
   | "unsafe_conditions"
   | "injury_risk";
 
-export type ReportSubjectType = "user" | "game" | "message" | "reel" | "payment";
+export type ReportSubjectType = "user" | "game" | "message" | "reel" | "payment" | "post";
 
 type ReasonOption = { value: ReportReason; label: string };
 
@@ -73,6 +74,9 @@ export const PAYMENT_REPORT_REASONS: ReasonOption[] = [
   { value: "other", label: "Other" },
 ];
 
+/** A network post is reported for what it says, as a message is: the same reasons, in the same words. */
+export const POST_REPORT_REASONS: ReasonOption[] = MESSAGE_REPORT_REASONS;
+
 /** Back-compat alias used by older call sites. */
 export const REPORT_REASONS = USER_REPORT_REASONS;
 
@@ -80,6 +84,7 @@ export function reasonsFor(subject: ReportSubjectType): ReasonOption[] {
   if (subject === "game") return GAME_REPORT_REASONS;
   if (subject === "message") return MESSAGE_REPORT_REASONS;
   if (subject === "payment") return PAYMENT_REPORT_REASONS;
+  if (subject === "post") return POST_REPORT_REASONS;
   return USER_REPORT_REASONS;
 }
 
@@ -221,6 +226,65 @@ export async function submitReport(input: SubmitReportInput) {
 
 export async function reportUser(reportedId: string, reason: ReportReason, details?: string) {
   await submitReport({ subjectType: "user", reportedId, reason, details });
+}
+
+/** What a member reads when report_post is not there (before 20261205100000, or after its rollback). */
+export const POST_REPORT_UNAVAILABLE_MESSAGE = "Reporting a post isn't available right now.";
+export const POST_REPORT_FAILED_MESSAGE = "Couldn't submit your report. Please try again.";
+/** A report was filed (by report_post, or written by submitReport). */
+export const REPORT_SUBMITTED_MESSAGE = "Report submitted. Our moderators will review it.";
+/** report_post filed nothing: the member's open report already says the same (a double tap, or the same again). */
+export const POST_REPORT_ALREADY_OPEN_MESSAGE =
+  "You already reported this post for that reason. Our moderators will review it.";
+
+/** What report_post did: `filed` is false when it found the member's open report that already says the same. */
+export type PostReportResult = { reportId: string; filed: boolean };
+
+/**
+ * report_post's answer, {report_id, filed}. Anything else is treated as a failure, so the member is never told a report
+ * was filed (or was already there) when that is not known.
+ */
+export function parsePostReportResult(data: unknown): PostReportResult {
+  const row = (data ?? {}) as { report_id?: unknown; filed?: unknown };
+  if (typeof row.report_id !== "string" || typeof row.filed !== "boolean") {
+    throw new Error(POST_REPORT_FAILED_MESSAGE);
+  }
+  return { reportId: row.report_id, filed: row.filed };
+}
+
+/**
+ * report_post's refusals in the member's words, never the database's text: the catalog sentence for its codes
+ * (POST_NOT_FOUND, CANNOT_REPORT_SELF, AUTH_REQUIRED), the unavailable sentence while the function is missing, and
+ * the fallback for anything else.
+ */
+export function reportPostErrorMessage(error: unknown): string {
+  if (isMissingFunctionError(error as { code?: string } | null)) {
+    return POST_REPORT_UNAVAILABLE_MESSAGE;
+  }
+  return userErrorMessage(error, POST_REPORT_FAILED_MESSAGE);
+}
+
+/**
+ * Reports a network post (20261205100000). The database decides everything: the post must be one the member can read
+ * (a post that does not exist and one they cannot see get the same answer), it is never their own, the reported user
+ * is the post's author, and a repeat that adds nothing to the member's open report (the same reason about the same
+ * text, no new note) files nothing and answers with that report (`filed: false`); anything else is a new report. The
+ * author never sees the report. Resolves to what it did; throws an Error whose message is already a sentence for the
+ * member.
+ */
+export async function reportPost(
+  postId: string,
+  reason: ReportReason,
+  details?: string,
+): Promise<PostReportResult> {
+  const rpc = (supabase.rpc as unknown as RpcCall).bind(supabase);
+  const { data, error } = await rpc("report_post", {
+    _post: postId,
+    _reason: reason,
+    _details: details?.trim().slice(0, 1000) || null,
+  });
+  if (error) throw new Error(reportPostErrorMessage(error));
+  return parsePostReportResult(data);
 }
 
 /** One row of the signed-in member's block list. */

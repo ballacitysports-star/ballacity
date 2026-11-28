@@ -19,9 +19,12 @@ import {
   setReportStatus,
   applyModerationAction,
   listModerationAudit,
+  REPORT_SUBJECT_FILTERS,
   type ModerationReport,
 } from "@/lib/moderation.functions";
 import { reportReasonLabel, reportStatusLabel } from "@/lib/moderation";
+import { ReportedPostEvidence } from "@/components/admin/ReportedPostEvidence";
+import { restoreMessageShownAsIs } from "@/lib/post-restore";
 
 export const Route = createFileRoute("/admin/moderation")({
   head: () =>
@@ -43,7 +46,7 @@ const STATUS_FILTERS = [
   "resolved",
   "dismissed",
 ] as const;
-const SUBJECT_FILTERS = ["all", "user", "game", "message", "reel"] as const;
+const SUBJECT_FILTERS = ["all", ...REPORT_SUBJECT_FILTERS] as const;
 
 function statusTone(status: string) {
   const s = reportStatusLabel(status);
@@ -189,7 +192,7 @@ const MODERATION_OWN_MESSAGES: ReadonlySet<string> = new Set([
 /** Moderator screen: our sentence, else a readable one with the code for support, never raw SQL (WP 4.0). */
 function moderationErrorMessage(e: unknown, fallback: string): string {
   const text = errorText(e);
-  if (text && MODERATION_OWN_MESSAGES.has(text)) return text;
+  if (text && (MODERATION_OWN_MESSAGES.has(text) || restoreMessageShownAsIs(text))) return text;
   const code = errorCode(e);
   return `${userErrorMessage(e, fallback)}${code ? ` (${code})` : ""}`;
 }
@@ -295,6 +298,9 @@ function ReportCard({ report, onDone }: { report: ModerationReport; onDone: () =
                 {report.reelHidden ? " (hidden)" : ""}
               </dd>
             </div>
+          ) : null}
+          {report.subjectType === "post" ? (
+            <ReportedPostEvidence postId={report.postId} post={report.post} />
           ) : null}
           {report.details ? (
             <div className="sm:col-span-2">

@@ -77,6 +77,7 @@ const DB_RAISES: readonly string[] = [
   "BLOCKED_BY_HOST: you can't join this host's games.",
   "BLOCKED_BY_HOST: you can't join this host's games, so a payment cannot be recorded.",
   "CANNOT_REPORT_SELF",
+  "CANNOT_REPORT_SELF: you cannot report your own post.",
   "CAPACITY_BELOW_REGISTERED",
   "CHILD_ACTIVITY_LOCKED",
   "CHILD_CANNOT_HOST: an adult must host games that include children.",
@@ -180,6 +181,7 @@ const DB_RAISES: readonly string[] = [
   "INVALID_LOCATION",
   "INVALID_MESSAGE",
   "INVALID_PARENT_EMAIL",
+  "INVALID_REASON",
   "INVALID_STATUS",
   "INVALID_TYPE",
   "INVALID_WINDOW",
@@ -275,6 +277,7 @@ const DB_RAISES: readonly string[] = [
   "POST_AUDIENCE_NOT_ALLOWED",
   "POST_DELETED",
   "POST_LOCKED",
+  "POST_NOT_FOUND",
   "POST_OWNER_FIXED",
   "POST_TARGET_INVALID",
   "RATE_LIMITED",
@@ -354,6 +357,8 @@ const HINT_RAISES: readonly { message: string; code: string; hint: string }[] = 
 /** Codes deliberately left to the caller's fallback: an app bug or a cron failure with nothing better to say. */
 const LEFT_TO_FALLBACK = new Set([
   "INVALID_LIMIT",
+  // report_post (20261205100000): the app only sends reasons from moderation.ts, so this is an app bug.
+  "INVALID_REASON",
   "INVALID_WINDOW",
   "INVALID_WORKER_PATH",
   "UNKNOWN_LISTING_KIND",
@@ -362,8 +367,9 @@ const LEFT_TO_FALLBACK = new Set([
 /**
  * Codes deliberately not in the catalog because no member meets them: Content Studio, which only superadmins use and
  * which words its own refusals (drizzle 0023); device pairing, which has no screen (drizzle 0002); the hotfix guard
- * that stops a write path outright; and the server-only sweep stamps (WP 5.4 push_sent_at, WP 5.6
- * attendance_prompted_at), which no screen writes.
+ * that stops a write path outright; the server-only sweep stamps (WP 5.4 push_sent_at, WP 5.6
+ * attendance_prompted_at), which no screen writes; and the guard that keeps post reports to report_post
+ * (20261205100000), which no screen goes around.
  */
 const NOT_FOR_MEMBERS = new Set([
   "ALREADY_PUBLISHED",
@@ -392,6 +398,8 @@ const NOT_FOR_MEMBERS = new Set([
   "PAIRING_NOT_FOUND",
   "PUBLISH_IN_PROGRESS",
   "PUSH_SENT_AT_SERVER_ONLY",
+  // 20261205100000: a direct API insert of a post report; the app reports a post only through report_post.
+  "REPORT_POST_VIA_RPC",
 ]);
 
 /**

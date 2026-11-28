@@ -599,6 +599,64 @@ async function guardianCancelRace() {
   ];
 }
 
+// 20261205100000: a member sends the same post report twice at the same moment (a double tap, two tabs). report_post
+// takes a transaction advisory lock on (reporter, post) before it looks for the open report, so the second call waits
+// for the first to commit, finds its report and answers with it: one row, one id for both, no error, and only the first
+// says it filed one. The lock must end with the transaction: a session lock would stay on a pooled connection after
+// COMMIT and make the member's next call from another connection wait. Each session reads its own advisory locks
+// after COMMIT, before it disconnects.
+const POST_REPORT_RACE_CLEANUP = `
+  DELETE FROM public.user_reports WHERE reporter_id = t.id('racerepb');
+  DELETE FROM public.posts WHERE id = t.id('race-net-post');
+  DELETE FROM auth.users WHERE id IN (t.id('racerepa'), t.id('racerepb'));`;
+
+async function postReportRace() {
+  psql(dbName, [], POST_REPORT_RACE_CLEANUP);
+  r = psql(
+    dbName,
+    [],
+    `SELECT t.person('racerepa', 30), t.person('racerepb', 31);
+     INSERT INTO public.posts (id, author_id, audience, body, moderation_status)
+       VALUES (t.id('race-net-post'), t.id('racerepa'), 'public', 'Race me', 'approved');`,
+  );
+  if (r.status !== 0) fail("The post report race could not set up its post.", r.stderr);
+  const report = (hold) =>
+    `BEGIN; SELECT t.as_user(t.id('racerepb'));
+     SELECT 'ANSWER:' || (r ->> 'report_id') || ':' || (r ->> 'filed')
+       FROM (SELECT public.report_post(t.id('race-net-post'), 'spam') AS r) x;
+     ${hold ? "SELECT pg_sleep(3);" : ""} COMMIT;
+     SELECT 'LOCKS:' || count(*) FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid();`;
+  const first = session(report(true));
+  await pause(1000);
+  const second = session(report(false));
+  const results = await Promise.all([first, second]);
+  const rows = psql(dbName, [
+    "-At",
+    "-c",
+    "SELECT count(*) FROM public.user_reports WHERE reporter_id = t.id('racerepb') AND post_id = t.id('race-net-post')",
+  ]).stdout.trim();
+  psql(dbName, [], POST_REPORT_RACE_CLEANUP);
+  const answers = results.map((x) =>
+    (x.out.match(/ANSWER:([0-9a-f-]{36}):(true|false)/) ?? []).slice(1),
+  );
+  const locks = results.map((x) => (x.out.match(/LOCKS:(\d+)/) ?? [])[1]);
+  return [
+    ["one member reporting the same post twice at once files one report", rows === "1"],
+    [
+      "and both calls answer with that report, without an error",
+      results.every((x) => x.code === 0) && !!answers[0][0] && answers[0][0] === answers[1][0],
+    ],
+    [
+      "the first says it filed the report, the second that it filed nothing",
+      answers[0][1] === "true" && answers[1][1] === "false",
+    ],
+    [
+      "neither session keeps an advisory lock after COMMIT (a transaction lock, not a session lock)",
+      locks.every((n) => n === "0"),
+    ],
+  ];
+}
+
 // 20261204100000: a removed player sends their declined request again (rejected -> pending, as the player, so the
 // ask-limit trigger and enforce_host_block_resend run) while game_respond_invite accepts the host's later invitation
 // for the same game and player. The resend holds the request and then the removal row; the accept holds the invitation,
@@ -1013,6 +1071,7 @@ try {
         ...(await lastSeatRace()),
         ...(await inviteLastPlaceRace()),
         ...(await paidInviteLastPlaceRace()),
+        ...(await postReportRace()),
         ...(await hostRemovalRaces()),
         ...(await guardianCancelRace()),
         ...(await removedAskVsAcceptRace()),

@@ -37,10 +37,10 @@ import { REMOVED_BY_HOST_MESSAGE } from "@/lib/host-removal";
  *
  * Vocabulary: game, spot, host, venue (facilities and gyms), listing (claimable team and gym pages), invite, clip,
  * date of birth, parent or guardian. Codes that only mean an app bug or a cron failure with no better words than
- * "something went wrong" (UNKNOWN_LISTING_KIND, INVALID_WINDOW, INVALID_LIMIT, INVALID_WORKER_PATH), and codes only superadmin tools
- * or no screen at all can meet (Content Studio, device pairing, hotfix guards), are left out on purpose, so the
- * caller's own fallback names what failed. user-error.test.ts reads every code both migration folders raise and fails
- * on one that is in neither place.
+ * "something went wrong" (UNKNOWN_LISTING_KIND, INVALID_WINDOW, INVALID_LIMIT, INVALID_WORKER_PATH, INVALID_REASON),
+ * and codes only superadmin tools or no screen at all can meet (Content Studio, device pairing, hotfix guards, the
+ * REPORT_POST_VIA_RPC insert guard), are left out on purpose, so the caller's own fallback names what failed.
+ * user-error.test.ts reads every code both migration folders raise and fails on one that is in neither place.
  */
 export const USER_ERROR_MESSAGES = {
   ADULT_HOST_REQUIRED: "Only adults can host events.",
@@ -306,6 +306,8 @@ export const USER_ERROR_MESSAGES = {
   POST_AUDIENCE_NOT_ALLOWED: "You can't share a post with that audience.",
   POST_DELETED: "That post was deleted.",
   POST_LOCKED: "A parent or guardian needs to approve your account first.",
+  // report_post (20261205100000): a post that does not exist and one the member cannot read get this one answer.
+  POST_NOT_FOUND: "That post isn't available.",
   POST_OWNER_FIXED: "You can't change who a post is from.",
   POST_TARGET_INVALID: "You can't post for that team or venue.",
   RATE_LIMITED: "You're sending messages too fast. Wait a moment and try again.",
@@ -410,6 +412,12 @@ export const USER_ERROR_VARIANTS: readonly UserErrorVariant[] = [
     code: "AGE_VERIFICATION_REQUIRED",
     when: /add your date of birth first/i,
     message: "Add your date of birth first, then open the invite again.",
+  },
+  // report_post (20261205100000) says what the member tried to report; report_team_chat_message raises it bare.
+  {
+    code: "CANNOT_REPORT_SELF",
+    when: /own post/i,
+    message: "You can't report your own post.",
   },
   {
     code: "ATTESTATION_REQUIRED",

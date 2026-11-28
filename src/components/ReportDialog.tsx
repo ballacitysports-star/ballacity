@@ -15,16 +15,22 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
+  POST_REPORT_ALREADY_OPEN_MESSAGE,
+  POST_REPORT_FAILED_MESSAGE,
+  POST_REPORT_UNAVAILABLE_MESSAGE,
+  REPORT_SUBMITTED_MESSAGE,
   reasonsFor,
+  reportPost,
   submitReport,
   type ReportReason,
   type ReportSubjectType,
 } from "@/lib/moderation";
 
-/** submitReport's own sentences (moderation.ts). */
+/** submitReport's and reportPost's own sentences (moderation.ts). */
 const REPORT_OWN_MESSAGES: ReadonlySet<string> = new Set([
   "Sign in to report",
   "You cannot report yourself",
+  POST_REPORT_UNAVAILABLE_MESSAGE,
 ]);
 
 type Props = {
@@ -39,6 +45,8 @@ type Props = {
   conversationId?: string | null;
   messageId?: string | null;
   reelId?: string | null;
+  /** The network post a "post" report is about; the database names its author as the reported user. */
+  postId?: string | null;
 };
 
 const TITLES: Record<ReportSubjectType, string> = {
@@ -47,6 +55,7 @@ const TITLES: Record<ReportSubjectType, string> = {
   message: "Report message",
   reel: "Report highlight",
   payment: "Report a payment problem",
+  post: "Report post",
 };
 
 export function ReportDialog({
@@ -59,6 +68,7 @@ export function ReportDialog({
   conversationId,
   messageId,
   reelId,
+  postId,
 }: Props) {
   const [reason, setReason] = useState<ReportReason | null>(null);
   const [details, setDetails] = useState("");
@@ -69,17 +79,26 @@ export function ReportDialog({
     if (!reason) return;
     setSubmitting(true);
     try {
-      await submitReport({
-        subjectType,
-        reportedId,
-        reason,
-        details,
-        gameId,
-        conversationId,
-        messageId,
-        reelId,
-      });
-      toast.success("Report submitted. Our moderators will review it.");
+      let done = REPORT_SUBMITTED_MESSAGE;
+      if (subjectType === "post") {
+        // report_post checks the post, the reporter and the author itself; nothing is written directly. It says when
+        // it filed nothing because the member's open report already says the same, and the member is told so.
+        if (!postId) throw new Error(POST_REPORT_FAILED_MESSAGE);
+        const { filed } = await reportPost(postId, reason, details);
+        if (!filed) done = POST_REPORT_ALREADY_OPEN_MESSAGE;
+      } else {
+        await submitReport({
+          subjectType,
+          reportedId,
+          reason,
+          details,
+          gameId,
+          conversationId,
+          messageId,
+          reelId,
+        });
+      }
+      toast.success(done);
       onOpenChange(false);
       setReason(null);
       setDetails("");
