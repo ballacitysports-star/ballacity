@@ -1,14 +1,16 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { restoreSession } from "./helpers/signed-in";
 import { stubRiskAcknowledged } from "./helpers/risk-ack";
+import { stubServerFn } from "./helpers/server-fn";
+import { PAY_FIXTURE_HOST_ID, payFixtureGameRow, serveFixtureGame } from "./helpers/pay-fixtures";
 
 /**
  * E2E: tapping the "Pay host" button on the game detail page must
  * navigate to /games/:gameId/pay and successfully render the payment
- * screen (game title as heading, no "Game not found") for BOTH:
- *
- *   1. a "custom" sample game (from src/lib/sample-data.ts)
- *   2. a "hosted" game (record loaded via hosted_games REST)
+ * screen (game title as heading, no "Game not found"). Both games are
+ * hosted_games rows the spec serves: g2, the pay specs' fixture row
+ * (serveFixtureGame), in every test but the last, and a row of the last
+ * test's own, answered for every hosted_games read.
  *
  * Auto-skips when no signed-in Supabase session is available in env.
  */
@@ -21,17 +23,57 @@ test.skip(
   "Requires a signed-in Supabase session (LOVABLE_BROWSER_SUPABASE_* env vars).",
 );
 
-const FAKE_HOST_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+// The fixture game's host, so the mocked payment settings and the game agree on who is paid.
+const FAKE_HOST_ID = PAY_FIXTURE_HOST_ID;
 
-// g2 is a paid sample game (price 8) shipped in src/lib/sample-data.ts.
+// g2 is no longer a sample game (src/lib/sample-data.ts ships none): the pages read it from
+// hosted_games, which serveCustomGame answers with a paid fixture row (price 8).
 const CUSTOM_GAME_ID = "g2";
-const CUSTOM_GAME_TITLE_MATCH = /./; // just require a non-empty h1
+const CUSTOM_GAME_TITLE = String(payFixtureGameRow(CUSTOM_GAME_ID).title);
 
 const HOSTED_GAME_ID = "e2e-hosted-pay-0001";
 const HOSTED_GAME_TITLE = "E2E Hosted Paid Game";
 
+/**
+ * How long "Host hasn't set up payment yet" may take once the pay screen is drawn, in the test
+ * whose viewer lookups (the viewer's payments and join request) hang. The page gives those lookups
+ * 6 s (withTimeout in the pay route's viewer-lookup effect, src/routes/games.$gameId.pay.tsx),
+ * starting just after the render that draws the screen. A page that held the payment options until
+ * they gave up would draw the empty state at least 5 s into this wait (which starts up to a second
+ * after the screen is drawn: a pending expect re-checks at most once a second), so it fails here.
+ * Every read the empty state waits on is answered by the spec, so it waits only for renders (under
+ * 200 ms on the local stack); the rest is slack for a busy runner.
+ */
+const EMPTY_STATE_WITHIN_MS = 3_000;
+
 function tableUrl(url: URL | string, table: string) {
   return String(url).includes(`/rest/v1/${table}`);
+}
+
+/**
+ * Serve g2 from the spec rather than from the target database: the game page needs it before it
+ * draws the Pay Host link, and until the hosted-games store has read the game from the database the
+ * pay page counts its roster as full (failing closed) and shows "Loading payment options…", then
+ * "We couldn't check whether this account can pay", in place of the payment options. Install
+ * before the page loads.
+ */
+async function serveCustomGame(page: Page) {
+  await serveFixtureGame(page, payFixtureGameRow(CUSTOM_GAME_ID));
+}
+
+/**
+ * The guardian check (game_payment_guardian_ready), as the database answers it for the adult
+ * fixture player. The pay page shows "Loading payment options…" until it has answered, in place of
+ * every payment option, empty state and payment-service error.
+ */
+async function answerGuardianReady(page: Page) {
+  await page.route(
+    (url) => String(url).includes("/rest/v1/rpc/game_payment_guardian_ready"),
+    async (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      await route.fulfill({ status: 200, contentType: "application/json", body: "true" });
+    },
+  );
 }
 
 /**
@@ -145,18 +187,29 @@ async function mockPaymentBackend(
 
 async function assertPayScreenRendered(page: Page, gameId: string) {
   await page.waitForURL((u) => u.pathname === `/games/${gameId}/pay`, { timeout: 10_000 });
+  // The URL changes as soon as the link is tapped, before the code-split pay route has drawn
+  // anything, and until it has, the game page (whose title is an h1 too) is still on screen. The
+  // hero amount's label is drawn only by the pay screen, once it has the game; the not-found
+  // fallback is drawn in its place, so wait for either and then require the hero.
+  const entryFee = page.getByText("Entry fee", { exact: true });
+  const notFound = page.getByText(/game not found/i);
+  await expect(entryFee.or(notFound).first()).toBeVisible({ timeout: 10_000 });
   // Must NOT show the not-found fallback.
-  await expect(page.getByText(/game not found/i)).toHaveCount(0);
+  await expect(notFound).toHaveCount(0);
+  await expect(entryFee).toBeVisible();
   // Title heading is rendered on the pay screen.
-  await expect(page.locator("h1").first()).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator("h1").first()).toBeVisible();
 }
 
-test("Pay host button on a custom (sample) game routes to the pay screen", async ({ browser }) => {
+test("Pay host button on the fixture game routes to the pay screen without writing", async ({
+  browser,
+}) => {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   const writeAttempts: string[] = [];
 
   await mockPaymentBackend(page, CUSTOM_GAME_ID, { writeAttempts });
+  await serveCustomGame(page);
   // Not a spec about "Before you join": the viewer has acknowledged it, so the pay page (which asks it
   // before any payment option, docs/paid-path-gates.md section 7) goes straight to the options.
   await stubRiskAcknowledged(page);
@@ -170,7 +223,7 @@ test("Pay host button on a custom (sample) game routes to the pay screen", async
   await cta.click();
 
   await assertPayScreenRendered(page, CUSTOM_GAME_ID);
-  await expect(page.locator("h1").first()).toContainText(CUSTOM_GAME_TITLE_MATCH);
+  await expect(page.locator("h1").first()).toContainText(CUSTOM_GAME_TITLE);
   expect(writeAttempts, "opening pay should not join/cancel/delete from the detail CTA").toEqual(
     [],
   );
@@ -251,6 +304,15 @@ test("Pay host still renders when optional status lookups hang", async ({ browse
     },
   );
 
+  // The reads the empty state does wait on, unlike the hanging lookups above: the game (for its
+  // roster count), the guardian check and the PayPal config. The config is a server function,
+  // answered here as not set up, which is what CI's server answers; unanswered, the page would wait
+  // up to PAYPAL_CONFIG_DEADLINE_MS (src/hooks/use-paypal-checkout-config.ts) for it. So the wait
+  // below measures the page, not the target database or the app server.
+  await serveCustomGame(page);
+  await answerGuardianReady(page);
+  await stubServerFn(page, "getPayPalCheckoutConfig", { clientId: null, merchantId: null });
+
   await stubRiskAcknowledged(page);
   await restoreSession(page);
   await page.goto(`/games/${CUSTOM_GAME_ID}`, { waitUntil: "domcontentloaded" });
@@ -261,7 +323,7 @@ test("Pay host still renders when optional status lookups hang", async ({ browse
 
   await assertPayScreenRendered(page, CUSTOM_GAME_ID);
   await expect(page.getByText(/host hasn't set up payment yet/i).first()).toBeVisible({
-    timeout: 10_000,
+    timeout: EMPTY_STATE_WITHIN_MS,
   });
   await expect(page.getByText(/couldn't reach the payment service/i)).toHaveCount(0);
   expect(writeAttempts, "opening pay should remain read-only").toEqual([]);
@@ -306,6 +368,11 @@ test("Pay screen exits payment-options loading when payment settings hang", asyn
     },
   );
 
+  // The payment-service error is drawn only once the game's roster count and the guardian check
+  // are in (until then the page shows "Loading payment options…"): answer both here.
+  await serveCustomGame(page);
+  await answerGuardianReady(page);
+
   await stubRiskAcknowledged(page);
   await restoreSession(page);
   await page.goto(`/games/${CUSTOM_GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
@@ -327,6 +394,7 @@ test("Pay host button remains a pay link when local joined state is stale", asyn
   const writeAttempts: string[] = [];
 
   await mockPaymentBackend(page, CUSTOM_GAME_ID, { writeAttempts });
+  await serveCustomGame(page);
   await stubRiskAcknowledged(page);
   await restoreSession(page);
   await page.evaluate(
@@ -358,6 +426,7 @@ test("Payment status button with a pending submission still routes to the pay sc
     submissions: [mockPendingSubmission(CUSTOM_GAME_ID)],
     writeAttempts,
   });
+  await serveCustomGame(page);
   await stubRiskAcknowledged(page);
   await restoreSession(page);
   await page.evaluate(
@@ -393,6 +462,7 @@ test("Payment rejected button routes back to the pay screen without deleting the
     submissions: [mockRejectedSubmission(CUSTOM_GAME_ID)],
     writeAttempts,
   });
+  await serveCustomGame(page);
   await stubRiskAcknowledged(page);
   await restoreSession(page);
   await page.evaluate(
