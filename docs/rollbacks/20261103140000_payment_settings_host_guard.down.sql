@@ -2,6 +2,32 @@
 -- NOT a migration. Re-opens the hole: any signed-in account can write payment settings for any game, a payment
 -- submission can name any payee, and "the latest settings row" is believed again.
 --     PGOPTIONS="-c app.confirm_reopen_payment_settings=yes" psql ... -f <this file>
+-- It stops, changing nothing, while public.game_removals exists: roll back 20261204110000, 20261204100000 and
+-- 20261202100000 first, in that order (docs/rollbacks/20261204110000_paid_invite_capacity.down.sql,
+-- docs/rollbacks/20261204100000_removal_ask_limits.down.sql, docs/rollbacks/20261202100000_removal_sticks.down.sql).
+-- Run while removals are recorded, it would put back a join gate and a release sweep that do not read them.
+-- It also stops, changing nothing, unless each of the seven functions it puts back (validate_join_request,
+-- enforce_approval_before_payment, enforce_game_join_gate, release_expired_payment_holds, settle_paid_spot,
+-- get_game_refund_terms, get_game_host_payment_methods) is exactly what 20261103140000 created (md5 below). Its
+-- CREATE OR REPLACE would otherwise overwrite a later definition without a word. On main these were redefined later:
+-- enforce_game_join_gate by 20261202100000, release_expired_payment_holds by 20261125100000 and 20261202100000, and
+-- get_game_host_payment_methods by 20261111120000, 20261119200000 and 20261128120000. Their rollbacks must have put
+-- 20261103140000's bodies back before this one runs; clearing game_removals alone is not enough. A changed body
+-- needs a person to look first.
+-- It also stops while any other function still calls one of the four helpers it drops at the end (a function body
+-- is a string, so DROP FUNCTION would succeed and that function would fail later).
+-- PRODUCTION CHECK: the md5 values were computed on the local Postgres 16 from a replay of the migrations up to and
+-- including 20261103140000. Production runs 17, where pg_get_functiondef text may differ. The guard fails closed (it
+-- refuses, changing nothing), but check before an emergency with this read-only query; on the state 20261103140000
+-- left it must list exactly the md5 values in the guard below:
+--     SELECT p.oid::regprocedure::text, md5(pg_get_functiondef(p.oid)) FROM pg_proc p
+--      WHERE p.oid IN ('public.validate_join_request()'::regprocedure,
+--                      'public.enforce_approval_before_payment()'::regprocedure,
+--                      'public.enforce_game_join_gate()'::regprocedure,
+--                      'public.release_expired_payment_holds(text)'::regprocedure,
+--                      'public.settle_paid_spot(text,uuid,text)'::regprocedure,
+--                      'public.get_game_refund_terms(text)'::regprocedure,
+--                      'public.get_game_host_payment_methods(uuid,text)'::regprocedure) ORDER BY 1;
 BEGIN;
 DO $guard$
 BEGIN
@@ -10,6 +36,53 @@ BEGIN
   END IF;
 END
 $guard$;
+DO $defs$
+DECLARE
+  _want CONSTANT text[][] := ARRAY[
+    ['public.validate_join_request()',                   '360371fe6b5b898d64af524f45ca563c'],
+    ['public.enforce_approval_before_payment()',         '3ffff8c3b95ae10ce43cdc4197cc886a'],
+    ['public.enforce_game_join_gate()',                  '9d4924a2d53915fca8fa245e15281a25'],
+    ['public.release_expired_payment_holds(text)',       '3eee00253e98ac807138ccf333f1c498'],
+    ['public.settle_paid_spot(text,uuid,text)',          '57f56d6ca1f73350c5896219236713ee'],
+    ['public.get_game_refund_terms(text)',               'b3a83c3ae050ffd7f92869d29df5c6b5'],
+    ['public.get_game_host_payment_methods(uuid,text)',  'ca5a74909181a98cf1416c6a5d37d156']];
+  _fn regprocedure;
+  _got text;
+  i int;
+BEGIN
+  -- First, because it names the order to follow, which a bare md5 mismatch does not.
+  IF to_regclass('public.game_removals') IS NOT NULL THEN
+    RAISE EXCEPTION 'Refusing to run: public.game_removals exists, so 20261202100000 is still applied and this would put back a join gate and a release sweep that ignore recorded removals. Roll back 20261204110000, 20261204100000 and 20261202100000 first, in that order.';
+  END IF;
+  FOR i IN 1 .. array_length(_want, 1) LOOP
+    _fn := to_regprocedure(_want[i][1]);
+    SELECT md5(pg_get_functiondef(p.oid)) INTO _got FROM pg_proc p WHERE p.oid = _fn;
+    IF _fn IS NULL OR _got IS DISTINCT FROM _want[i][2] THEN
+      RAISE EXCEPTION 'Refusing to run: % is not the definition 20261103140000 created (md5 %). A later change needs a person to look first.', _want[i][1], _got;
+    END IF;
+  END LOOP;
+  -- The end of this file drops four helpers. A function body that calls one by name is a string Postgres does not
+  -- track, so the drops would succeed and that function would fail at its next call. Refuse while any function this
+  -- file does not replace or drop still names one (on main: get_game_join_policy, game_respond_invite,
+  -- paypal_payment_block, get_game_payment_terms).
+  SELECT string_agg(p.oid::regprocedure::text, ', ' ORDER BY 1) INTO _got
+    FROM pg_proc p
+   WHERE p.prosrc ~ '\m(game_payee|game_payee_id|can_manage_game_payment_settings|can_read_game_payment_settings)\M'
+     AND NOT p.oid = ANY (array_remove(ARRAY[
+           to_regprocedure('public.validate_join_request()'), to_regprocedure('public.enforce_approval_before_payment()'),
+           to_regprocedure('public.enforce_game_join_gate()'), to_regprocedure('public.release_expired_payment_holds(text)'),
+           to_regprocedure('public.settle_paid_spot(text,uuid,text)'), to_regprocedure('public.get_game_refund_terms(text)'),
+           to_regprocedure('public.get_game_host_payment_methods(uuid,text)'),
+           to_regprocedure('public.enforce_payment_destination()'),
+           to_regprocedure('private_sec.can_read_game_payment_settings(text,uuid)'),
+           to_regprocedure('public.game_payee_id(text)'),
+           to_regprocedure('private_sec.can_manage_game_payment_settings(text)'),
+           to_regprocedure('private_sec.game_payee(text)')]::oid[], NULL));
+  IF _got IS NOT NULL THEN
+    RAISE EXCEPTION 'Refusing to run: % still call a helper this rollback drops (game_payee, game_payee_id, can_manage_game_payment_settings or can_read_game_payment_settings). They would fail at their next call. Roll back the migrations that created them first, or keep the helpers.', _got;
+  END IF;
+END
+$defs$;
 
 DROP TRIGGER IF EXISTS aa_payment_destination_trg ON public.payment_submissions;
 DROP FUNCTION IF EXISTS public.enforce_payment_destination();

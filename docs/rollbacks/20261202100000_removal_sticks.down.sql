@@ -42,13 +42,14 @@
 -- (host_remove_player), docs/rollbacks/20261125100000_profile_blocks_suspension.down.sql
 -- (release_expired_payment_holds) and docs/rollbacks/20261119200000_payment_claim_preconditions.down.sql
 -- (payment_claim_block, enforce_payment_claim_preconditions). docs/rollbacks/20261103140000_payment_settings_host_guard.down.sql
--- (enforce_game_join_gate, release_expired_payment_holds) has NO definition guard, only its confirmation setting: run
--- while 20261202100000 is applied it silently overwrites the join gate and the release sweep, dropping the
--- REMOVED_BY_HOST check and the sweep's waitlist exclusion while game_removals and the lift trigger stay (removals
--- recorded, not enforced), and this rollback then refuses on the gate's md5. Do not run it before this one. The
--- 20261125100000 rollback also lists the triggers that run lock_row_identity and refuses while the roster lock exists.
+-- (enforce_game_join_gate, release_expired_payment_holds) once had only its confirmation setting. Since 2026-11-27 it
+-- also has a definition guard: it refuses while public.game_removals exists or while any of its seven pinned bodies
+-- differs, so it cannot overwrite the join gate and the release sweep while this migration is applied. Run this one
+-- first. The 20261125100000 rollback also lists the triggers that run lock_row_identity and refuses while the roster
+-- lock exists.
 -- The rollback of 20261130110000 is independent of this one.
--- docs/release/p0-1-verify.sql pins enforce_game_join_gate's earlier md5 9d4924a2... and passes again after this.
+-- docs/release/p0-1-verify.sql pins enforce_game_join_gate's earlier md5 9d4924a2..., and that row passes again after
+-- this. Its rows for the release sweep and get_game_host_payment_methods stay not ok (see its SCOPE note).
 -- LEDGER: this file does not touch supabase_migrations.schema_migrations. After a successful rollback, delete the ledger
 -- row for 20261202100000 by hand (as the earlier release records do), or the ledger says applied while the definitions
 -- are the old ones, and a later re-apply hits a primary-key conflict.

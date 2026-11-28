@@ -9,6 +9,13 @@
 -- postgres:16 (2026-11-06) after the seven files; they are the texts in the repository, so they hold on 17 too
 -- (the 2026-11-05 hotfix rehearsal found the same values on 16 and 17). The ledger check accepts, per file, a
 -- supabase ledger row (psql path) or a drizzle row with the file's sha256 with or without its final newline (Lovable).
+-- SCOPE: this verifies the P0-1 state only, as it stood right after the seven files, and its queries are kept as they
+-- were run then. Later migrations replaced some of the definitions it pins, so on a current database those rows are
+-- expected to be not ok: the public.enforce_game_join_gate() row (9d4924a2...) is superseded by 20261202100000, the
+-- public.release_expired_payment_holds(text) row by 20261125100000 and 20261202100000, and the
+-- public.get_game_host_payment_methods(uuid,text) row by 20261111120000, 20261119200000 and 20261128120000. A not ok
+-- there is not drift. docs/rollbacks/20261103140000_payment_settings_host_guard.down.sql
+-- pins seven of these function md5s and refuses to run until those later changes are rolled back.
 BEGIN READ ONLY;
 SET LOCAL search_path = '';
 WITH expected_fn(sig, md5, exec) AS (VALUES
