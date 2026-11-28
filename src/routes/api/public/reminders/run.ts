@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { authorizeWorker } from "@/lib/worker-auth.server";
+import { REMINDERS_WORKER, reportingWorkerFailures } from "@/lib/worker-failure-report.server";
 
 /**
  * P2-7: sends every player's due game reminders, so they arrive while the app is closed.
@@ -10,6 +11,9 @@ import { authorizeWorker } from "@/lib/worker-auth.server";
  * to mark attendance (WP 5.6). runScheduledSweeps runs the three jobs one after another under one
  * time budget, each claiming its rows before it sends; one failing does not stop the others, and
  * the run reports 500 if any failed.
+ *
+ * A 500 (a job failed, or the run threw) is also filed in the superadmin error view as
+ * "send-game-reminders: <error>" (P2-7a, src/lib/worker-failure-report.server.ts).
  */
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -21,7 +25,7 @@ function json(body: unknown, status = 200) {
 export const Route = createFileRoute("/api/public/reminders/run")({
   server: {
     handlers: {
-      POST: async ({ request }) => {
+      POST: reportingWorkerFailures(REMINDERS_WORKER, async ({ request }) => {
         if ((await authorizeWorker(request)) !== "ok") return json({ error: "Unauthorized" }, 401);
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { runScheduledSweeps } = await import("@/lib/game-reminders.server");
@@ -38,7 +42,7 @@ export const Route = createFileRoute("/api/public/reminders/run")({
           },
           errors.length ? 500 : 200,
         );
-      },
+      }),
     },
   },
 });
