@@ -21,7 +21,7 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 
 import { ReportedPostEvidence, reportedPostState } from "./ReportedPostEvidence";
-import { RESTORE_KEEPS_HIDDEN, restoreKeepsHidden } from "@/lib/post-restore";
+import { RESTORE_CHECK_FAILED, RESTORE_KEEPS_HIDDEN, restoreKeepsHidden } from "@/lib/post-restore";
 
 const post = (over: Partial<ModerationPost> = {}): ModerationPost => ({
   id: "post-1",
@@ -102,13 +102,10 @@ describe("ReportedPostEvidence (moderation queue, post reports)", () => {
     show("post-1", post({ hidden: true }));
     expect(screen.queryByText(/leaves the post hidden/)).toBeNull();
     cleanup();
-    show(
-      "post-1",
-      post({ hidden: true, restoreKeepsHidden: "another report about this post was acted on" }),
-    );
+    show("post-1", post({ hidden: true, restoreKeepsHidden: RESTORE_KEEPS_HIDDEN.hiddenSince }));
     expect(
       screen.getByText(
-        "Restore dismisses this report but leaves the post hidden: another report about this post was acted on. A superadmin unhides it on /superadmin, Content, Network posts.",
+        "Restore dismisses this report but leaves the post hidden: it was hidden again, or this report was updated, after this report hid it. A superadmin unhides it on /superadmin, Content, Network posts.",
       ),
     ).toBeTruthy();
     // Restore on a post report lifts only this report's own suspension or ban: the card never promises a lift
@@ -123,7 +120,8 @@ describe("ReportedPostEvidence (moderation queue, post reports)", () => {
       resolutionNotes: "Post hidden — abuse",
       reviewedAt: T_MINE,
       hiddenAt: T_MINE,
-      otherClosedReports: 0,
+      ownHides: [],
+      otherReports: 0,
     };
     const card = (over: Partial<typeof own>) => {
       const input = { ...own, ...over };
@@ -134,6 +132,9 @@ describe("ReportedPostEvidence (moderation queue, post reports)", () => {
     };
     const warning = (why: string) =>
       `Restore dismisses this report but leaves the post hidden: ${why}. A superadmin unhides it on /superadmin, Content, Network posts.`;
+    /** Another report keeps this report's own hide: Restore is refused and the report stays as it is. */
+    const refusal =
+      "Restore changes nothing while another report about this post was acted on: this report's own hide stays, and so does the report. Dismiss that report first if its action no longer applies.";
 
     it("warns of nothing when this report's own hide is the one Restore would undo", () => {
       card({});
@@ -147,13 +148,29 @@ describe("ReportedPostEvidence (moderation queue, post reports)", () => {
     });
 
     it("warns that another moderator's later hide through another report stays", () => {
-      card({ hiddenAt: T_LATER, otherClosedReports: 1 });
-      expect(screen.getByText(warning(RESTORE_KEEPS_HIDDEN.otherReport))).toBeTruthy();
+      card({ hiddenAt: T_LATER, otherReports: 1 });
+      expect(screen.getByText(warning(RESTORE_KEEPS_HIDDEN.hiddenSince))).toBeTruthy();
     });
 
-    it("warns that the post stays hidden while another report about it is resolved", () => {
-      card({ otherClosedReports: 1 });
-      expect(screen.getByText(warning(RESTORE_KEEPS_HIDDEN.otherReport))).toBeTruthy();
+    it("says Restore changes nothing, and keeps the report, while another report keeps this report's own hide", () => {
+      card({ otherReports: 1 });
+      expect(screen.getByText(refusal)).toBeTruthy();
+      expect(screen.queryByText(/dismisses this report/)).toBeNull();
+    });
+
+    it("knows this report's own hide after a second action, from its audit entry", () => {
+      card({ resolutionNotes: "Warning issued — abuse", reviewedAt: T_LATER, ownHides: [T_MINE] });
+      expect(screen.queryByText(/leaves the post hidden|changes nothing/)).toBeNull();
+    });
+
+    it("warns that a hide that was there before this report's Remove content stays", () => {
+      card({ resolutionNotes: "Post already hidden — abuse" });
+      expect(screen.getByText(warning(RESTORE_KEEPS_HIDDEN.alreadyHidden))).toBeTruthy();
+    });
+
+    it("says when it could not check what Restore would keep", () => {
+      show("post-1", post({ hidden: true, restoreKeepsHidden: RESTORE_CHECK_FAILED }));
+      expect(screen.getByText(RESTORE_CHECK_FAILED)).toBeTruthy();
     });
 
     it("warns that a hide this report's notes do not claim stays", () => {

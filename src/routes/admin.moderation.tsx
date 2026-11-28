@@ -24,7 +24,7 @@ import {
 } from "@/lib/moderation.functions";
 import { reportReasonLabel, reportStatusLabel } from "@/lib/moderation";
 import { ReportedPostEvidence } from "@/components/admin/ReportedPostEvidence";
-import { RESTORE_READ_FAILED } from "@/lib/post-restore";
+import { restoreMessageShownAsIs } from "@/lib/post-restore";
 
 export const Route = createFileRoute("/admin/moderation")({
   head: () =>
@@ -187,13 +187,12 @@ function ReportsTab() {
 const MODERATION_OWN_MESSAGES: ReadonlySet<string> = new Set([
   "Report not found",
   "This report has no removable content attached",
-  RESTORE_READ_FAILED,
 ]);
 
 /** Moderator screen: our sentence, else a readable one with the code for support, never raw SQL (WP 4.0). */
 function moderationErrorMessage(e: unknown, fallback: string): string {
   const text = errorText(e);
-  if (text && MODERATION_OWN_MESSAGES.has(text)) return text;
+  if (text && (MODERATION_OWN_MESSAGES.has(text) || restoreMessageShownAsIs(text))) return text;
   const code = errorCode(e);
   return `${userErrorMessage(e, fallback)}${code ? ` (${code})` : ""}`;
 }

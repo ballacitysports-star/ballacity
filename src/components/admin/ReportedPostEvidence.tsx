@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { AUDIENCE_LABELS, type PostAudience } from "@/lib/network-posts-rules";
 import type { ModerationPost } from "@/lib/moderation.functions";
+import { restoreCardNote } from "@/lib/post-restore";
 
 /** Where a post stands, in the queue's words: what a moderator needs before choosing Remove content or Restore. */
 export function reportedPostState(post: ModerationPost): string | null {
@@ -77,10 +78,7 @@ export function ReportedPostEvidence({
           ) : null}
         </p>
         {post.restoreKeepsHidden ? (
-          <p className="text-muted-foreground">
-            Restore dismisses this report but leaves the post hidden: {post.restoreKeepsHidden}. A
-            superadmin unhides it on /superadmin, Content, Network posts.
-          </p>
+          <p className="text-muted-foreground">{restoreCardNote(post.restoreKeepsHidden)}</p>
         ) : null}
       </dd>
     </div>
