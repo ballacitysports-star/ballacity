@@ -235,15 +235,22 @@ check this. Production payment code and `vite.config.ts` are unchanged.
   whole cookie headers; values of fields named like `access_token`, `refresh_token`,
   `id_token`, `password`, `secret`, `token`, `api_key`, `service_role_key`,
   `authorization`, at any depth of backslash escaping, including unicode-escaped values.
-  The report step has no exact values, so it relies on these.
-- **The report, specifically.** Each string is redacted as written in the file and again
-  decoded, so a JWT or key right after an escaped newline and a unicode-escaped field name
-  are found there too, and no escape sequence is ever split. A credential-named key's value
-  is replaced whole: every string and number in it, at any depth, becomes `"[REDACTED]"`;
+  The report step is given no secrets. Of the workflow's own values only the job-level
+  `E2E_BASE_URL` reaches it, as an exact value, so `http://localhost:8080` shows as
+  `[REDACTED:E2E_BASE_URL]` in the report. For secrets it relies on these patterns.
+- **The report, specifically.** In each string exact values go first, as written and
+  decoded. Then the string is redacted as written in the file, with rules that never start
+  inside an escape sequence, and again decoded, exactly as a log line is (the result is
+  written back as JSON, so no rule can split an escape there). The report therefore loses
+  nothing log mode would remove from that string: a JWT or key right after an escaped
+  newline, a value on the line after its field name, a unicode-escaped field name. As a
+  check, a string whose result keeps any word more often than log mode's result for it is
+  replaced whole by `"[REDACTED]"` (a rule as written can take part of what a rule decoded
+  needs, such as a cookie name inside a field's value). A credential-named key's value is
+  replaced whole: every string and number in it, at any depth, becomes `"[REDACTED]"`;
   null and booleans are kept. The step fails (nothing uploaded) if an exact value occurs
-  outside a single string, such as in a number or across JSON structure, or is still in the
-  output. A value on the line after its field name (`secret:` then a line break) is not
-  treated as that field's value in the report; in logs it still is.
+  outside a single string, such as in a number or across JSON structure, or is still in
+  the output.
 - **Not reliably caught:** an opaque value with no recognizable format that is neither a
   known environment value nor next to a credential-looking field name; in logs, a field
   _name_ that is itself escaped; secrets split across lines or fields; base64- or

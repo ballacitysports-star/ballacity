@@ -13,13 +13,16 @@
  * Logs (`redact`, `makeRedactor`, `sanitizeLog`) are redacted as plain text.
  *
  * A JSON report (`redactJsonReport`) is redacted string by string, so the result is
- * always valid JSON and no escape sequence is ever cut in half. Each string is redacted
- * as it is written in the file (what a text redactor sees) and again decoded (so a JWT
- * after a newline or a unicode-escaped field name is found too); a changed string is
- * written back with JSON.stringify. A credential-named key's value is replaced whole:
- * every string and number in it, at any depth, becomes "[REDACTED]" (null and booleans
- * are kept). The report fails, and nothing may be uploaded, if an exact value occurs
- * anywhere but inside a single string, or is still in the output.
+ * always valid JSON and no escape sequence is ever cut in half. In each string, exact
+ * values go first (as written and decoded); then the string is redacted as it is written
+ * in the file (what a text redactor sees) and again decoded, exactly as a log line (so a
+ * JWT after a newline, a value on the line after its field name or a unicode-escaped
+ * field name is found too); a changed string is written back with JSON.stringify. A
+ * string whose result keeps a word more often than log mode's result for it becomes
+ * "[REDACTED]" whole. A credential-named key's value is replaced whole: every string and
+ * number in it, at any depth, becomes "[REDACTED]" (null and booleans are kept). The
+ * report fails, and nothing may be uploaded, if an exact value occurs anywhere but inside
+ * a single string, or is still in the output.
  *
  * Limits, stated plainly. Shape matching is a safety net, not a guarantee. Not
  * detectable: an opaque value with no recognizable format that is neither a known
@@ -55,28 +58,39 @@ const BACKSLASH_PAIRS = String.raw`(?=(?<pairs>(?:\\\\)*))\k<pairs>`;
 // The position follows an odd run of backslashes, so it is inside an escape sequence.
 const AFTER_ODD_BACKSLASHES = String.raw`(?:^|[^\\])\\(?:\\\\)*`;
 
+const SHAPE_MARKERS = ["jwt", "supabase-key", "payments-key", "bearer", "host"];
+const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** This redactor's own markers: [REDACTED], or with a shape name or an environment name. */
+const ownMarker = (names) =>
+  String.raw`\[REDACTED(?::(?:${[...SHAPE_MARKERS, ...names].map(escapeRegExp).join("|")}))?\]`;
+
 /**
  * The shape rules. Logs: a value that starts with an escape (`token:\nabc`) is replaced
  * together with that escape, so no backslash is left dangling and everything the rules
- * caught before is still caught. JSON strings (`json`): no replacement starts right
- * after a lone backslash (inside an escape such as \n or \r), and a separator is
- * followed by spaces or tabs only, never a line break. A string as written in a JSON
- * file has no raw line breaks, so this drops only replacements that used to leave an
- * invalid escape behind. `decoded`: a value that is already a marker is left alone, so the
- * second pass over a string does not turn [REDACTED] into [REDACTED]].
+ * caught before is still caught. JSON strings as written in the file (`json`): no
+ * replacement starts right after a lone backslash (inside an escape such as \n or \r);
+ * such a string has no raw line break or tab, so a line break there is always an escape.
+ * The report's decoded strings get the log rules. `names`: the environment names this
+ * redactor replaces. A field whose value is exactly one of this redactor's own markers
+ * is left alone, so [REDACTED:bearer] (or a second pass over a string) does not become
+ * [REDACTED]]: the old rule replaced only the marker's text there.
  */
-function shapes(json, decoded = false) {
-  const space = json ? String.raw`[^\S\r\n]` : String.raw`\s`;
+function shapes(json, names = []) {
+  const space = String.raw`\s`;
   const start = json ? String.raw`\b(?<!${AFTER_ODD_BACKSLASHES})` : String.raw`\b`;
-  // In the decoded pass, a separator followed by a marker is not a match at all (so the
-  // match cannot fall back to taking the space before the marker as the value).
-  const fresh = decoded ? String.raw`(?!${space}*\\*["']?\[REDACTED[\]:])` : "";
-  const sep = String.raw`${space}*[:=]${fresh}${space}*`;
-  const field = String.raw`(?<!\\)(\\*["']?)(${FIELD_NAMES})(\\*["']?)(${sep})`;
+  const sep = String.raw`${space}*[:=]${space}*`;
+  const fresh = String.raw`(?!${space}*\\*["']?${ownMarker(names)})`;
+  const field = String.raw`(?<!\\)(\\*["']?)(${FIELD_NAMES})(\\*["']?)(${space}*[:=]${fresh}${space}*)`;
   const cookie = String.raw`(?<!\\)(\\*["']?(?:set-)?cookie\\*["']?${sep})`;
   return [
     // user:password@ in any scheme://. Scheme and host are kept; the userinfo is not.
-    [/\b([a-z][a-z0-9+.-]*:\/\/)[^\/\s"'\\?#]*@/gi, "$1[REDACTED]@"],
+    // A run of scheme characters is taken whole and kept as it is when no "://" and
+    // userinfo follow, so the search goes on after it: every start inside that run ends
+    // at the same place, so none could match, and retrying each one is quadratic.
+    [
+      /\b([a-z][a-z0-9+.-]*)(:\/\/[^\/\s"'\\?#]*@)?/gi,
+      (m, scheme, userinfo) => (userinfo ? `${scheme}://[REDACTED]@` : m),
+    ],
     [
       new RegExp(String.raw`${start}eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]*`, "g"),
       "[REDACTED:jwt]",
@@ -96,11 +110,12 @@ function shapes(json, decoded = false) {
     // Whole cookie header value, which holds several name=value pairs.
     json
       ? [
-          // The value does not start with a space: the old rule only did that by giving back
+          // After a quote or backslash pairs the value may start with a space, as before.
+          // Right after the separator it may not: the old rule only did that by giving back
           // the separator's spaces when the value proper could not start, which removed
-          // nothing, and here it would mark the field as done and hide the real value.
+          // nothing, and here it would hide the real value from the decoded pass.
           new RegExp(
-            String.raw`${cookie}(${VALUE_QUOTE}|${BACKSLASH_PAIRS})(?!\s)${COOKIE_CHAR}+`,
+            String.raw`${cookie}(${VALUE_QUOTE}|(?=\\)${BACKSLASH_PAIRS}|(?!\s))${COOKIE_CHAR}+`,
             "gi",
           ),
           "$1$2[REDACTED]",
@@ -127,9 +142,7 @@ function shapes(json, decoded = false) {
     [new RegExp(String.raw`${start}[a-z0-9]{20}\.supabase\.(?:co|in)\b`, "gi"), "[REDACTED:host]"],
   ];
 }
-const LOG_SHAPES = shapes(false);
-const ENCODED_SHAPES = shapes(true);
-const DECODED_SHAPES = shapes(true, true);
+const namesOf = (replacements) => [...new Set(replacements.map(([name]) => name))];
 
 /** The text as it would appear inside 1..n layers of JSON string escaping. */
 function escapeLayers(text) {
@@ -177,11 +190,18 @@ function exactValues(env) {
  * @returns {(text: string) => string}
  */
 export function makeRedactor(env = {}) {
-  const replacements = exactValues(env);
+  return textRedactor(exactValues(env));
+}
+
+/** Exact values, then the log rules. */
+function textRedactor(replacements) {
+  const rules = shapes(false, namesOf(replacements));
   return (text) => {
     let out = String(text);
-    for (const [name, v] of replacements) out = out.split(v).join(`[REDACTED:${name}]`);
-    for (const [re, rep] of LOG_SHAPES) out = out.replace(re, rep);
+    for (const [name, v] of replacements) {
+      if (out.includes(v)) out = out.split(v).join(`[REDACTED:${name}]`);
+    }
+    for (const [re, rep] of rules) out = out.replace(re, rep);
     return out;
   };
 }
@@ -200,33 +220,30 @@ export function sanitizeLog(text, env = {}, tail = 80) {
 }
 
 const decode = (content) => JSON.parse(`"${content}"`);
-const isContent = (content) => {
-  try {
-    decode(content);
-    return true;
-  } catch {
-    return false;
-  }
-};
 const encodedMarker = (name) => JSON.stringify(`[REDACTED:${name}]`).slice(1, -1);
 
 /**
- * Exact values in a string as written in the file. Replaced like the text redactor does
- * when that leaves the string valid. Otherwise a value started or ended inside an escape
- * sequence (a value "nightly..." after the \ of "\n"), and every occurrence is widened to
- * whole escape sequences before it is replaced.
+ * Exact values in a string as written in the file, replaced before any shape rule runs
+ * (as in the text redactor), so no rule can take part of one. Every occurrence goes: as
+ * written, widened to whole escape sequences when it starts or ends inside one (a value
+ * "nightly..." after the \ of "\n", or one ending in that \), so no escape is ever cut;
+ * and decoded, where an escape the variants do not cover hid it, mapped back to the text
+ * as written. Overlapping occurrences become one marker.
  */
 function replaceEncoded(content, replacements) {
-  let out = content;
-  for (const [name, v] of replacements) {
-    if (out.includes(v)) out = out.split(v).join(encodedMarker(name));
-  }
-  if (out === content || isContent(out)) return out;
+  if (replacements.length === 0) return content;
+  const decoded = decode(content);
+  if (!replacements.some(([, v]) => content.includes(v) || decoded.includes(v))) return content;
+  // start[d]: where the d-th decoded character starts as written.
+  const start = new Int32Array(decoded.length + 1);
   const boundary = new Uint8Array(content.length + 1);
-  for (let i = 0; i < content.length;) {
+  let d = 0;
+  for (let i = 0; i < content.length; d++) {
+    start[d] = i;
     boundary[i] = 1;
     i += content[i] !== "\\" ? 1 : content[i + 1] === "u" ? 6 : 2;
   }
+  start[d] = content.length;
   boundary[content.length] = 1;
   const spans = [];
   for (const [name, v] of replacements) {
@@ -236,6 +253,9 @@ function replaceEncoded(content, replacements) {
       while (!boundary[a]) a--;
       while (!boundary[b]) b++;
       spans.push([a, b, name]);
+    }
+    for (let i = decoded.indexOf(v); i !== -1; i = decoded.indexOf(v, i + 1)) {
+      spans.push([start[i], start[i + v.length], name]);
     }
   }
   spans.sort((x, y) => x[0] - y[0] || y[1] - x[1]);
@@ -249,17 +269,38 @@ function replaceEncoded(content, replacements) {
   return result + content.slice(at);
 }
 
-/** One JSON string token's content (between the quotes), redacted; returns the token. */
-function redactStringToken(content, replacements) {
-  let encoded = replaceEncoded(content, replacements);
-  for (const [re, rep] of ENCODED_SHAPES) encoded = encoded.replace(re, rep);
-  const decoded = decode(encoded);
-  let out = decoded;
-  for (const [name, v] of replacements) {
-    if (out.includes(v)) out = out.split(v).join(`[REDACTED:${name}]`);
+/** True if `out` has some word (a run of letters and digits) more often than `plain`. */
+function keepsMoreWords(out, plain, marker) {
+  const allowed = new Map();
+  for (const [w] of plain.replace(marker, " ").matchAll(/[A-Za-z0-9]+/g)) {
+    allowed.set(w, (allowed.get(w) ?? 0) + 1);
   }
-  for (const [re, rep] of DECODED_SHAPES) out = out.replace(re, rep);
-  return encoded === content && out === decoded ? `"${content}"` : JSON.stringify(out);
+  for (const [w] of out.replace(marker, " ").matchAll(/[A-Za-z0-9]+/g)) {
+    const n = allowed.get(w) ?? 0;
+    if (n === 0) return true;
+    allowed.set(w, n - 1);
+  }
+  return false;
+}
+
+/**
+ * One JSON string token's content (between the quotes), redacted; returns the token.
+ * First as written, with the JSON rules; then decoded, exactly as a log line is redacted
+ * (the result is written back with JSON.stringify, so no rule can break the JSON there).
+ * A rule as written can take part of what a rule would match decoded (a cookie name
+ * inside a field's value, cut short by an escape), so the result is checked against the
+ * text redactor's result for the same decoded string: if it keeps any word more often,
+ * the whole string becomes "[REDACTED]".
+ */
+function redactStringToken(content, { replacements, rules, redactText, marker }) {
+  let encoded = replaceEncoded(content, replacements);
+  for (const [re, rep] of rules) encoded = encoded.replace(re, rep);
+  const decoded = decode(encoded);
+  const out = redactText(decoded);
+  if (encoded === content) return out === decoded ? `"${content}"` : JSON.stringify(out);
+  const plain = redactText(decode(content));
+  if (out !== plain && keepsMoreWords(out, plain, marker)) return '"[REDACTED]"';
+  return JSON.stringify(out);
 }
 
 // A key whose value is a credential: it ends in a field name or "cookie", optionally
@@ -289,6 +330,12 @@ export function redactJsonReport(raw, env = {}) {
   const text = String(raw);
   JSON.parse(text);
   const replacements = exactValues(env);
+  const redactor = {
+    replacements,
+    rules: shapes(true, namesOf(replacements)),
+    redactText: textRedactor(replacements),
+    marker: new RegExp(ownMarker(namesOf(replacements)), "g"),
+  };
   const out = [];
   // The input with everything but string contents blanked, for the exact-value check.
   const inStrings = [];
@@ -320,9 +367,9 @@ export function redactJsonReport(raw, env = {}) {
       if (top?.object && expectKey) {
         keySecret = top.secret || isCredentialKey(content);
         expectKey = false;
-        out.push(redactStringToken(content, replacements));
+        out.push(redactStringToken(content, redactor));
       } else {
-        out.push(valueIsSecret() ? '"[REDACTED]"' : redactStringToken(content, replacements));
+        out.push(valueIsSecret() ? '"[REDACTED]"' : redactStringToken(content, redactor));
       }
       inStrings.push(`\0${content}\0`);
       i = j + 1;

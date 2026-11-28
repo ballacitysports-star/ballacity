@@ -601,6 +601,22 @@ describe("redactJsonReport: the #486 failure", () => {
     stats: { expected: 283 },
   };
   const raw = JSON.stringify(report, undefined, 2);
+  // Decoded, the text after `case "check_worker_secret":` and its line break is that field's
+  // value to the text rules, as in a log: the first word on the next line (the diff's "+")
+  // is replaced. Nothing else changes.
+  const expected = JSON.stringify(
+    {
+      ...report,
+      config: {
+        metadata: {
+          ...report.config.metadata,
+          gitDiff: gitDiff.replace('secret":\n+', 'secret":\n[REDACTED]'),
+        },
+      },
+    },
+    undefined,
+    2,
+  );
 
   it("is reproduced: the report holds the escaped line the old rule broke", () => {
     expect(raw).toContain('case \\"check_worker_secret\\":\\n');
@@ -608,8 +624,11 @@ describe("redactJsonReport: the #486 failure", () => {
 
   it("gives valid JSON with nothing lost", () => {
     const out = fileRedact(raw);
-    expect(out).toBe(raw);
-    expect(JSON.parse(out)).toEqual(report);
+    expect(out).toBe(expected);
+    expect(JSON.parse(out).config.metadata.gitDiff).toBe(redact(gitDiff, {}));
+    expect(JSON.parse(out).config.metadata.gitDiff).toContain(
+      "[REDACTED]          return { data: false, error: null };",
+    );
   });
 
   it("through the CLI: exit 0 and the same report", () => {
@@ -619,7 +638,7 @@ describe("redactJsonReport: the #486 failure", () => {
     writeFileSync(input, raw);
     const r = cli(root, ["--in", input, "--out", output]);
     expect(r.status).toBe(0);
-    expect(readFileSync(output, "utf8")).toBe(raw);
+    expect(readFileSync(output, "utf8")).toBe(expected);
   });
 
   it("log mode no longer leaves a backslash in front of the marker", () => {
@@ -730,9 +749,8 @@ describe("redactJsonReport: credential-named keys", () => {
 
 describe("redactJsonReport: escapes next to separators and exact values", () => {
   const ESCAPES = ["\\n", "\\t", "\\r", "\\b", "\\f", '\\"', "\\\\", "\\/", "\\u0041", "\\u0022"];
-  // Escapes that decode to a line break leave the value on the next line, which is not
-  // treated as the field's value; every other one must not shield the value.
-  const LINE_BREAKS = new Set(["\\n", "\\r"]);
+  // No escape shields the value, not even one that decodes to a line break (the value is
+  // then on the next line, which the text rules treat as the field's value too).
   const inString = (content: string) => `{"m": "${content}"}`;
 
   it.each(ESCAPES)("%s right after a field separator", (e) => {
@@ -746,7 +764,7 @@ describe("redactJsonReport: escapes next to separators and exact values", () => 
     ]) {
       const out = fileRedact(inString(content));
       const value = (JSON.parse(out) as { m: string }).m;
-      if (!LINE_BREAKS.has(e)) expect(value).not.toMatch(/value-after-escape/);
+      expect(value).not.toMatch(/value-after-escape/);
       expect(value).not.toMatch(/\\$/);
     }
   });
@@ -841,6 +859,146 @@ describe("redactJsonReport: multi-layer escaped JSON inside strings", () => {
       expect(out).not.toContain(v.replace(/^sb-a=/, ""));
     expect(out).toContain("keep me");
     expect(JSON.parse(out).n).toBe(1);
+  });
+});
+
+describe("redactJsonReport: what the text rules catch in a decoded string", () => {
+  // Each string is redacted again decoded, exactly as a log line, so file mode removes at
+  // least what log mode removes from that string.
+  const inReport = (text: string) => JSON.stringify({ stdout: [{ text }] }, undefined, 2);
+  const decodedOut = (text: string, env: Record<string, string> = {}) =>
+    (JSON.parse(fileRedact(inReport(text), env)) as { stdout: { text: string }[] }).stdout[0].text;
+
+  it.each([
+    'Cookie: " sessionid=opaque-cookie-1; csrftoken=opaque-cookie-2"',
+    "cookie=' sid=opaque-cookie-1'",
+    'set-cookie="\tsid=opaque-cookie-1; Path=/"',
+    'Cookie: "\t sid=opaque-cookie-1"',
+    "cookie: \\ sid=opaque-cookie-1",
+    "cookie: \\\\ sid=opaque-cookie-1",
+    'cookie: \\" a=opaque-cookie-1; c=opaque-cookie-2\\"',
+    JSON.stringify({ "set-cookie": " sid=opaque-cookie-1; Path=/" }),
+    `request headers: ${JSON.stringify({ cookie: " sb-a=opaque-cookie-1; sb-b=opaque-cookie-2" })}`,
+    JSON.stringify(JSON.stringify({ cookie: " sid=opaque-cookie-1" })),
+  ])("a cookie value that starts with whitespace after its quote: %s", (text) => {
+    expect(redact(text, {})).not.toContain("opaque-cookie");
+    expect(decodedOut(text)).not.toContain("opaque-cookie");
+  });
+
+  it.each([
+    "password:\nopaque-pw-123456",
+    "password=\ropaque-pw-123456",
+    "secret:\r\n  opaque-pw-123456",
+    "token\n: opaque-pw-123456",
+    "npassword\r\n:opaque-pw-123456",
+    "set-cookie\n = sid=opaque-pw-123456",
+    "cookie:\nsid=opaque-pw-123456",
+    "apiKey = \r\\opaque-pw-123456",
+    '{\n  "password":\n    "opaque-pw-123456"\n}',
+  ])("a value across a line break from its field name: %j", (text) => {
+    expect(redact(text, {})).not.toContain("opaque-pw");
+    expect(decodedOut(text)).not.toContain("opaque-pw");
+  });
+
+  it.each([
+    // A rule as written takes part of what a rule decoded needs (a cookie name or "Basic"
+    // inside a field's value, an escape cutting the value short).
+    "\\'passwd\\':\"set-cookie:\t\"a=opaque-mix-1; b=opaque-mix-2",
+    "service_role_key\\\" = '\\u0041cookie: \n  \\\\ \tsid=opaque-mix-1; csrf=opaque-mix-2",
+    'service_role_key=\\\\\\"Basic\topaque-mix-123456\\\\\\"',
+    'x-api-key\\\\\\":\\n\\/opaque-mix-1\\u0041',
+  ])("a value a rule as written would cut short: %j", (text) => {
+    expect(redact(text, {})).not.toContain("opaque-mix");
+    expect(decodedOut(text)).not.toContain("opaque-mix");
+  });
+
+  it("an exact value deeper than the escaped forms searched, next to a field name", () => {
+    // Four layers deep in the file, three once decoded: the value is only found decoded,
+    // and a field rule as written must not take its first part before that.
+    const env = { SOME_TOKEN: "opaque-exact-1\topaque-exact-2" };
+    const text = enc(JSON.stringify({ password: enc(env.SOME_TOKEN, 1), n: 1 }), 1);
+    expect(inReport(text)).toContain(enc(env.SOME_TOKEN, 4));
+    expect(redact(text, env)).not.toContain("opaque-exact");
+    expect(decodedOut(text, env)).not.toContain("opaque-exact");
+    expect(decodedOut(text, env)).toContain('password\\":\\"[REDACTED:SOME_TOKEN]\\"');
+  });
+
+  it("through the CLI: exit 0, valid JSON, the value gone", () => {
+    const root = checkout();
+    const input = join(root, "results.json");
+    const output = join(root, "clean.json");
+    writeFileSync(input, inReport("password:\nopaque-pw-123456 and Cookie: ' sid=opaque-c-1'"));
+    const r = cli(root, ["--in", input, "--out", output]);
+    expect(r.status).toBe(0);
+    const out = readFileSync(output, "utf8");
+    JSON.parse(out);
+    expect(out).not.toMatch(/opaque-pw|opaque-c/);
+  });
+
+  it("leaves a field whose value is already one of its own markers alone", () => {
+    const env = { SOME_TOKEN: "synthetic-exact-value-0042" };
+    for (const [text, kept] of [
+      ['authorization: "Bearer worker-secret-987"', 'authorization: "[REDACTED:bearer]"'],
+      [`token=${env.SOME_TOKEN}`, "token=[REDACTED:SOME_TOKEN]"],
+      [`{"jwt": "${JWT}"}`, '{"jwt": "[REDACTED:jwt]"}'],
+    ]) {
+      expect(redact(text, env)).toBe(kept);
+      expect(decodedOut(text, env)).toBe(kept);
+    }
+  });
+
+  it("still replaces a value that only looks like a marker", () => {
+    for (const text of [
+      "token: [REDACTED:opaque-look-alike-1]",
+      "token: [REDACTED:opaque-look-alike-1",
+      "token: [REDACTEDopaque-look-alike-1]",
+    ]) {
+      expect(redact(text, {})).not.toContain("opaque-look-alike");
+      expect(decodedOut(text)).not.toContain("opaque-look-alike");
+    }
+  });
+});
+
+describe("redact: URL credentials, the same matches in linear time", () => {
+  // The rule as it was written: retried from every word boundary in a run of scheme
+  // characters, which is quadratic on a long a-b-c-... run.
+  const OLD_RULE = /\b([a-z][a-z0-9+.-]*:\/\/)[^/\s"'\\?#]*@/gi;
+
+  it("replaces exactly what the old rule replaced (seeded)", () => {
+    let seed = 7;
+    const rnd = () => {
+      seed = (seed * 1103515245 + 12345) >>> 0;
+      return seed / 4294967296;
+    };
+    // Only the URL rule reacts to these pieces, so redact() applies that rule alone.
+    const PIECES = [
+      ..."ab1Z+.-_:/@ ?#é",
+      "://",
+      "a://u:p@",
+      "x-y.z+w",
+      "-x://",
+      "_a-b://",
+      "1a://",
+      "@h/",
+    ];
+    for (let i = 0; i < 20_000; i++) {
+      const s = Array.from(
+        { length: 1 + Math.floor(rnd() * 24) },
+        () => PIECES[Math.floor(rnd() * PIECES.length)],
+      ).join("");
+      expect(redact(s, {})).toBe(s.replace(OLD_RULE, "$1[REDACTED]@"));
+    }
+    expect(redact("-x://u:pw@h _a-b://u:pw@h 1a://u:pw@h", {})).toBe(
+      "-x://[REDACTED]@h _a-b://[REDACTED]@h 1a://u:pw@h",
+    );
+  });
+
+  it("is linear on a long run of scheme characters", () => {
+    const run = "a-".repeat(60_000);
+    const t = Date.now();
+    expect(redact(`${run} x://user:pw-linear-1@host`, {})).not.toContain("pw-linear-1");
+    fileRedact(JSON.stringify({ m: `${run} x://user:pw-linear-2@host` }));
+    expect(Date.now() - t).toBeLessThan(1000);
   });
 });
 
@@ -939,6 +1097,48 @@ describe("redactJsonReport: fuzz (seeded)", () => {
       const out = fileRedact(raw, env);
       for (const s of secrets) expect(out).not.toContain(s);
       expect(JSON.parse(out).stats.n).toBe(i);
+    }
+  });
+
+  it("1000 reports: a word log mode removes from a decoded string is gone from the report", () => {
+    // Every value is a unique word, env values too. Whatever the text redactor removes from
+    // a string (key or value) given decoded, file mode must remove from the report as well.
+    let n = 0;
+    const mark = () => `W${(n++).toString(36).padStart(5, "0")}q`;
+    const NAMES2 = [...NAMES, "cookie", "Cookie", "set-cookie", "Authorization", "apiKey"];
+    const SEPS2 = [...SEPS, "\n:", " \r\n= ", ":\r", "=\n  ", ": \\\\ ", ":\\\\\\\\"];
+    const AFTER = ["", " ", "\t", "  ", "\n", "\\", "\\\\", " \\t"];
+    let env: Record<string, string> = {};
+    const frag = (): string =>
+      pick([
+        () =>
+          `${pick(QUOTES)}${pick([...NAMES2, ...OTHER])}${pick(QUOTES)}${pick(SEPS2)}${pick(QUOTES)}${pick(AFTER)}${mark()}${pick(["", "; b=", '"', "'", "\\n"])}${mark()}`,
+        () =>
+          `${pick(QUOTES)}${pick(NAMES2)}${pick(QUOTES)}${pick(SEPS2)}${pick(QUOTES)}${enc(env.SOME_TOKEN, Math.floor(rnd() * 5))}`,
+        () => `${pick(["Bearer", "Basic"])}${pick([" ", "\t", "\n"])}${mark()}${mark()}`,
+        () => `${pick(["https", "x-y.z", "-a"])}://${mark()}:${mark()}@host.test/`,
+        () => `${pick(ESC)}${mark()}${pick(ESC)}`,
+        () =>
+          enc(JSON.stringify({ [pick(NAMES2)]: `${pick(AFTER)}${mark()}` }), Math.floor(rnd() * 3)),
+      ])();
+    const text = () => Array.from({ length: 1 + Math.floor(rnd() * 5) }, frag).join(pick(ESC));
+    const words = (s: string) => s.match(/W[0-9a-z]{5}q/g) ?? [];
+    for (let i = 0; i < 1000; i++) {
+      env = { SOME_TOKEN: `${mark()}${pick(["\t", "\n", "\\", "/", '"', " ", "-"])}${mark()}` };
+      const doc = {
+        message: text(),
+        [text()]: [text(), { [pick(OTHER)]: text() }],
+        nested: JSON.stringify({ m: text() }),
+      };
+      // Removed: in some string, and in no string once redacted (env words repeat).
+      const logged = stringsOf(doc)
+        .map((s) => redact(s, env))
+        .join("\n");
+      const removed = stringsOf(doc)
+        .flatMap(words)
+        .filter((w) => !logged.includes(w));
+      const out = fileRedact(JSON.stringify(doc, undefined, pick([0, 2])), env);
+      for (const w of removed) expect(out).not.toContain(w);
     }
   });
 });
