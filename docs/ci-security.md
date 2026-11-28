@@ -212,10 +212,12 @@ check this. Production payment code and `vite.config.ts` are unchanged.
   user's session is injected into the page.
 - **Report.** The only artifact is `ci-sanitized/results.json`, a separate file written by
   `ci-redact.mjs --in playwright-report/results.json --out ci-sanitized/results.json`. Input
-  and output must both be valid JSON. On any failure the tool removes the output, prints one
-  fixed line and exits 1. The step sets `sanitized=true` only after the redactor exits 0, and
-  the upload runs only when that output is `true` and uploads exactly that file with 3-day
-  retention. The raw report, `test-results/` (screenshots, per-test files) and logs are
+  and output must both be valid JSON. The report is redacted string by string, so the output
+  is always valid JSON (a text-level redaction once cut the `\n` escape after
+  `case "check_worker_secret":` in the diff Playwright puts in the report, and the run lost
+  its report). On any failure the tool removes the output, prints one fixed line and
+  exits 1. The step sets `sanitized=true` only after the redactor exits 0, and the upload
+  runs only when that output is `true` and uploads exactly that file with 3-day retention. The raw report, `test-results/` (screenshots, per-test files) and logs are
   never upload candidates. Failure screenshots and traces are not available from CI.
 - **What is in the report.** `results.json` contains Playwright's serialized config,
   including `webServer.env.E2E_DEV_SERVER_SPEC`. That has the Supabase URL, project id and
@@ -233,11 +235,26 @@ check this. Production payment code and `vite.config.ts` are unchanged.
   whole cookie headers; values of fields named like `access_token`, `refresh_token`,
   `id_token`, `password`, `secret`, `token`, `api_key`, `service_role_key`,
   `authorization`, at any depth of backslash escaping, including unicode-escaped values.
-  The report step has no exact values, so it relies on these.
+  The report step is given no secrets. Of the workflow's own values only the job-level
+  `E2E_BASE_URL` reaches it, as an exact value, so `http://localhost:8080` shows as
+  `[REDACTED:E2E_BASE_URL]` in the report. For secrets it relies on these patterns.
+- **The report, specifically.** In each string exact values go first, as written and
+  decoded. Then the string is redacted as written in the file, with rules that never start
+  inside an escape sequence, and again decoded, exactly as a log line is (the result is
+  written back as JSON, so no rule can split an escape there). The report therefore loses
+  nothing log mode would remove from that string: a JWT or key right after an escaped
+  newline, a value on the line after its field name, a unicode-escaped field name. As a
+  check, a string whose result keeps any word more often than log mode's result for it is
+  replaced whole by `"[REDACTED]"` (a rule as written can take part of what a rule decoded
+  needs, such as a cookie name inside a field's value). A credential-named key's value is
+  replaced whole: every string and number in it, at any depth, becomes `"[REDACTED]"`;
+  null and booleans are kept. The step fails (nothing uploaded) if an exact value occurs
+  outside a single string, such as in a number or across JSON structure, or is still in
+  the output.
 - **Not reliably caught:** an opaque value with no recognizable format that is neither a
-  known environment value nor next to a credential-looking field name; a field _name_ that
-  is itself escaped; secrets split across lines or fields; base64- or URL-re-encoded
-  secrets; and tokens minted at run time. The fixture user's session tokens are created
+  known environment value nor next to a credential-looking field name; in logs, a field
+  _name_ that is itself escaped; secrets split across lines or fields; base64- or
+  URL-re-encoded secrets; and tokens minted at run time. The fixture user's session tokens are created
   inside the Playwright process and are deliberately not handed to the report step (that
   would widen secret scope for convenience). JWT-form tokens are still caught by shape; an
   opaque refresh token only next to its field name.
