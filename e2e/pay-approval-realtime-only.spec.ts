@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Route as PWRoute } from "@playwright/test";
 import { answerSessionChecks } from "./helpers/signed-in";
+import { PAY_FIXTURE_HOST_ID, payFixtureGameRow, serveFixtureGame } from "./helpers/pay-fixtures";
 
 /**
  * E2E: the pay page must flip from the approval gate to the payment picker
@@ -26,7 +27,7 @@ test.skip(
 );
 
 const GAME_ID = "g2";
-const FAKE_HOST_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+const FAKE_HOST_ID = PAY_FIXTURE_HOST_ID;
 const METHOD_ID = "mock-method-venmo";
 const ENTRY_FEE = 15;
 
@@ -150,6 +151,30 @@ test("realtime approval flips pay page from gate to picker (no focus / reload)",
       });
     },
   );
+
+  // Everything else the approval gate waits on, answered here rather than by the shared staging project: the game row
+  // and its roster count, the viewer's roster rows and removal record, and the guardian checks (an adult). With them
+  // unanswered, a slow staging read kept the page on "Loading payment options…" past the gate's 10s budget (run 1439,
+  // 2026-11-28). Realtime is left on: the spec needs the pay page's join-request channel.
+  await serveFixtureGame(page, payFixtureGameRow(GAME_ID));
+  for (const table of ["game_participants", "game_removals"]) {
+    await page.route(
+      (u) => isTable(u, table),
+      async (route: PWRoute) => {
+        if (route.request().method() !== "GET") return route.fallback();
+        await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+      },
+    );
+  }
+  for (const rpc of ["game_payment_guardian_ready", "game_manual_claim_guardian_ready"]) {
+    await page.route(
+      (u) => String(u).includes(`/rest/v1/rpc/${rpc}`),
+      async (route: PWRoute) => {
+        if (route.request().method() !== "POST") return route.fallback();
+        await route.fulfill({ status: 200, contentType: "application/json", body: "true" });
+      },
+    );
+  }
 
   await restoreSession(page);
   await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
