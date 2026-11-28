@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { validateVenueList } from "./venue-address";
 import { requireAccountType } from "./account-type-guard";
+import { cleanStaffAvatars } from "./inline-image-metadata";
 
 const TeamShape = z.object({
   id: z.string().min(1).max(200),
@@ -132,11 +133,17 @@ function refineVenues(
 export const TeamInput = TeamShape.superRefine(refineVenues);
 export const TeamPatch = TeamShape.partial().extend({ id: z.string() }).superRefine(refineVenues);
 
-/** Strip fields that aren't real DB columns before writing to Supabase. */
-function stripNonDbFields<T extends { verified_venues?: unknown }>(input: T) {
+/**
+ * Strip fields that aren't real DB columns before writing to Supabase, and
+ * (G3) the location and camera tags from staff photos, which the edit screens
+ * send inline as data URLs and the row stores as they come.
+ */
+function stripNonDbFields<
+  T extends { verified_venues?: unknown; staff?: { name: string; role: string; avatar: string }[] },
+>(input: T) {
   const { verified_venues: _v, ...rest } = input;
   void _v;
-  return rest;
+  return rest.staff ? { ...rest, staff: cleanStaffAvatars(rest.staff) } : rest;
 }
 
 /**

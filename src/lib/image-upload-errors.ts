@@ -15,6 +15,10 @@ export const ANIMATED_IMAGE_REFUSAL =
 /** finalizeImageUpload: stored bytes with no readable image header. */
 export const UNREADABLE_IMAGE_REFUSAL = "The file is not a readable JPG, PNG or WEBP image";
 
+/** finalizeImageUpload and uploadDataUrlToBucket (G3): the file could not be parsed to remove its location data. */
+export const METADATA_IMAGE_REFUSAL =
+  "This photo's location details could not be removed, so it was not uploaded. Try another photo.";
+
 /** validateImageMeta's sentences (type, empty, size, dimensions, resolution) and the ones above. */
 const IMAGE_UPLOAD_OWN_TEXT =
   /^(?:Only JPG, PNG or WEBP images are allowed|The file is empty|Image is too (?:large|small) \([^)]{1,40}\)|Image resolution is too high)$/;
@@ -23,6 +27,7 @@ const OWN_SENTENCES: ReadonlySet<string> = new Set([
   IMAGE_FLAGGED_MESSAGE,
   ANIMATED_IMAGE_REFUSAL,
   UNREADABLE_IMAGE_REFUSAL,
+  METADATA_IMAGE_REFUSAL,
 ]);
 
 /** Whether `text` is one of our own image upload refusals. */

@@ -103,6 +103,45 @@ export async function serveFixtureGame(page: Page, row: Record<string, unknown>)
   });
 }
 
+const fulfillJson = (body: string) => ({ status: 200, contentType: "application/json", body });
+
+/**
+ * Answer the pay page's entry checks for an adult with no removal: the guardian checks
+ * (`game_payment_guardian_ready`, `game_manual_claim_guardian_ready`, both true) and the viewer's
+ * `game_removals` read (none). Left to the shared staging project, the guardian check has no client
+ * deadline, so a slow staging read kept the page on "Loading payment options…" past the specs'
+ * budgets (run 1439, 2026-11-28). Install before the page loads.
+ */
+export async function answerPayEntryChecks(page: Page): Promise<void> {
+  for (const rpc of ["game_payment_guardian_ready", "game_manual_claim_guardian_ready"]) {
+    await page.route(
+      (u) => String(u).includes(`/rest/v1/rpc/${rpc}`),
+      async (route) => {
+        if (route.request().method() !== "POST") return route.fallback();
+        await route.fulfill(fulfillJson("true"));
+      },
+    );
+  }
+  await page.route(/\/rest\/v1\/game_removals(\?|$)/, async (route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    await route.fulfill(fulfillJson("[]"));
+  });
+}
+
+/**
+ * Everything the pay page's approval gate waits on besides the spec's own settings, methods,
+ * submissions and join requests: the fixture game row and its roster count, the viewer's roster
+ * rows (none), and the entry checks above. Realtime is left as it is. Install before the page loads.
+ */
+export async function servePayEntryReads(page: Page, gameId: string): Promise<void> {
+  await serveFixtureGame(page, payFixtureGameRow(gameId));
+  await page.route(/\/rest\/v1\/game_participants(\?|$)/, async (route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    await route.fulfill(fulfillJson("[]"));
+  });
+  await answerPayEntryChecks(page);
+}
+
 /**
  * Make realtime unavailable: every realtime WebSocket the page opens is closed
  * straight away, so the client keeps retrying and no channel ever joins. The

@@ -18,6 +18,11 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { adminCheck } from "@/lib/admin.functions";
 import { parseBrowser, type DenialReason } from "@/lib/location-denial-telemetry";
+import {
+  LOCATION_ANALYTICS_DEFAULT_DAYS,
+  LOCATION_ANALYTICS_TIMEFRAMES,
+  locationAnalyticsDays,
+} from "@/lib/location-analytics";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -78,7 +83,7 @@ function LocationAnalyticsPage() {
   const [authReady, setAuthReady] = useState(false);
   const [hasSession, setHasSession] = useState(false);
 
-  const [days, setDays] = useState<string>("30");
+  const [days, setDays] = useState<string>(String(LOCATION_ANALYTICS_DEFAULT_DAYS));
   const [sport, setSport] = useState<string>("all");
   const [browser, setBrowser] = useState<string>("all");
   const [sessionType, setSessionType] = useState<string>("all");
@@ -113,9 +118,8 @@ function LocationAnalyticsPage() {
   }, [authReady, hasSession, checking, adminData, navigate]);
 
   const sinceISO = useMemo(() => {
-    const n = Number(days);
-    const ms = Number.isFinite(n) && n > 0 ? n * 86400000 : 30 * 86400000;
-    return new Date(Date.now() - ms).toISOString();
+    // Read no further back than the chart goes, which is no further than the purge keeps rows.
+    return new Date(Date.now() - locationAnalyticsDays(days) * 86400000).toISOString();
   }, [days]);
 
   const {
@@ -174,7 +178,7 @@ function LocationAnalyticsPage() {
       if (!byDay[day]) byDay[day] = {};
       byDay[day][e.reason] = (byDay[day][e.reason] ?? 0) + 1;
     });
-    const numDays = Math.min(Number(days) || 30, 180);
+    const numDays = locationAnalyticsDays(days);
     const series: Array<Record<string, number | string>> = [];
     for (let i = numDays - 1; i >= 0; i--) {
       const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
@@ -238,11 +242,11 @@ function LocationAnalyticsPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="7">Last 7 days</SelectItem>
-                <SelectItem value="14">Last 14 days</SelectItem>
-                <SelectItem value="30">Last 30 days</SelectItem>
-                <SelectItem value="90">Last 90 days</SelectItem>
-                <SelectItem value="180">Last 180 days</SelectItem>
+                {LOCATION_ANALYTICS_TIMEFRAMES.map((n) => (
+                  <SelectItem key={n} value={String(n)}>
+                    Last {n} days
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
